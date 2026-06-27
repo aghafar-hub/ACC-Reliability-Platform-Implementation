@@ -183,6 +183,29 @@ export {
   NOTIFICATION_REQUESTED_VERSION,
 } from './contracts/platform-messages';
 
+// ── Health Service — Types ────────────────────────────────────────────────────
+export type {
+  HealthStatus,
+  KnownHealthCategory,
+  HealthComponentCategory,
+  HealthCheckOutcome,
+  HealthCheckFn,
+  HealthComponentRegistration,
+  HealthCheckResult,
+  HealthComponentStatus,
+  HealthSummary,
+  HealthServiceOptions,
+  IHealthService,
+} from './health/health-types';
+
+export {
+  HEALTH_CATEGORIES,
+  DEFAULT_HEALTH_CHECK_TIMEOUT_MS,
+} from './health/health-types';
+
+// ── Health Service — Implementation ──────────────────────────────────────────
+export { HealthService } from './health/health-service';
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 export {
   AuthError,
@@ -196,4 +219,7 @@ export {
   EntityNotFoundError,
   DuplicateEntityError,
   TransactionError,
+  HealthError,
+  HealthCheckTimeoutError,
+  HealthComponentNotFoundError,
 } from './errors';

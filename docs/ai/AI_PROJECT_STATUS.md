@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Project Status
 
-Version: 1.4  
+Version: 1.5  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.4)
+Updated By: AI Agent (Milestone 4.5)
 
 ---
 
@@ -17,6 +17,31 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 ---
 
 ## Implemented So Far
+
+### Milestone 4.5 — Health Service
+
+**Package:** `@acc-reliability/services` (`platform/services/src/health/`)
+
+| Component | File | Status |
+|---|---|---|
+| `HealthStatus` — healthy / warning / degraded / critical / offline / maintenance | `src/health/health-types.ts` | ✅ Complete |
+| `HealthComponentCategory` / `KnownHealthCategory` / `HEALTH_CATEGORIES` — kernel, service, storage, module, communication | `src/health/health-types.ts` | ✅ Complete |
+| `HealthCheckOutcome` — what a check function returns (status + message + details) | `src/health/health-types.ts` | ✅ Complete |
+| `HealthCheckFn` — function type a component provides | `src/health/health-types.ts` | ✅ Complete |
+| `HealthComponentRegistration` — descriptor for registering a component | `src/health/health-types.ts` | ✅ Complete |
+| `DEFAULT_HEALTH_CHECK_TIMEOUT_MS` — 5 000 ms default timeout | `src/health/health-types.ts` | ✅ Complete |
+| `HealthCheckResult` — full check record (componentId, status, checkedAt, durationMs, timedOut, error?) | `src/health/health-types.ts` | ✅ Complete |
+| `HealthComponentStatus` — current state of a registered component including checkCount, consecutiveFailures | `src/health/health-types.ts` | ✅ Complete |
+| `HealthSummary` — platform-wide snapshot with per-status counts and overallStatus | `src/health/health-types.ts` | ✅ Complete |
+| `HealthServiceOptions` — defaultTimeoutMs option | `src/health/health-types.ts` | ✅ Complete |
+| `IHealthService` — register, unregister, check, checkAll, getStatus, getSummary, isHealthy, listComponentIds | `src/health/health-types.ts` | ✅ Complete |
+| `HealthService` — in-memory implementation; parallel checkAll; per-check timeout via Promise.race | `src/health/health-service.ts` | ✅ Complete |
+| `HealthError` — base health error (`HEALTH_ERROR`) | `src/errors.ts` | ✅ Complete |
+| `HealthCheckTimeoutError` — check exceeded timeoutMs (`HEALTH_CHECK_TIMEOUT`) | `src/errors.ts` | ✅ Complete |
+| `HealthComponentNotFoundError` — unknown componentId (`HEALTH_COMPONENT_NOT_FOUND`) | `src/errors.ts` | ✅ Complete |
+| Public barrel updated | `src/index.ts` | ✅ Updated |
+
+---
 
 ### Milestone 4.4 — Communication Contracts
 
@@ -224,7 +249,7 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 | Milestone | Capability | Notes |
 |---|---|---|
 | 4.4 | Communication Contracts | ✅ Done — 4 contract files, 6 identifier types, 13 events, 2 messages, `AnyPlatformEvent` union |
-| 4.5 | Health Service | `IHealthService`, `HealthStatus`, health-check contracts |
+| 4.5 | Health Service | ✅ Done — `IHealthService`, `HealthService` (in-memory), 6 health states, 5 categories, `HealthSummary`, timeout + parallel checks, 3 error classes |
 | 4.6 | Metrics Service | `IMetricsService`, `MetricEntry`, counter/gauge/histogram contracts |
 | 4.7 | Notification Service | `INotificationService`, `NotificationPayload`, channel contracts |
 | 4.8 | Action Service | `IActionService`, `ActionRequest`, `ActionResult` contracts |
@@ -292,6 +317,9 @@ As of Milestone 3.2, the platform supports 8 strongly typed configuration groups
 21. `EquipmentId` is now the canonical branded type for equipment identity in contracts. Business modules must use `createEquipmentId()` to produce values; never cast raw strings.
 22. `AnyPlatformEvent` and `AnyPlatformMessage` are discriminated unions. Adding a new event requires: (a) payload interface, (b) typed envelope interface, (c) version constant, (d) add to the union, (e) re-export from `index.ts`.
 23. `PlatformModule` is an open union. New modules are added to `PLATFORM_MODULES` in `communication-types.ts` without requiring changes in event or message files.
+24. `HealthService` is an in-memory implementation. It holds no persistent state — statuses reset on process restart. The service id `platform.health` is reserved for registration in the Service Registry; no registration occurs until an implementation milestone wires it into bootstrap.
+25. `HealthStatus` in the health service (`healthy | warning | degraded | critical | offline | maintenance`) and `ComponentHealthStatus` in `platform-events.ts` (`healthy | degraded | unhealthy | unknown`) are separate types serving different purposes. Mapping between them is the responsibility of the layer that publishes `HealthStatusChangedEvent`.
+26. `consecutiveFailures` in `HealthComponentStatus` resets to `0` on any `healthy` or `maintenance` result. Escalation logic (e.g. auto-create action after N failures) belongs to a future milestone.
 
 ---
 

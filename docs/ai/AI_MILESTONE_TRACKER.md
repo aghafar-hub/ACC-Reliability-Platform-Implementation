@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Milestone Tracker
 
-Version: 1.4  
+Version: 1.5  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.4)
+Updated By: AI Agent (Milestone 4.5)
 
 ---
 
@@ -39,7 +39,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | 4.2 | Authorization and Permission Contracts | ✅ Done | 2026-06-27 | AppRole (6 roles), ContractorScope, ModuleId (5 modules), ActionType (7 actions), PermissionEntry, PermissionRequest, IPermissionService, AuthorizationError, PermissionDeniedError |
 | 4.3 | Storage Abstraction Contracts | ✅ Done | 2026-06-27 | FilterExpression (field/composite), QueryOptions (filter+sort+page), PageRequest, PageResult, PagedQueryOptions, SortClause, Entity, IRepository<T>, ITransaction, IStorageProvider, StorageProviderConfig (5 providers), StorageHealthStatus, StorageError hierarchy (6 classes) |
 | 4.4 | Communication Contracts | ✅ Done | 2026-06-27 | CorrelationId/MessageId/RequestId/EventId/TraceId/OperationId, EquipmentId, PlatformModule (9), MessageMetadata, PlatformEvent\<T\>/PlatformMessage\<T\>, 13 domain events, 2 command messages, AnyPlatformEvent union |
-| 4.5 | Health Service | ⏳ Planned | — | IHealthService, HealthStatus, health-check contracts |
+| 4.5 | Health Service | ✅ Done | 2026-06-27 | IHealthService, HealthService (in-memory), 6 health states, 5 categories, HealthCheckResult, HealthComponentStatus, HealthSummary, parallel checkAll, per-check timeout, HealthError hierarchy (3 classes) |
 | 4.6 | Metrics Service | ⏳ Planned | — | IMetricsService, MetricEntry, counter/gauge/histogram contracts |
 | 4.7 | Notification Service | ⏳ Planned | — | INotificationService, NotificationPayload, channel contracts |
 | 4.8 | Action Service | ⏳ Planned | — | IActionService, ActionRequest, ActionResult contracts |
@@ -681,6 +681,82 @@ All are open-union extensible via `PlatformModule`.
 ```
 kernel:   tsc --build platform/kernel/tsconfig.json       → exit 0
 services: tsc --noEmit platform/services/tsconfig.json    → exit 0
+```
+
+---
+
+## Milestone 4.5 Detail — Health Service
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/services` (new sub-module `src/health/`)
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `platform/services/src/health/health-types.ts` | All health types, `IHealthService` interface, `HealthCheckFn`, options |
+| `platform/services/src/health/health-service.ts` | `HealthService` — in-memory implementation |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/services/src/errors.ts` | Added `HealthError`, `HealthCheckTimeoutError`, `HealthComponentNotFoundError` |
+| `platform/services/src/index.ts` | Added all health type exports, `HealthService` class export, and health error exports |
+
+### Health States
+
+| Status | Severity | Meaning |
+|---|---|---|
+| `offline` | 5 (worst) | Unreachable or check could not run |
+| `critical` | 4 | Running but in unacceptable state; immediate action required |
+| `degraded` | 3 | Running with reduced capability |
+| `warning` | 2 | Running normally but a condition warrants attention |
+| `maintenance` | 1 | Intentionally paused; not a failure |
+| `healthy` | 0 (best) | Fully operational |
+
+`overallStatus` = worst status across all components. All-maintenance → `maintenance`. No components → `healthy`.
+
+### Component Categories
+
+`kernel` · `service` · `storage` · `module` · `communication`
+
+All are open-union extensible via `HealthComponentCategory`.
+
+### IHealthService Contract
+
+| Method | Description |
+|---|---|
+| `register(registration)` | Registers a component; throws `HealthError` on duplicate `componentId` |
+| `unregister(componentId)` | Removes component and its stored result (no-op if not found) |
+| `check(componentId)` | Runs check fresh; throws `HealthComponentNotFoundError` if not registered |
+| `checkAll()` | Runs all checks in parallel via `Promise.allSettled`; no check can abort others |
+| `getStatus(componentId)` | Returns last known `HealthComponentStatus` or `null` if not registered |
+| `getSummary()` | Returns `HealthSummary` from cached statuses — does NOT trigger new checks |
+| `isHealthy()` | Shorthand: `getSummary().overallStatus === 'healthy'` |
+| `listComponentIds()` | Returns all registered component IDs |
+
+### HealthError Hierarchy
+
+| Class | Code | When thrown |
+|---|---|---|
+| `HealthError` | `HEALTH_ERROR` | Base; duplicate component registration |
+| `HealthCheckTimeoutError` | `HEALTH_CHECK_TIMEOUT` | Check exceeded `timeoutMs` |
+| `HealthComponentNotFoundError` | `HEALTH_COMPONENT_NOT_FOUND` | `check()` called for unregistered component |
+
+### Design Decisions
+
+- `HealthCheckFn` returns only `HealthCheckOutcome` (status + message + details). The service is responsible for timing, timeout, and metadata — check functions stay simple.
+- `checkAll()` uses `Promise.allSettled` so one failing check never silences the others. Rejected promises are caught and recorded as `offline`.
+- Per-check timeout is enforced via `Promise.race` against a `setTimeout` reject. `HealthCheckTimeoutError` is thrown internally; the result is recorded as `status: 'offline', timedOut: true`.
+- `consecutiveFailures` is tracked per component. It resets to `0` on any `healthy` or `maintenance` result. Future milestone (escalation logic) can use this for auto-action creation.
+- `getSummary()` is a pure read of cached state. It never triggers new checks — callers that need fresh data must call `checkAll()` first.
+- Service id `platform.health` is reserved. Bootstrap registration is deferred to the SDK milestone when all platform services are wired together.
+
+### Compile Verification
+
+```
+services: tsc --noEmit platform/services/tsconfig.json → exit 0
 ```
 
 ---

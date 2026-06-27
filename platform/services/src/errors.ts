@@ -13,12 +13,15 @@
 //     │    └─ SessionExpiredError  AUTH_SESSION_EXPIRED     — session has lapsed
 //     ├─ AuthorizationError     AUTHZ_ERROR                 — base for all permission failures
 //     │    └─ PermissionDeniedError  AUTHZ_PERMISSION_DENIED — action not permitted
-//     └─ StorageError           STORAGE_ERROR               — base for all storage failures
-//          ├─ ConnectionError      STORAGE_CONNECTION_ERROR — backend unreachable
-//          ├─ QueryError           STORAGE_QUERY_ERROR      — invalid query / unsupported operator
-//          ├─ EntityNotFoundError  STORAGE_NOT_FOUND        — requested entity does not exist
-//          ├─ DuplicateEntityError STORAGE_DUPLICATE        — unique constraint violated
-//          └─ TransactionError     STORAGE_TRANSACTION_ERROR — tx not supported or failed
+//     ├─ StorageError           STORAGE_ERROR               — base for all storage failures
+//     │    ├─ ConnectionError      STORAGE_CONNECTION_ERROR — backend unreachable
+//     │    ├─ QueryError           STORAGE_QUERY_ERROR      — invalid query / unsupported operator
+//     │    ├─ EntityNotFoundError  STORAGE_NOT_FOUND        — requested entity does not exist
+//     │    ├─ DuplicateEntityError STORAGE_DUPLICATE        — unique constraint violated
+//     │    └─ TransactionError     STORAGE_TRANSACTION_ERROR — tx not supported or failed
+//     └─ HealthError            HEALTH_ERROR                — base for all health service failures
+//          ├─ HealthCheckTimeoutError    HEALTH_CHECK_TIMEOUT     — check exceeded time limit
+//          └─ HealthComponentNotFoundError HEALTH_COMPONENT_NOT_FOUND — unknown component id
 
 import { PlatformError } from '@acc-reliability/kernel';
 
@@ -223,6 +226,69 @@ export class TransactionError extends StorageError {
   ) {
     super(message, 'STORAGE_TRANSACTION_ERROR', context);
     this.name = 'TransactionError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Health errors ─────────────────────────────────────────────────────────────
+
+/**
+ * Base error for all health service failures.
+ *
+ * Catch this type to handle any health-related error without enumerating
+ * sub-types.  Sub-classes supply a more specific `code`; when this class is
+ * thrown directly it uses `'HEALTH_ERROR'`.
+ */
+export class HealthError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'HEALTH_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'HealthError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a health check function does not complete within its allowed
+ * `timeoutMs`.  The component's status is recorded as `'offline'`.
+ *
+ * The `timeoutMs` field carries the limit that was exceeded.
+ */
+export class HealthCheckTimeoutError extends HealthError {
+  readonly timeoutMs: number;
+
+  constructor(componentId: string, timeoutMs: number) {
+    super(
+      `Health check for '${componentId}' timed out after ${timeoutMs}ms`,
+      'HEALTH_CHECK_TIMEOUT',
+      { componentId, timeoutMs },
+    );
+    this.name = 'HealthCheckTimeoutError';
+    this.timeoutMs = timeoutMs;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation targets a component that is not registered with
+ * the health service.
+ *
+ * HTTP equivalent: 404 Not Found.
+ */
+export class HealthComponentNotFoundError extends HealthError {
+  readonly componentId: string;
+
+  constructor(componentId: string) {
+    super(
+      `Health component '${componentId}' is not registered`,
+      'HEALTH_COMPONENT_NOT_FOUND',
+      { componentId },
+    );
+    this.name = 'HealthComponentNotFoundError';
+    this.componentId = componentId;
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
