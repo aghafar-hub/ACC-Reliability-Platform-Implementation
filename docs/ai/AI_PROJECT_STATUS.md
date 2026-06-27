@@ -4,19 +4,36 @@
 
 Version: 1.0  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 3.6)
+Updated By: AI Agent (Milestone 4.1)
 
 ---
 
 ## Current Phase
 
-**Phase 1 — Platform Kernel**
+**Phase 2 — Platform Services**
 
-Active work is on the Platform Kernel (`platform/kernel`). The kernel must be complete and stable before Platform Services, Storage Abstraction, or the SDK are built.
+Active work is on Platform Services (`platform/services`). The Platform Kernel is complete and stable. Platform Services are being built on top of the kernel.
 
 ---
 
 ## Implemented So Far
+
+### Milestone 4.1 — Authentication Service Interface
+
+**Package:** `@acc-reliability/services` (`platform/services/src/auth/`)
+
+| Component | File | Status |
+|---|---|---|
+| Branded identity types + factories | `src/auth/auth-types.ts` | ✅ Complete |
+| `UserContext` — immutable authenticated user snapshot | `src/auth/auth-types.ts` | ✅ Complete |
+| `SessionInfo` — session metadata | `src/auth/auth-types.ts` | ✅ Complete |
+| `AuthCredentials` — discriminated union (password, token) | `src/auth/auth-types.ts` | ✅ Complete |
+| `IAuthService` — authentication service interface | `src/auth/auth-types.ts` | ✅ Complete |
+| `AuthError`, `AuthenticationError`, `SessionExpiredError` | `src/errors.ts` | ✅ Complete |
+| Public barrel | `src/index.ts` | ✅ Complete |
+| Package scaffold (package.json, tsconfig.json) | `platform/services/` | ✅ Complete |
+
+---
 
 ### Milestone 3.1 — Kernel Bootstrap
 
@@ -107,7 +124,9 @@ Active work is on the Platform Kernel (`platform/kernel`). The kernel must be co
 
 | Capability | Roadmap Item | Notes |
 |---|---|---|
-| Platform Services | Item 2 | auth, notifications, audit |
+| Authorization / RBAC service | Item 2 (4.2) | `IAuthorizationService`, permission checking |
+| Notification Service | Item 2 (4.3) | `INotificationService` |
+| Audit Log Service | Item 2 (4.4) | `IAuditService`, `AuditEntry` |
 | Storage Abstraction | Item 3 | repository interfaces + Google Sheets adapter |
 | Platform SDK | Item 4 | public API for modules to consume |
 | Owner Control Center | Item 5 | first app |
@@ -119,10 +138,11 @@ Active work is on the Platform Kernel (`platform/kernel`). The kernel must be co
 
 ---
 
-## Active Package
+## Active Packages
 
 ```
-platform/kernel/   @acc-reliability/kernel   v0.1.0
+platform/kernel/     @acc-reliability/kernel     v0.1.0
+platform/services/   @acc-reliability/services   v0.1.0
 ```
 
 All other packages under `platform/`, `modules/`, and `apps/` are empty scaffolds.
@@ -148,12 +168,16 @@ As of Milestone 3.2, the platform supports 8 strongly typed configuration groups
 
 ## Known Limitations / Next Steps
 
-1. `ConfigManager` currently only supports static defaults + env var overrides. The `IConfigProvider` interface is ready for a remote config source (future milestone).
-2. Feature flags are all `false` by default except `developerTools`. Enable per-environment via `ACC_FEATURE_*` env vars.
-3. Storage provider is configured but no implementation exists yet (`platform/storage` is a future milestone).
-4. Authentication and authorization are not implemented (`platform/services` is a future milestone).
-5. `NullEventBus` is a no-op placeholder. A real in-process event bus will be introduced in Phase 9. Resolve `platform.eventBus` from the `ServiceRegistry` — callers need no change when the real implementation is swapped in.
-6. `LifecycleManager` is registered at `platform.lifecycle`. No platform services implement `ILifecycleComponent` yet — that will happen when Platform Services (Phase 2) and future kernel services are refactored to use lifecycle management.
+1. `IAuthService` is an interface only — no implementation exists yet. Milestone 4.1 establishes the contract; the implementation (e.g. Google Identity, session-based) belongs to a future implementation milestone.
+2. `ContractorId`, `UserId`, `SessionId` are branded types. Always use the factory functions (`createContractorId`, `createUserId`, `createSessionId`) to produce values — never cast raw strings directly.
+3. `UserRole` is an open string union. The known platform roles are defined; module-specific roles can extend freely.
+4. `AuthCredentials` currently supports `password` and `token` kinds. OAuth/SAML kinds will be added when an identity provider is introduced.
+5. `ConfigManager` currently only supports static defaults + env var overrides. The `IConfigProvider` interface is ready for a remote config source (future milestone).
+6. Feature flags are all `false` by default except `developerTools`. Enable per-environment via `ACC_FEATURE_*` env vars.
+7. Storage provider is configured but no implementation exists yet (`platform/storage` is a future milestone).
+8. Authentication and authorization are not implemented (`IAuthService` contract is defined; no concrete implementation yet).
+9. `NullEventBus` is a no-op placeholder. A real in-process event bus will be introduced in Phase 9.
+10. `LifecycleManager` is registered at `platform.lifecycle`. Platform Services will implement `ILifecycleComponent` as they are built.
 
 ---
 

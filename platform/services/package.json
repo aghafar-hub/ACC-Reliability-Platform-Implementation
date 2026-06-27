@@ -1,0 +1,26 @@
+{
+  "name": "@acc-reliability/services",
+  "version": "0.1.0",
+  "description": "ACC Reliability Platform — Platform Services",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "build:watch": "tsc --project tsconfig.json --watch",
+    "clean": "rimraf dist",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@acc-reliability/kernel": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

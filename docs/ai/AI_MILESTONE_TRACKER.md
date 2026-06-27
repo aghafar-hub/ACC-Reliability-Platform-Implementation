@@ -4,7 +4,7 @@
 
 Version: 1.0  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 3.6)
+Updated By: AI Agent (Milestone 4.1)
 
 ---
 
@@ -32,7 +32,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 
 | ID | Milestone | Status | Completed | Notes |
 |---|---|---|---|---|
-| 4.1 | Authentication Service interface | ⏳ Planned | — | IAuthService, UserContext, ContractorId |
+| 4.1 | Authentication Service interface | ✅ Done | 2026-06-27 | ContractorId, UserId, SessionId (branded), UserContext, SessionInfo, AuthCredentials (discriminated union), IAuthService, AuthError/AuthenticationError/SessionExpiredError |
 | 4.2 | Authorization / RBAC interface | ⏳ Planned | — | IAuthorizationService, permission checking |
 | 4.3 | Notification Service interface | ⏳ Planned | — | INotificationService |
 | 4.4 | Audit Log Service interface | ⏳ Planned | — | IAuditService, AuditEntry |
@@ -357,6 +357,87 @@ The kernel now exposes the full event bus contract. Phase 9 replaces `NullEventB
 | `platform.configManager` | Platform Config Manager | `running` |
 | `platform.eventBus` | Platform Event Bus (Null Phase 1) | `running` |
 | `platform.lifecycle` | Platform Lifecycle Manager | `running` |
+
+---
+
+## Milestone 4.1 Detail — Authentication Service Interface
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/services` (new package)
+
+### Package Bootstrap
+
+| File | Purpose |
+|---|---|
+| `platform/services/package.json` | `@acc-reliability/services` v0.1.0; depends on `@acc-reliability/kernel` |
+| `platform/services/tsconfig.json` | Strict TypeScript; `composite: true`; project reference to `../kernel` |
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `platform/services/src/auth/auth-types.ts` | All authentication types, branded type factories, `IAuthService` interface |
+| `platform/services/src/errors.ts` | `AuthError`, `AuthenticationError`, `SessionExpiredError` |
+| `platform/services/src/index.ts` | Public barrel — all exported symbols |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/kernel/tsconfig.json` | Added `"composite": true` to enable TypeScript project references |
+| `package.json` (root) | Added `services:build`, `services:check`, `services:clean` workspace scripts |
+
+### Public API Surface
+
+| Export | Kind | Description |
+|---|---|---|
+| `ContractorId` | `type` | Branded string — contractor identity; first-class isolation primitive |
+| `UserId` | `type` | Branded string — platform user identity |
+| `SessionId` | `type` | Branded string — authentication session handle |
+| `KnownContractorCode` | `type` | `'ACC' \| 'RHI' \| 'ASEC'` — currently registered contractors |
+| `KNOWN_CONTRACTORS` | `const` | `readonly ['ACC', 'RHI', 'ASEC']` |
+| `UserRole` | `type` | Open string union of known platform and contractor roles |
+| `UserContext` | `interface` | Immutable snapshot of the authenticated user; no methods |
+| `SessionInfo` | `interface` | Session metadata; safe to log; no credential material |
+| `AuthCredentials` | `type` | Discriminated union: `PasswordCredentials \| TokenCredentials` |
+| `PasswordCredentials` | `interface` | `kind: 'password'`, `username`, `password` |
+| `TokenCredentials` | `interface` | `kind: 'token'`, `token` |
+| `IAuthService` | `interface` | Authentication service contract consumed by business modules |
+| `createContractorId` | `function` | Factory for `ContractorId`; normalises to uppercase, rejects blank |
+| `createUserId` | `function` | Factory for `UserId`; rejects blank |
+| `createSessionId` | `function` | Factory for `SessionId`; rejects blank |
+| `AuthError` | `class` | Base error for all auth failures (`AUTH_ERROR`) |
+| `AuthenticationError` | `class` | Not authenticated or bad credentials (`AUTH_UNAUTHENTICATED`) |
+| `SessionExpiredError` | `class` | Session has lapsed (`AUTH_SESSION_EXPIRED`) |
+
+### IAuthService Contract
+
+| Method | Return | Throws |
+|---|---|---|
+| `getCurrentUser()` | `UserContext \| null` | — |
+| `isAuthenticated()` | `boolean` | — |
+| `signIn(credentials)` | `Promise<UserContext>` | `AuthenticationError`, `AuthError` |
+| `signOut()` | `Promise<void>` | — (no-op if no session) |
+| `refreshSession()` | `Promise<UserContext>` | `SessionExpiredError`, `AuthenticationError` |
+| `getSessionInfo()` | `SessionInfo \| null` | — |
+
+### Design Decisions
+
+- `ContractorId` is a branded type enforced at compile time. All contractor-scoped queries must carry it; accidental mixing of contractor data is a type error.
+- `UserContext` is a pure data snapshot with no methods. Services receive it as an argument; they do not query it for behaviour.
+- `AuthCredentials` is a discriminated union so new credential kinds (OAuth, SAML, certificate) extend the type without breaking any existing switch/if-else in callers.
+- `IAuthService` is interface-only in this milestone. No implementation class is created; the concrete implementation belongs to a future milestone once an identity provider is selected.
+- The service id `platform.auth` is reserved for registration in the `ServiceRegistry`. No registration occurs in this milestone (no implementation exists).
+- `AuthError` extends `PlatformError` via a protected `code` parameter so sub-classes supply their specific code through the constructor chain without mutating readonly fields.
+- Future Event Bus: when Phase 9 is active, `signIn` and `signOut` will publish to `platform.events.auth.signed-in` and `platform.events.auth.signed-out`. Callers of `IAuthService` need no changes.
+
+### Compile Verification
+
+```
+kernel:  tsc --build platform/kernel/tsconfig.json   → exit 0
+services: tsc --project platform/services/tsconfig.json → exit 0
+dist files emitted: 12 (index.js, index.d.ts, auth/auth-types.js, auth/auth-types.d.ts, errors.js, errors.d.ts + maps)
+```
 
 ---
 

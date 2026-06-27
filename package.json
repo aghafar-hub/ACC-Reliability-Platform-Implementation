@@ -17,7 +17,10 @@
     "lint": "echo Linting will be configured later",
     "kernel:build": "npm run build --workspace=platform/kernel",
     "kernel:check": "npm run type-check --workspace=platform/kernel",
-    "kernel:clean": "npm run clean --workspace=platform/kernel"
+    "kernel:clean": "npm run clean --workspace=platform/kernel",
+    "services:build": "npm run build --workspace=platform/services",
+    "services:check": "npm run type-check --workspace=platform/services",
+    "services:clean": "npm run clean --workspace=platform/services"
   },
   "devDependencies": {
     "turbo": "^2.10.0"
