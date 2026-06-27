@@ -46,6 +46,37 @@ export {
   KNOWN_ACTIONS,
 } from './authz/authz-types';
 
+// ── Storage — Query types ─────────────────────────────────────────────────────
+export type {
+  FilterOperator,
+  FieldFilter,
+  CompositeFilter,
+  FilterExpression,
+  SortDirection,
+  SortClause,
+  PageRequest,
+  PageResult,
+  QueryOptions,
+  PagedQueryOptions,
+} from './storage/query-types';
+
+// ── Storage — Provider and repository types ───────────────────────────────────
+export type {
+  StorageProviderKind,
+  GoogleSheetsProviderConfig,
+  SqlServerProviderConfig,
+  PostgreSQLProviderConfig,
+  SQLiteProviderConfig,
+  MockStorageProviderConfig,
+  StorageProviderConfig,
+  StorageHealthState,
+  StorageHealthStatus,
+  Entity,
+  ITransaction,
+  IRepository,
+  IStorageProvider,
+} from './storage/storage-types';
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 export {
   AuthError,
@@ -53,4 +84,10 @@ export {
   SessionExpiredError,
   AuthorizationError,
   PermissionDeniedError,
+  StorageError,
+  ConnectionError,
+  QueryError,
+  EntityNotFoundError,
+  DuplicateEntityError,
+  TransactionError,
 } from './errors';

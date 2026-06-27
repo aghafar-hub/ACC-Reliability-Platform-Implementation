@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Project Status
 
-Version: 1.2  
+Version: 1.3  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.2)
+Updated By: AI Agent (Milestone 4.3)
 
 ---
 
@@ -17,6 +17,43 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 ---
 
 ## Implemented So Far
+
+### Milestone 4.3 — Storage Abstraction Contracts
+
+**Package:** `@acc-reliability/services` (`platform/services/src/storage/`)
+
+| Component | File | Status |
+|---|---|---|
+| `FilterOperator` — 13 comparison/membership operators | `src/storage/query-types.ts` | ✅ Complete |
+| `FieldFilter<T>` — single-field predicate (discriminated, `kind: 'field'`) | `src/storage/query-types.ts` | ✅ Complete |
+| `CompositeFilter<T>` — and/or tree (`kind: 'composite'`) | `src/storage/query-types.ts` | ✅ Complete |
+| `FilterExpression<T>` — union of FieldFilter and CompositeFilter | `src/storage/query-types.ts` | ✅ Complete |
+| `SortDirection`, `SortClause<T>` — sort terms with field safety | `src/storage/query-types.ts` | ✅ Complete |
+| `PageRequest` — 1-based page + pageSize | `src/storage/query-types.ts` | ✅ Complete |
+| `PageResult<T>` — items + totalCount + pagination metadata | `src/storage/query-types.ts` | ✅ Complete |
+| `QueryOptions<T>` — optional filter + sort + page | `src/storage/query-types.ts` | ✅ Complete |
+| `PagedQueryOptions<T>` — QueryOptions with required page | `src/storage/query-types.ts` | ✅ Complete |
+| `StorageProviderKind` — GoogleSheets, SQLServer, PostgreSQL, SQLite, Mock | `src/storage/storage-types.ts` | ✅ Complete |
+| `GoogleSheetsProviderConfig` — spreadsheetId, credentialsJson, scopes | `src/storage/storage-types.ts` | ✅ Complete |
+| `SqlServerProviderConfig` — host, port, database, pool config | `src/storage/storage-types.ts` | ✅ Complete |
+| `PostgreSQLProviderConfig` — connectionString, pool config | `src/storage/storage-types.ts` | ✅ Complete |
+| `SQLiteProviderConfig` — filePath, readOnly | `src/storage/storage-types.ts` | ✅ Complete |
+| `MockStorageProviderConfig` — seedData map | `src/storage/storage-types.ts` | ✅ Complete |
+| `StorageProviderConfig` — discriminated union of all configs | `src/storage/storage-types.ts` | ✅ Complete |
+| `StorageHealthState`, `StorageHealthStatus` — health probe result | `src/storage/storage-types.ts` | ✅ Complete |
+| `Entity` — base shape with `id: string` | `src/storage/storage-types.ts` | ✅ Complete |
+| `ITransaction` — id, startedAt, isActive, commit(), rollback() | `src/storage/storage-types.ts` | ✅ Complete |
+| `IRepository<T extends Entity>` — full CRUD + query contract | `src/storage/storage-types.ts` | ✅ Complete |
+| `IStorageProvider` — connect, disconnect, getRepository, transactions, healthCheck | `src/storage/storage-types.ts` | ✅ Complete |
+| `StorageError` — base storage error (`STORAGE_ERROR`) | `src/errors.ts` | ✅ Complete |
+| `ConnectionError` — backend unreachable (`STORAGE_CONNECTION_ERROR`) | `src/errors.ts` | ✅ Complete |
+| `QueryError` — invalid query or unsupported operator (`STORAGE_QUERY_ERROR`) | `src/errors.ts` | ✅ Complete |
+| `EntityNotFoundError` — entity not in contractor scope (`STORAGE_NOT_FOUND`) | `src/errors.ts` | ✅ Complete |
+| `DuplicateEntityError` — unique constraint violated (`STORAGE_DUPLICATE`) | `src/errors.ts` | ✅ Complete |
+| `TransactionError` — tx unsupported or failed (`STORAGE_TRANSACTION_ERROR`) | `src/errors.ts` | ✅ Complete |
+| Public barrel updated | `src/index.ts` | ✅ Updated |
+
+---
 
 ### Milestone 4.2 — Authorization and Permission Contracts
 
@@ -150,7 +187,6 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 
 | Milestone | Capability | Notes |
 |---|---|---|
-| 4.3 | Storage Abstraction Contracts | `IRepository<T>`, `QueryOptions`, `IEquipmentRepository`, Google Sheets adapter scaffold |
 | 4.4 | Communication Contracts | Inter-service communication interfaces; no Event Bus implementation |
 | 4.5 | Health Service | `IHealthService`, `HealthStatus`, health-check contracts |
 | 4.6 | Metrics Service | `IMetricsService`, `MetricEntry`, counter/gauge/histogram contracts |
@@ -209,6 +245,11 @@ As of Milestone 3.2, the platform supports 8 strongly typed configuration groups
 12. `AppRole` is an open string union. The 6 platform roles are defined; module-specific or contractor-specific roles can extend freely.
 13. `ContractorScope = ContractorId | 'all'` — `'all'` is only valid for `AppOwner` users. Implementations must enforce this invariant; the type alone does not prevent misuse.
 14. The service id `platform.permissions` is reserved in the Service Registry. No registration occurs until an implementation exists.
+15. `IStorageProvider` and `IRepository<T>` are interfaces only — no implementation exists yet. Milestone 4.3 establishes the contracts; concrete implementations (Google Sheets adapter, SQL adapters) belong to future milestones.
+16. The service id `platform.storage` is reserved in the Service Registry. No registration occurs until an implementation exists.
+17. `ITransaction` is fully defined but Google Sheets will not support it. Google Sheets implementations must throw `TransactionError` from `beginTransaction()` — they must not omit the method.
+18. `Entity.id` is a plain `string`. Platform-specific branded identifiers (e.g. `EquipmentId`) that satisfy this shape structurally are used by business modules; the `Entity` constraint does not prevent this.
+19. `SqlServerProviderConfig.password` and `GoogleSheetsProviderConfig.credentialsJson` must be sourced from environment variables or a secret store — never hardcoded.
 9. `NullEventBus` is a no-op placeholder. A real in-process event bus will be introduced in Phase 9.
 10. `LifecycleManager` is registered at `platform.lifecycle`. Platform Services will implement `ILifecycleComponent` as they are built.
 

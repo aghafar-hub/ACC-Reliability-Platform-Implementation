@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Milestone Tracker
 
-Version: 1.2  
+Version: 1.3  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.2)
+Updated By: AI Agent (Milestone 4.3)
 
 ---
 
@@ -37,7 +37,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 |---|---|---|---|---|
 | 4.1 | Authentication Contracts | ✅ Done | 2026-06-27 | ContractorId, UserId, SessionId (branded), UserContext, SessionInfo, AuthCredentials (discriminated union), IAuthService, AuthError/AuthenticationError/SessionExpiredError |
 | 4.2 | Authorization and Permission Contracts | ✅ Done | 2026-06-27 | AppRole (6 roles), ContractorScope, ModuleId (5 modules), ActionType (7 actions), PermissionEntry, PermissionRequest, IPermissionService, AuthorizationError, PermissionDeniedError |
-| 4.3 | Storage Abstraction Contracts | ⏳ Planned | — | IRepository<T>, QueryOptions, contractor isolation patterns, IEquipmentRepository, Equipment_ID type, Google Sheets adapter scaffold |
+| 4.3 | Storage Abstraction Contracts | ✅ Done | 2026-06-27 | FilterExpression (field/composite), QueryOptions (filter+sort+page), PageRequest, PageResult, PagedQueryOptions, SortClause, Entity, IRepository<T>, ITransaction, IStorageProvider, StorageProviderConfig (5 providers), StorageHealthStatus, StorageError hierarchy (6 classes) |
 | 4.4 | Communication Contracts | ⏳ Planned | — | Inter-service communication interfaces; no Event Bus implementation |
 | 4.5 | Health Service | ⏳ Planned | — | IHealthService, HealthStatus, health-check contracts |
 | 4.6 | Metrics Service | ⏳ Planned | — | IMetricsService, MetricEntry, counter/gauge/histogram contracts |
@@ -451,6 +451,83 @@ kernel:  tsc --build platform/kernel/tsconfig.json   → exit 0
 services: tsc --project platform/services/tsconfig.json → exit 0
 dist files emitted: 12 (index.js, index.d.ts, auth/auth-types.js, auth/auth-types.d.ts, errors.js, errors.d.ts + maps)
 ```
+
+---
+
+## Milestone 4.3 Detail — Storage Abstraction Contracts
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/services` (new sub-module `src/storage/`)
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `platform/services/src/storage/query-types.ts` | Filtering, sorting, paging types and `QueryOptions<T>` |
+| `platform/services/src/storage/storage-types.ts` | Provider configs, `Entity`, `ITransaction`, `IRepository<T>`, `IStorageProvider` |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/services/src/errors.ts` | Added `StorageError` hierarchy: 6 error classes |
+| `platform/services/src/index.ts` | Added all storage type exports and storage error exports |
+
+### Provider Architecture
+
+| Provider | Config Type | Transaction Support | Notes |
+|---|---|---|---|
+| `GoogleSheets` | `GoogleSheetsProviderConfig` | ❌ Must throw `TransactionError` | Current production source |
+| `SQLServer` | `SqlServerProviderConfig` | ✅ Full ACID | Future migration target (on-premise) |
+| `PostgreSQL` | `PostgreSQLProviderConfig` | ✅ Full ACID | Future migration target (cloud) |
+| `SQLite` | `SQLiteProviderConfig` | ✅ Full ACID | Dev and CI |
+| `Mock` | `MockStorageProviderConfig` | ✅ (simulated) | Unit tests |
+
+### Filtering Model
+
+| Type | Kind discriminant | Purpose |
+|---|---|---|
+| `FieldFilter<T>` | `'field'` | Single field predicate |
+| `CompositeFilter<T>` | `'composite'` | `and` / `or` tree of child expressions |
+| `FilterExpression<T>` | — | Union: `FieldFilter<T> \| CompositeFilter<T>` |
+
+Supported operators: `eq` · `ne` · `gt` · `gte` · `lt` · `lte` · `contains` · `startsWith` · `endsWith` · `in` · `notIn` · `isNull` · `isNotNull`
+
+### IRepository<T> Contract
+
+| Method | Return | Throws |
+|---|---|---|
+| `findById(id)` | `T \| null` | `StorageError` |
+| `findAll(options?)` | `readonly T[]` | `QueryError`, `StorageError` |
+| `findPaged(options)` | `PageResult<T>` | `QueryError`, `StorageError` |
+| `findOne(filter)` | `T \| null` | `QueryError`, `StorageError` |
+| `create(data)` | `T` | `DuplicateEntityError`, `StorageError` |
+| `update(id, changes)` | `T` | `EntityNotFoundError`, `StorageError` |
+| `delete(id)` | `void` | `EntityNotFoundError`, `StorageError` |
+| `count(filter?)` | `number` | `QueryError`, `StorageError` |
+| `exists(id)` | `boolean` | `StorageError` |
+
+Instances are contractor-scoped at creation time via `IStorageProvider.getRepository(entityType, contractorId)`.
+
+### StorageError Hierarchy
+
+| Class | Code | HTTP equiv | When thrown |
+|---|---|---|---|
+| `StorageError` | `STORAGE_ERROR` | 500 | Base; provider-level catch-all |
+| `ConnectionError` | `STORAGE_CONNECTION_ERROR` | 503 | Backend unreachable |
+| `QueryError` | `STORAGE_QUERY_ERROR` | 400 | Invalid query or unsupported operator |
+| `EntityNotFoundError` | `STORAGE_NOT_FOUND` | 404 | Entity absent in contractor scope |
+| `DuplicateEntityError` | `STORAGE_DUPLICATE` | 409 | Unique constraint violated |
+| `TransactionError` | `STORAGE_TRANSACTION_ERROR` | 500 | TX unsupported or failed |
+
+### Design Decisions
+
+- `IRepository<T>` is contractor-scoped at construction. The `ContractorId` is bound when the provider creates the repository via `getRepository(entityType, contractorId)`. Individual method calls carry no contractor parameter — it cannot be forgotten or bypassed.
+- `ITransaction` is defined completely even though Google Sheets cannot support it. Providers that lack transaction support throw `TransactionError` from `beginTransaction()`. Business modules that opt into transactional workflows compile against the interface and are transparent to the backend swap during SQL migration.
+- `PagedQueryOptions<T>` extends `QueryOptions<T>` making `page` required. `findPaged` accepts only this type so it is impossible to call it without pagination parameters.
+- `FilterExpression<T>` is recursive — `CompositeFilter<T>.filters` contains `FilterExpression<T>[]` — allowing arbitrarily deep predicate trees.
+- `StorageProviderConfig` is a discriminated union on `kind`. Switch/narrowing on `config.kind` is exhaustive and required; adding a new provider is a single-point change.
+- `withTransaction` is a convenience wrapper over `beginTransaction`/`commit`/`rollback` to prevent resource leaks when the caller's operation throws.
 
 ---
 
