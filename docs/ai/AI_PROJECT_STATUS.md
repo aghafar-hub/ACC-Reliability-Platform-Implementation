@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Project Status
 
-Version: 1.1  
+Version: 1.2  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Phase 2 Roadmap Alignment)
+Updated By: AI Agent (Milestone 4.2)
 
 ---
 
@@ -17,6 +17,29 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 ---
 
 ## Implemented So Far
+
+### Milestone 4.2 — Authorization and Permission Contracts
+
+**Package:** `@acc-reliability/services` (`platform/services/src/authz/`)
+
+| Component | File | Status |
+|---|---|---|
+| `AppRole` — open union of platform roles (AppOwner, Manager, Engineer, ContractorManager, ContractorEngineer, Viewer) | `src/authz/authz-types.ts` | ✅ Complete |
+| `PLATFORM_ROLES` — ordered const tuple of built-in roles | `src/authz/authz-types.ts` | ✅ Complete |
+| `KnownAppRole` — literal union derived from `PLATFORM_ROLES` | `src/authz/authz-types.ts` | ✅ Complete |
+| `ContractorScope` — `ContractorId \| 'all'`; enforces contractor isolation | `src/authz/authz-types.ts` | ✅ Complete |
+| `ModuleId` / `KnownModuleId` — 5 built-in modules + extensible | `src/authz/authz-types.ts` | ✅ Complete |
+| `KNOWN_MODULES` — const tuple of built-in module ids | `src/authz/authz-types.ts` | ✅ Complete |
+| `ActionType` / `KnownActionType` — 7 built-in actions + extensible | `src/authz/authz-types.ts` | ✅ Complete |
+| `KNOWN_ACTIONS` — const tuple of built-in action types | `src/authz/authz-types.ts` | ✅ Complete |
+| `PermissionEntry` — resolved permission grant (module + action + scope) | `src/authz/authz-types.ts` | ✅ Complete |
+| `PermissionRequest` — structural permission check descriptor | `src/authz/authz-types.ts` | ✅ Complete |
+| `IPermissionService` — authorization service interface | `src/authz/authz-types.ts` | ✅ Complete |
+| `AuthorizationError` — base error for all permission failures | `src/errors.ts` | ✅ Complete |
+| `PermissionDeniedError` — 403-equivalent; action not permitted | `src/errors.ts` | ✅ Complete |
+| Public barrel updated | `src/index.ts` | ✅ Updated |
+
+---
 
 ### Milestone 4.1 — Authentication Service Interface
 
@@ -127,7 +150,6 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 
 | Milestone | Capability | Notes |
 |---|---|---|
-| 4.2 | Authorization and Permission Contracts | `IAuthorizationService`, permission checking, role/permission types |
 | 4.3 | Storage Abstraction Contracts | `IRepository<T>`, `QueryOptions`, `IEquipmentRepository`, Google Sheets adapter scaffold |
 | 4.4 | Communication Contracts | Inter-service communication interfaces; no Event Bus implementation |
 | 4.5 | Health Service | `IHealthService`, `HealthStatus`, health-check contracts |
@@ -182,7 +204,11 @@ As of Milestone 3.2, the platform supports 8 strongly typed configuration groups
 5. `ConfigManager` currently only supports static defaults + env var overrides. The `IConfigProvider` interface is ready for a remote config source (future milestone).
 6. Feature flags are all `false` by default except `developerTools`. Enable per-environment via `ACC_FEATURE_*` env vars.
 7. Storage provider is configured but no implementation exists yet (`platform/storage` is a future milestone).
-8. Authentication and authorization are not implemented (`IAuthService` contract is defined; no concrete implementation yet).
+8. Authentication is not implemented (`IAuthService` contract is defined; no concrete implementation yet).
+11. `IPermissionService` is an interface only — no implementation exists yet. Milestone 4.2 establishes the contract; the implementation belongs to a future milestone once the role-to-permission mapping strategy is confirmed.
+12. `AppRole` is an open string union. The 6 platform roles are defined; module-specific or contractor-specific roles can extend freely.
+13. `ContractorScope = ContractorId | 'all'` — `'all'` is only valid for `AppOwner` users. Implementations must enforce this invariant; the type alone does not prevent misuse.
+14. The service id `platform.permissions` is reserved in the Service Registry. No registration occurs until an implementation exists.
 9. `NullEventBus` is a no-op placeholder. A real in-process event bus will be introduced in Phase 9.
 10. `LifecycleManager` is registered at `platform.lifecycle`. Platform Services will implement `ILifecycleComponent` as they are built.
 

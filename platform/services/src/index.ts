@@ -26,5 +26,31 @@ export {
   createSessionId,
 } from './auth/auth-types';
 
+// ── Authorization — Types ─────────────────────────────────────────────────────
+export type {
+  AppRole,
+  KnownAppRole,
+  ContractorScope,
+  ModuleId,
+  KnownModuleId,
+  ActionType,
+  KnownActionType,
+  PermissionEntry,
+  PermissionRequest,
+  IPermissionService,
+} from './authz/authz-types';
+
+export {
+  PLATFORM_ROLES,
+  KNOWN_MODULES,
+  KNOWN_ACTIONS,
+} from './authz/authz-types';
+
 // ── Errors ────────────────────────────────────────────────────────────────────
-export { AuthError, AuthenticationError, SessionExpiredError } from './errors';
+export {
+  AuthError,
+  AuthenticationError,
+  SessionExpiredError,
+  AuthorizationError,
+  PermissionDeniedError,
+} from './errors';

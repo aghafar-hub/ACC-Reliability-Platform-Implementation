@@ -8,9 +8,11 @@
 //
 // Hierarchy:
 //   PlatformError (kernel)
-//     └─ AuthError              AUTH_ERROR           — base for all auth failures
-//          ├─ AuthenticationError  AUTH_UNAUTHENTICATED — no active session / bad credentials
-//          └─ SessionExpiredError  AUTH_SESSION_EXPIRED — session has lapsed
+//     ├─ AuthError              AUTH_ERROR               — base for all auth failures
+//     │    ├─ AuthenticationError  AUTH_UNAUTHENTICATED  — no active session / bad credentials
+//     │    └─ SessionExpiredError  AUTH_SESSION_EXPIRED  — session has lapsed
+//     └─ AuthorizationError     AUTHZ_ERROR              — base for all permission failures
+//          └─ PermissionDeniedError  AUTHZ_PERMISSION_DENIED — action not permitted
 
 import { PlatformError } from '@acc-reliability/kernel';
 
@@ -62,6 +64,49 @@ export class SessionExpiredError extends AuthError {
   constructor(context?: Record<string, unknown>) {
     super('Session has expired', 'AUTH_SESSION_EXPIRED', context);
     this.name = 'SessionExpiredError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Authorization errors ──────────────────────────────────────────────────────
+
+/**
+ * Base error for all authorization and permission failures.
+ *
+ * Catch this type to handle any authz-related error without needing to
+ * enumerate sub-types.
+ *
+ * Sub-classes supply a more specific `code`; when this class is thrown
+ * directly it uses `'AUTHZ_ERROR'`.
+ */
+export class AuthorizationError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'AUTHZ_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'AuthorizationError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an authenticated user attempts an operation they are not
+ * permitted to perform.
+ *
+ * The caller should surface this as a permission-denied response and must
+ * not reveal why the permission was denied (to avoid information leakage).
+ *
+ * HTTP equivalent: 403 Forbidden.
+ */
+export class PermissionDeniedError extends AuthorizationError {
+  constructor(
+    message: string = 'Permission denied',
+    context?: Record<string, unknown>
+  ) {
+    super(message, 'AUTHZ_PERMISSION_DENIED', context);
+    this.name = 'PermissionDeniedError';
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }

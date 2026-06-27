@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Milestone Tracker
 
-Version: 1.1  
+Version: 1.2  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Phase 2 Roadmap Alignment)
+Updated By: AI Agent (Milestone 4.2)
 
 ---
 
@@ -36,7 +36,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | ID | Milestone | Status | Completed | Notes |
 |---|---|---|---|---|
 | 4.1 | Authentication Contracts | ✅ Done | 2026-06-27 | ContractorId, UserId, SessionId (branded), UserContext, SessionInfo, AuthCredentials (discriminated union), IAuthService, AuthError/AuthenticationError/SessionExpiredError |
-| 4.2 | Authorization and Permission Contracts | ⏳ Planned | — | IAuthorizationService, permission checking, role/permission types |
+| 4.2 | Authorization and Permission Contracts | ✅ Done | 2026-06-27 | AppRole (6 roles), ContractorScope, ModuleId (5 modules), ActionType (7 actions), PermissionEntry, PermissionRequest, IPermissionService, AuthorizationError, PermissionDeniedError |
 | 4.3 | Storage Abstraction Contracts | ⏳ Planned | — | IRepository<T>, QueryOptions, contractor isolation patterns, IEquipmentRepository, Equipment_ID type, Google Sheets adapter scaffold |
 | 4.4 | Communication Contracts | ⏳ Planned | — | Inter-service communication interfaces; no Event Bus implementation |
 | 4.5 | Health Service | ⏳ Planned | — | IHealthService, HealthStatus, health-check contracts |
@@ -451,6 +451,78 @@ kernel:  tsc --build platform/kernel/tsconfig.json   → exit 0
 services: tsc --project platform/services/tsconfig.json → exit 0
 dist files emitted: 12 (index.js, index.d.ts, auth/auth-types.js, auth/auth-types.d.ts, errors.js, errors.d.ts + maps)
 ```
+
+---
+
+## Milestone 4.2 Detail — Authorization and Permission Contracts
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/services` (new sub-module `src/authz/`)
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `platform/services/src/authz/authz-types.ts` | All authorization types, permission structures, and `IPermissionService` interface |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/services/src/errors.ts` | Added `AuthorizationError` (code: `AUTHZ_ERROR`) and `PermissionDeniedError` (code: `AUTHZ_PERMISSION_DENIED`) |
+| `platform/services/src/index.ts` | Added authorization type exports and const exports |
+
+### Role Model
+
+| Role | Authority level | Scope |
+|---|---|---|
+| `AppOwner` | Full platform access | Cross-contractor (`'all'`) |
+| `Manager` | Read, write, approve | Own contractor |
+| `Engineer` | Read, write | Own contractor |
+| `ContractorManager` | Manage users and data | Single contractor boundary |
+| `ContractorEngineer` | Engineer rights | Own contractor only |
+| `Viewer` | Read-only | Permitted modules |
+
+### Module Registry
+
+| Module ID | Description |
+|---|---|
+| `oil-lubrication` | Oil lubrication module |
+| `oil-analysis` | Oil analysis module |
+| `vibration-analysis` | Vibration analysis module |
+| `compressors` | Compressors module |
+| `reliability-measurements` | Reliability measurements module |
+
+### Action Types
+
+`read` · `create` · `update` · `delete` · `approve` · `export` · `configure`
+
+All types are open unions (`string & Record<never, never>` extension); module-specific actions can be added without a platform-wide change.
+
+### IPermissionService Contract
+
+| Method | Return | Description |
+|---|---|---|
+| `hasRole(user, role)` | `boolean` | Tests if the user holds the given role |
+| `hasPermission(user, request)` | `boolean` | Tests module + action + contractor scope; enforces contractor isolation |
+| `getGrantedPermissions(user)` | `readonly PermissionEntry[]` | Returns all effective permission grants for the user |
+| `canAccessModule(user, moduleId)` | `boolean` | Coarse-grained module access check |
+| `getRoles(user)` | `readonly AppRole[]` | Returns the user's normalised role list |
+
+### Error Codes
+
+| Class | Code | HTTP |
+|---|---|---|
+| `AuthorizationError` | `AUTHZ_ERROR` | 403 |
+| `PermissionDeniedError` | `AUTHZ_PERMISSION_DENIED` | 403 |
+
+### Design Decisions
+
+- `ContractorScope = ContractorId | 'all'` — `'all'` is reserved for `AppOwner` users only. Implementations must enforce this invariant; the type alone does not prevent misuse.
+- `hasPermission()` returns `false` (not an error) for cross-contractor requests from non-AppOwner users. Throwing would leak information about whether a resource exists.
+- `IPermissionService` methods are synchronous — permission checks are on the hot path of every module operation. Implementations cache the effective permission set when the session is established.
+- The service id `platform.permissions` is reserved. No registration in this milestone.
+- Future Event Bus: when Phase 9 is active, role changes will publish to `platform.events.permissions.roles-changed` so dependent services can invalidate caches without polling. Callers of `IPermissionService` need no changes.
 
 ---
 
