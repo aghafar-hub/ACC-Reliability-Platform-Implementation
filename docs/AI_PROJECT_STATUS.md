@@ -4,7 +4,7 @@
 
 Version: 1.0  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 3.2)
+Updated By: AI Agent (Milestone 3.3)
 
 ---
 
@@ -26,11 +26,28 @@ Active work is on the Platform Kernel (`platform/kernel`). The kernel must be co
 |---|---|---|
 | Bootstrap entry point | `src/bootstrap.ts` | ✅ Complete |
 | Platform Context | `src/platform-context.ts` | ✅ Complete |
-| Service Registry | `src/service-registry.ts` | ✅ Complete |
+| Service Registry | `src/service-registry.ts` | ✅ Complete (hardened in 3.3) |
 | Module Registry | `src/module-registry.ts` | ✅ Complete |
 | Platform Logger | `src/logger.ts` | ✅ Complete |
 | Error Hierarchy | `src/errors.ts` | ✅ Complete |
 | Public API barrel | `src/index.ts` | ✅ Complete |
+
+### Milestone 3.3 — Service Registry Hardening
+
+**Package:** `@acc-reliability/kernel` (`platform/kernel`)
+
+| Component | File | Status |
+|---|---|---|
+| ServiceStatus type | `src/service-registry.ts` | ✅ Complete |
+| ServiceInfo type (public descriptor without instance) | `src/service-registry.ts` | ✅ Complete |
+| Lifecycle timestamps (initializedAt, startedAt, stoppedAt) | `src/service-registry.ts` | ✅ Complete |
+| `tryRegister()` — duplicate-safe registration | `src/service-registry.ts` | ✅ Complete |
+| `getRequired()` — assert-style retrieval | `src/service-registry.ts` | ✅ Complete |
+| `setStatus()` — lifecycle transition | `src/service-registry.ts` | ✅ Complete |
+| `getStatus()` — status query | `src/service-registry.ts` | ✅ Complete |
+| `listByStatus()` — filtered listing | `src/service-registry.ts` | ✅ Complete |
+| `clear()` — reset for tests | `src/service-registry.ts` | ✅ Complete |
+| Bootstrap: core services marked `running` | `src/bootstrap.ts` | ✅ Updated |
 
 ### Milestone 3.2 — Platform Configuration Manager
 

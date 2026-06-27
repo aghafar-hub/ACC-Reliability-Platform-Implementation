@@ -69,6 +69,12 @@ export async function bootstrapPlatform(): Promise<BootstrapResult> {
       modules:      moduleRegistry,
     });
 
+    // ── Step 7: Mark kernel services as running ────────────────────────────
+    // Transition from 'registered' → 'running' now that the context is ready.
+    serviceRegistry.setStatus('platform.logger',        'running');
+    serviceRegistry.setStatus('platform.config',        'running');
+    serviceRegistry.setStatus('platform.configManager', 'running');
+
     const durationMs = Date.now() - startedAt;
 
     logger.info('Platform bootstrap complete ✓', {

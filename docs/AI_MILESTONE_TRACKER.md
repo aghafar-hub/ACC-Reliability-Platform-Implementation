@@ -20,6 +20,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | 1.1 | Workspace setup (npm workspaces + Turborepo) | ✅ Done | 2026-06 | `package.json`, `turbo.json` |
 | 3.1 | Kernel Bootstrap | ✅ Done | 2026-06 | PlatformContext, ServiceRegistry, ModuleRegistry, PlatformLogger, PlatformError |
 | 3.2 | Platform Configuration Manager | ✅ Done | 2026-06-27 | 8-group AppConfig, ConfigManager, ConfigValidator, env overrides, feature flags |
+| 3.3 | Service Registry Hardening | ✅ Done | 2026-06-27 | ServiceStatus, lifecycle timestamps, tryRegister, getRequired, setStatus, listByStatus, clear |
 
 ---
 
@@ -142,6 +143,43 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | `offlineMode` | `false` |
 | `aiAssistant` | `false` |
 | `developerTools` | `true` |
+
+---
+
+## Milestone 3.3 Detail — Service Registry Hardening
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/kernel`
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/kernel/src/service-registry.ts` | Full rewrite — see API additions below |
+| `platform/kernel/src/bootstrap.ts` | Step 7 added: core services transitioned to `running` after context creation |
+| `platform/kernel/src/index.ts` | Added exports: `ServiceStatus`, `ServiceInfo` |
+
+### New API Surface
+
+| Addition | Kind | Description |
+|---|---|---|
+| `ServiceStatus` | `type` | `registered \| initialized \| running \| degraded \| failed \| stopped` |
+| `ServiceInfo` | `type` | `Omit<ServiceDescriptor, 'instance'>` — public descriptor without the live instance |
+| `ServiceDescriptor.status` | field | Current lifecycle status |
+| `ServiceDescriptor.statusChangedAt` | field | ISO 8601 timestamp of the last status transition |
+| `ServiceDescriptor.initializedAt?` | field | Set when status → `initialized` |
+| `ServiceDescriptor.startedAt?` | field | Set when status → `running` |
+| `ServiceDescriptor.stoppedAt?` | field | Set when status → `stopped` |
+| `IServiceRegistry.tryRegister()` | method | Duplicate-safe: returns `boolean`, never throws for duplicates |
+| `IServiceRegistry.getRequired()` | method | Assert-style get: stronger error message for unconditional dependencies |
+| `IServiceRegistry.setStatus()` | method | Transitions a service to a new `ServiceStatus` |
+| `IServiceRegistry.getStatus()` | method | Returns current `ServiceStatus` for a service |
+| `IServiceRegistry.listByStatus()` | method | Returns `ServiceInfo[]` filtered by status |
+| `IServiceRegistry.clear()` | method | Removes all services — for test teardown only |
+
+### Backward Compatibility
+
+`register()`, `get()`, `has()`, and `list()` signatures are unchanged. Existing callers compile without modification. `list()` now returns objects with additional fields (`status`, `statusChangedAt`, optional lifecycle timestamps).
 
 ---
 

@@ -42,7 +42,12 @@ export type { ILogger, LogLevel, LogEntry, LoggerOptions } from './logger';
 
 // ── Service Registry ──────────────────────────────────────────────────────────
 export { ServiceRegistry } from './service-registry';
-export type { IServiceRegistry, ServiceDescriptor } from './service-registry';
+export type {
+  IServiceRegistry,
+  ServiceDescriptor,
+  ServiceInfo,
+  ServiceStatus,
+} from './service-registry';
 
 // ── Module Registry ───────────────────────────────────────────────────────────
 export { ModuleRegistry } from './module-registry';
