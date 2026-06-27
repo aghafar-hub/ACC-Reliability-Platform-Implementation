@@ -61,3 +61,12 @@ export class ModuleError extends PlatformError {
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
+
+/** Thrown when a DI container operation fails (missing token, circular dependency, etc.). */
+export class ContainerError extends PlatformError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'CONTAINER_ERROR', context);
+    this.name = 'ContainerError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}

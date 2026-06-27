@@ -21,6 +21,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | 3.1 | Kernel Bootstrap | ✅ Done | 2026-06 | PlatformContext, ServiceRegistry, ModuleRegistry, PlatformLogger, PlatformError |
 | 3.2 | Platform Configuration Manager | ✅ Done | 2026-06-27 | 8-group AppConfig, ConfigManager, ConfigValidator, env overrides, feature flags |
 | 3.3 | Service Registry Hardening | ✅ Done | 2026-06-27 | ServiceStatus, lifecycle timestamps, tryRegister, getRequired, setStatus, listByStatus, clear |
+| 3.4 | Dependency Injection Container | ✅ Done | 2026-06-27 | Token<T>, Container (singleton/lazy-singleton/transient), circular-dep detection, ContainerError |
 
 ---
 
@@ -143,6 +144,50 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | `offlineMode` | `false` |
 | `aiAssistant` | `false` |
 | `developerTools` | `true` |
+
+---
+
+## Milestone 3.4 Detail — Dependency Injection Container
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/kernel`
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `platform/kernel/src/di/token.ts` | `Token<T>` — phantom-typed dependency handle keyed by name string |
+| `platform/kernel/src/di/container-types.ts` | `RegistrationKind`, `Factory<T>`, `ContainerRegistrationInfo`, `IContainer` interface |
+| `platform/kernel/src/di/container.ts` | `Container` — full implementation with circular-dep detection |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/kernel/src/errors.ts` | Added `ContainerError extends PlatformError` (code: `CONTAINER_ERROR`) |
+| `platform/kernel/src/index.ts` | Added DI exports: `Token`, `Container`, `IContainer`, `Factory`, `RegistrationKind`, `ContainerRegistrationInfo`, `ContainerError` |
+
+### Container API
+
+| Method | Description |
+|---|---|
+| `registerSingleton(token, instance)` | Registers a pre-built instance; returned as-is on every resolve |
+| `registerLazySingleton(token, factory)` | Factory called once on first resolve; result cached for all subsequent resolves |
+| `registerFactory(token, factory)` | Factory called fresh on every resolve; nothing is cached |
+| `resolve(token)` | Returns the dependency; throws `ContainerError` if not registered or if circular |
+| `has(token)` | Returns `true` if the token is registered |
+| `list()` | Returns `ContainerRegistrationInfo[]` — no factory refs or instances exposed |
+| `reset()` | Clears all registrations and caches (tests / hot-reload) |
+
+### ServiceRegistry Integration
+
+None. `Container` and `ServiceRegistry` are intentionally independent:
+- `ServiceRegistry` — runtime lifecycle management, string IDs, status tracking
+- `Container` — compile-time-typed dependency composition for application code
+
+### Bootstrap
+
+`bootstrap.ts` was not modified. The `Container` is available for use by the Platform SDK and application code in future milestones.
 
 ---
 

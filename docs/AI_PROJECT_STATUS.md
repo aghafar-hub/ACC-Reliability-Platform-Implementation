@@ -4,7 +4,7 @@
 
 Version: 1.0  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 3.3)
+Updated By: AI Agent (Milestone 3.4)
 
 ---
 
@@ -31,6 +31,18 @@ Active work is on the Platform Kernel (`platform/kernel`). The kernel must be co
 | Platform Logger | `src/logger.ts` | ✅ Complete |
 | Error Hierarchy | `src/errors.ts` | ✅ Complete |
 | Public API barrel | `src/index.ts` | ✅ Complete |
+
+### Milestone 3.4 — Dependency Injection Container
+
+**Package:** `@acc-reliability/kernel` (`platform/kernel/src/di/`)
+
+| Component | File | Status |
+|---|---|---|
+| `Token<T>` — typed dependency handle | `src/di/token.ts` | ✅ Complete |
+| `IContainer`, `Factory`, `RegistrationKind`, `ContainerRegistrationInfo` | `src/di/container-types.ts` | ✅ Complete |
+| `Container` — singleton, lazy-singleton, transient, circular-dep detection | `src/di/container.ts` | ✅ Complete |
+| `ContainerError` | `src/errors.ts` | ✅ Complete |
+| Public barrel updated | `src/index.ts` | ✅ Updated |
 
 ### Milestone 3.3 — Service Registry Hardening
 

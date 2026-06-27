@@ -57,10 +57,21 @@ export type {
   ModuleStatus,
 } from './module-registry';
 
+// ── Dependency Injection ──────────────────────────────────────────────────────
+export { Token } from './di/token';
+export { Container } from './di/container';
+export type {
+  IContainer,
+  Factory,
+  RegistrationKind,
+  ContainerRegistrationInfo,
+} from './di/container-types';
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 export {
   PlatformError,
   ConfigurationError,
   RegistryError,
   ModuleError,
+  ContainerError,
 } from './errors';
