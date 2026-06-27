@@ -14,6 +14,12 @@
     "dev": "echo Development environment will be configured later",
     "build": "echo Build pipeline will be configured later",
     "test": "echo Test pipeline will be configured later",
-    "lint": "echo Linting will be configured later"
+    "lint": "echo Linting will be configured later",
+    "kernel:build": "npm run build --workspace=platform/kernel",
+    "kernel:check": "npm run type-check --workspace=platform/kernel",
+    "kernel:clean": "npm run clean --workspace=platform/kernel"
+  },
+  "devDependencies": {
+    "turbo": "^2.10.0"
   }
 }
