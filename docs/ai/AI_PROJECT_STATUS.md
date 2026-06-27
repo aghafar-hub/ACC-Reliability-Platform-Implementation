@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Project Status
 
-Version: 1.5  
+Version: 1.6  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.5)
+Updated By: AI Agent (Milestone 4.6)
 
 ---
 
@@ -17,6 +17,32 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 ---
 
 ## Implemented So Far
+
+### Milestone 4.6 — Metrics Service
+
+**Package:** `@acc-reliability/services` (`platform/services/src/metrics/`)
+
+| Component | File | Status |
+|---|---|---|
+| `MetricId` — branded string identifier + `createMetricId` factory | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `MetricKind` — counter / gauge / histogram / timer / duration / rate | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `KnownMetricCategory` / `MetricCategory` / `METRIC_CATEGORIES` — 10 built-in categories | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `MetricLevel` — debug / info / warning / critical | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `MetricValue` — numeric observation type alias | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `MetricTags` — immutable key-value pairs for multi-dimensional grouping | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `MetricDefinition` — immutable registration descriptor (id, name, kind, category, level, unit, tags) | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `MetricSample` — frozen single observation (metricId, value, timestamp, tags) | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `MetricSnapshot` — frozen point-in-time state (lastSample, sampleCount, sum, min, max, registeredAt) | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `MetricSummary` — platform-wide frozen aggregate (totalMetrics, byCategory, byKind, totalSamples) | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `MetricsServiceOptions` — maxSamplesPerMetric option | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `IMetricsService` — full contract: register, record, increment, decrement, set, timing, startTimer, getSnapshot, getAllSnapshots, getSnapshotsByCategory, getSummary, flush, reset, resetAll | `src/metrics/metrics-types.ts` | ✅ Complete |
+| `MetricsService` — in-memory implementation; O(1) recording; rolling buffer per metric; performance.now() timers | `src/metrics/metrics-service.ts` | ✅ Complete |
+| `MetricsError` — base metrics error (`METRICS_ERROR`) | `src/errors.ts` | ✅ Complete |
+| `MetricNotFoundError` — unknown metricId (`METRICS_NOT_FOUND`) | `src/errors.ts` | ✅ Complete |
+| `MetricAlreadyRegisteredError` — duplicate registration (`METRICS_ALREADY_REGISTERED`) | `src/errors.ts` | ✅ Complete |
+| Public barrel updated | `src/index.ts` | ✅ Updated |
+
+---
 
 ### Milestone 4.5 — Health Service
 
@@ -250,7 +276,7 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 |---|---|---|
 | 4.4 | Communication Contracts | ✅ Done — 4 contract files, 6 identifier types, 13 events, 2 messages, `AnyPlatformEvent` union |
 | 4.5 | Health Service | ✅ Done — `IHealthService`, `HealthService` (in-memory), 6 health states, 5 categories, `HealthSummary`, timeout + parallel checks, 3 error classes |
-| 4.6 | Metrics Service | `IMetricsService`, `MetricEntry`, counter/gauge/histogram contracts |
+| 4.6 | Metrics Service | ✅ Done — `IMetricsService`, `MetricsService` (in-memory), 6 metric kinds, 10 categories, `MetricSnapshot`, `MetricSummary`, startTimer, flush, reset, 3 error classes |
 | 4.7 | Notification Service | `INotificationService`, `NotificationPayload`, channel contracts |
 | 4.8 | Action Service | `IActionService`, `ActionRequest`, `ActionResult` contracts |
 | 4.9 | Audit Service | `IAuditService`, `AuditEntry`, write-only audit trail contracts |
@@ -320,6 +346,11 @@ As of Milestone 3.2, the platform supports 8 strongly typed configuration groups
 24. `HealthService` is an in-memory implementation. It holds no persistent state — statuses reset on process restart. The service id `platform.health` is reserved for registration in the Service Registry; no registration occurs until an implementation milestone wires it into bootstrap.
 25. `HealthStatus` in the health service (`healthy | warning | degraded | critical | offline | maintenance`) and `ComponentHealthStatus` in `platform-events.ts` (`healthy | degraded | unhealthy | unknown`) are separate types serving different purposes. Mapping between them is the responsibility of the layer that publishes `HealthStatusChangedEvent`.
 26. `consecutiveFailures` in `HealthComponentStatus` resets to `0` on any `healthy` or `maintenance` result. Escalation logic (e.g. auto-create action after N failures) belongs to a future milestone.
+27. `MetricsService` is an in-memory implementation. All state is lost on process restart. The service id `platform.metrics` is reserved in the Service Registry; no registration occurs until the SDK milestone wires it into bootstrap.
+28. `increment()` and `decrement()` record the delta value as a sample (not the absolute value). For counters, `sum` is the running total. For gauges, `lastSample.value` is the current reading; use `set()` for absolute assignment.
+29. `flush()` drains the per-metric rolling buffer (bounded by `maxSamplesPerMetric`, default 100). The aggregate state (`sampleCount`, `sum`, `min`, `max`) is not affected by flush. If `flush()` is never called, the buffer self-manages via FIFO eviction.
+30. `startTimer()` uses `performance.now()` for sub-millisecond precision. It is available globally in Node.js 16+. The timer records elapsed milliseconds as a floating-point `MetricValue`.
+31. `MetricCategory` is an open union. New categories (module-specific or future platform categories) can be added without modifying the core type. Existing `KnownMetricCategory` values map directly to the 10 platform domain areas.
 
 ---
 

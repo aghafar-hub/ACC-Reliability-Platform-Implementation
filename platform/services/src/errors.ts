@@ -19,9 +19,12 @@
 //     │    ├─ EntityNotFoundError  STORAGE_NOT_FOUND        — requested entity does not exist
 //     │    ├─ DuplicateEntityError STORAGE_DUPLICATE        — unique constraint violated
 //     │    └─ TransactionError     STORAGE_TRANSACTION_ERROR — tx not supported or failed
-//     └─ HealthError            HEALTH_ERROR                — base for all health service failures
-//          ├─ HealthCheckTimeoutError    HEALTH_CHECK_TIMEOUT     — check exceeded time limit
-//          └─ HealthComponentNotFoundError HEALTH_COMPONENT_NOT_FOUND — unknown component id
+//     ├─ HealthError            HEALTH_ERROR                — base for all health service failures
+//     │    ├─ HealthCheckTimeoutError    HEALTH_CHECK_TIMEOUT     — check exceeded time limit
+//     │    └─ HealthComponentNotFoundError HEALTH_COMPONENT_NOT_FOUND — unknown component id
+//     └─ MetricsError           METRICS_ERROR               — base for all metrics service failures
+//          ├─ MetricNotFoundError          METRICS_NOT_FOUND          — unknown metric id
+//          └─ MetricAlreadyRegisteredError METRICS_ALREADY_REGISTERED — duplicate registration
 
 import { PlatformError } from '@acc-reliability/kernel';
 
@@ -289,6 +292,70 @@ export class HealthComponentNotFoundError extends HealthError {
     );
     this.name = 'HealthComponentNotFoundError';
     this.componentId = componentId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Metrics errors ────────────────────────────────────────────────────────────
+
+/**
+ * Base error for all metrics service failures.
+ *
+ * Catch this type to handle any metrics-related error without enumerating
+ * sub-types.  Sub-classes supply a more specific `code`; when this class is
+ * thrown directly it uses `'METRICS_ERROR'`.
+ */
+export class MetricsError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'METRICS_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'MetricsError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation (record, increment, set, timing, startTimer, reset)
+ * targets a metric id that is not registered with the metrics service.
+ *
+ * HTTP equivalent: 404 Not Found.
+ */
+export class MetricNotFoundError extends MetricsError {
+  readonly metricId: string;
+
+  constructor(metricId: string) {
+    super(
+      `Metric '${metricId}' is not registered`,
+      'METRICS_NOT_FOUND',
+      { metricId },
+    );
+    this.name = 'MetricNotFoundError';
+    this.metricId = metricId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when attempting to register a metric whose id is already registered.
+ *
+ * Unregister the existing metric first if a re-definition is intended.
+ *
+ * HTTP equivalent: 409 Conflict.
+ */
+export class MetricAlreadyRegisteredError extends MetricsError {
+  readonly metricId: string;
+
+  constructor(metricId: string) {
+    super(
+      `Metric '${metricId}' is already registered`,
+      'METRICS_ALREADY_REGISTERED',
+      { metricId },
+    );
+    this.name = 'MetricAlreadyRegisteredError';
+    this.metricId = metricId;
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }

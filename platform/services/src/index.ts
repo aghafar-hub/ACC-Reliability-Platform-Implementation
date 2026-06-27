@@ -206,6 +206,31 @@ export {
 // ── Health Service — Implementation ──────────────────────────────────────────
 export { HealthService } from './health/health-service';
 
+// ── Metrics Service — Types ───────────────────────────────────────────────────
+export type {
+  MetricId,
+  MetricKind,
+  KnownMetricCategory,
+  MetricCategory,
+  MetricLevel,
+  MetricValue,
+  MetricTags,
+  MetricDefinition,
+  MetricSample,
+  MetricSnapshot,
+  MetricSummary,
+  MetricsServiceOptions,
+  IMetricsService,
+} from './metrics/metrics-types';
+
+export {
+  METRIC_CATEGORIES,
+  createMetricId,
+} from './metrics/metrics-types';
+
+// ── Metrics Service — Implementation ─────────────────────────────────────────
+export { MetricsService } from './metrics/metrics-service';
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 export {
   AuthError,
@@ -222,4 +247,7 @@ export {
   HealthError,
   HealthCheckTimeoutError,
   HealthComponentNotFoundError,
+  MetricsError,
+  MetricNotFoundError,
+  MetricAlreadyRegisteredError,
 } from './errors';

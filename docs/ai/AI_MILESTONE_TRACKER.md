@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Milestone Tracker
 
-Version: 1.5  
+Version: 1.6  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.5)
+Updated By: AI Agent (Milestone 4.6)
 
 ---
 
@@ -40,7 +40,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | 4.3 | Storage Abstraction Contracts | ✅ Done | 2026-06-27 | FilterExpression (field/composite), QueryOptions (filter+sort+page), PageRequest, PageResult, PagedQueryOptions, SortClause, Entity, IRepository<T>, ITransaction, IStorageProvider, StorageProviderConfig (5 providers), StorageHealthStatus, StorageError hierarchy (6 classes) |
 | 4.4 | Communication Contracts | ✅ Done | 2026-06-27 | CorrelationId/MessageId/RequestId/EventId/TraceId/OperationId, EquipmentId, PlatformModule (9), MessageMetadata, PlatformEvent\<T\>/PlatformMessage\<T\>, 13 domain events, 2 command messages, AnyPlatformEvent union |
 | 4.5 | Health Service | ✅ Done | 2026-06-27 | IHealthService, HealthService (in-memory), 6 health states, 5 categories, HealthCheckResult, HealthComponentStatus, HealthSummary, parallel checkAll, per-check timeout, HealthError hierarchy (3 classes) |
-| 4.6 | Metrics Service | ⏳ Planned | — | IMetricsService, MetricEntry, counter/gauge/histogram contracts |
+| 4.6 | Metrics Service | ✅ Done | 2026-06-27 | IMetricsService, MetricsService (in-memory), 6 metric kinds, 10 categories, MetricDefinition, MetricSample, MetricSnapshot, MetricSummary, startTimer, flush, reset/resetAll, MetricsError hierarchy (3 classes) |
 | 4.7 | Notification Service | ⏳ Planned | — | INotificationService, NotificationPayload, channel contracts |
 | 4.8 | Action Service | ⏳ Planned | — | IActionService, ActionRequest, ActionResult contracts |
 | 4.9 | Audit Service | ⏳ Planned | — | IAuditService, AuditEntry, write-only audit trail contracts |
@@ -752,6 +752,104 @@ All are open-union extensible via `HealthComponentCategory`.
 - `consecutiveFailures` is tracked per component. It resets to `0` on any `healthy` or `maintenance` result. Future milestone (escalation logic) can use this for auto-action creation.
 - `getSummary()` is a pure read of cached state. It never triggers new checks — callers that need fresh data must call `checkAll()` first.
 - Service id `platform.health` is reserved. Bootstrap registration is deferred to the SDK milestone when all platform services are wired together.
+
+### Compile Verification
+
+```
+services: tsc --noEmit platform/services/tsconfig.json → exit 0
+```
+
+---
+
+## Milestone 4.6 Detail — Metrics Service
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/services` (new sub-module `src/metrics/`)
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `platform/services/src/metrics/metrics-types.ts` | All metric types, `IMetricsService` interface, `createMetricId` factory, `METRIC_CATEGORIES` constant |
+| `platform/services/src/metrics/metrics-service.ts` | `MetricsService` — in-memory implementation |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/services/src/errors.ts` | Added `MetricsError` hierarchy: 3 error classes |
+| `platform/services/src/index.ts` | Added all metrics type exports, `MetricsService` class export, and metrics error exports |
+
+### Metric Kinds
+
+| Kind | Semantic | Recording method | Current value |
+|---|---|---|---|
+| `counter` | Monotonically increasing total | `increment(id, delta)` | `snapshot.sum` |
+| `gauge` | Instantaneous reading | `set(id, value)` | `snapshot.lastSample.value` |
+| `histogram` | Value distribution | `record(id, value)` | `min` / `max` / `sum/sampleCount` |
+| `timer` | Latency distribution (ms) | `timing(id, ms)` or `startTimer(id)` | `min` / `max` / average |
+| `duration` | Single elapsed-time observation | `timing(id, ms)` | `snapshot.lastSample.value` |
+| `rate` | Events/second (future aggregation) | `increment(id, delta)` | `snapshot.sum` |
+
+### Metric Categories
+
+`platform` · `kernel` · `storage` · `communication` · `health` · `module` · `security` · `performance` · `business` · `custom`
+
+All are open-union extensible via `MetricCategory`.
+
+### IMetricsService Contract
+
+| Group | Method | Description |
+|---|---|---|
+| Registration | `register(definition)` | Register a metric; throws `MetricAlreadyRegisteredError` on duplicate |
+| Registration | `unregister(metricId)` | Remove metric and its samples; no-op if not found |
+| Recording | `record(id, value, tags?)` | Raw observation; throws `MetricNotFoundError` if not registered |
+| Recording | `increment(id, amount?)` | Record positive delta (default 1) |
+| Recording | `decrement(id, amount?)` | Record negative delta (default 1) |
+| Recording | `set(id, value)` | Record absolute value (gauge assignment) |
+| Recording | `timing(id, durationMs)` | Record elapsed time in ms |
+| Timer | `startTimer(id)` | Start timer; returns `stop()` closure that records duration and returns ms |
+| Query | `getSnapshot(id)` | Frozen snapshot or `null` if not registered |
+| Query | `getAllSnapshots()` | All snapshots in insertion order |
+| Query | `getSnapshotsByCategory(cat)` | Snapshots filtered by category |
+| Query | `getSummary()` | Frozen platform-wide aggregate |
+| Lifecycle | `listMetricIds()` | All registered ids |
+| Lifecycle | `isRegistered(id)` | Existence check |
+| Export | `flush()` | Drain and return all buffered samples (clears buffer; keeps aggregates) |
+| Reset | `reset(id)` | Clear all state for one metric; throws if not registered |
+| Reset | `resetAll()` | Clear all state for every metric |
+
+### MetricsError Hierarchy
+
+| Class | Code | HTTP equiv | When thrown |
+|---|---|---|---|
+| `MetricsError` | `METRICS_ERROR` | 500 | Base; catch-all |
+| `MetricNotFoundError` | `METRICS_NOT_FOUND` | 404 | record/increment/set/timing/startTimer/reset on unregistered id |
+| `MetricAlreadyRegisteredError` | `METRICS_ALREADY_REGISTERED` | 409 | register() called with duplicate id |
+
+### Pre-wired Metric IDs (reserved for future platform services)
+
+The following metric ids are **not yet registered** — they are reserved for wiring in the SDK milestone and future service milestones:
+
+| Metric ID | Kind | Category | What it measures |
+|---|---|---|---|
+| `platform.startup.duration` | `duration` | `platform` | Platform startup time |
+| `platform.shutdown.duration` | `duration` | `platform` | Platform shutdown time |
+| `storage.operation.duration` | `timer` | `storage` | Storage operation latency |
+| `repository.operation.duration` | `timer` | `storage` | Repository method latency |
+| `communication.duration` | `timer` | `communication` | Communication round-trip latency |
+| `health.check.duration` | `timer` | `health` | Health check execution time |
+| `module.execution.duration` | `timer` | `module` | Module operation latency |
+
+### Design Decisions
+
+- `increment()` and `decrement()` always record the delta as a sample. `sum` is the running total for counters. For gauge "current value" use `lastSample.value`; for absolute assignment use `set()`.
+- `startTimer()` verifies the metric exists at call time (not in the stop closure). If the metric is unregistered between start and stop, the stop closure throws `MetricNotFoundError` — this fails loudly rather than silently discarding the observation.
+- `flush()` drains per-metric rolling buffers (bounded by `maxSamplesPerMetric`, default 100). The aggregate state (`sampleCount`, `sum`, `min`, `max`) is not cleared by flush — only by `reset()`.
+- All `MetricSample` objects are frozen at creation. All `MetricSnapshot` and `MetricSummary` objects are frozen before return. No copies are needed on read.
+- `MetricState` is an internal mutable interface; its mutable fields are never exposed through the public API.
+- Service id `platform.metrics` is reserved. Bootstrap registration is deferred to the SDK milestone.
+- Future Event Bus: when Phase 9 is active, metric samples above `MetricLevel.warning` may publish to `platform.events.metrics.threshold-exceeded`. Callers of `IMetricsService` need no changes.
 
 ### Compile Verification
 
