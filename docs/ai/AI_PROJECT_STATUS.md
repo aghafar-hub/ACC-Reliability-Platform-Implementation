@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Project Status
 
-Version: 1.0  
+Version: 1.1  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.1)
+Updated By: AI Agent (Phase 2 Roadmap Alignment)
 
 ---
 
@@ -122,19 +122,26 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 
 ## What Is NOT Yet Implemented
 
-| Capability | Roadmap Item | Notes |
+> **Phase 2 sequencing note:** Storage Abstraction Contracts (4.3) and Communication Contracts (4.4) are prioritised before business-module migration. All modules consume platform abstractions; those contracts must be stable first.  
+> **Event Bus:** Real Event Bus implementation is deferred to a Future Phase (Phase 9). `NullEventBus` from Phase 1 remains the only runtime artifact. Do not implement an Event Bus in Phase 2.
+
+| Milestone | Capability | Notes |
 |---|---|---|
-| Authorization / RBAC service | Item 2 (4.2) | `IAuthorizationService`, permission checking |
-| Notification Service | Item 2 (4.3) | `INotificationService` |
-| Audit Log Service | Item 2 (4.4) | `IAuditService`, `AuditEntry` |
-| Storage Abstraction | Item 3 | repository interfaces + Google Sheets adapter |
-| Platform SDK | Item 4 | public API for modules to consume |
-| Owner Control Center | Item 5 | first app |
-| Module Migration | Item 6 | oil-lubrication, vibration-analysis, etc. |
-| Event Bus | Item 7 | prepare code; do not implement yet |
-| AI Integration | Item 8 | future |
-| External Integrations | Item 9 | future |
-| SQL Migration | Item 10 | future |
+| 4.2 | Authorization and Permission Contracts | `IAuthorizationService`, permission checking, role/permission types |
+| 4.3 | Storage Abstraction Contracts | `IRepository<T>`, `QueryOptions`, `IEquipmentRepository`, Google Sheets adapter scaffold |
+| 4.4 | Communication Contracts | Inter-service communication interfaces; no Event Bus implementation |
+| 4.5 | Health Service | `IHealthService`, `HealthStatus`, health-check contracts |
+| 4.6 | Metrics Service | `IMetricsService`, `MetricEntry`, counter/gauge/histogram contracts |
+| 4.7 | Notification Service | `INotificationService`, `NotificationPayload`, channel contracts |
+| 4.8 | Action Service | `IActionService`, `ActionRequest`, `ActionResult` contracts |
+| 4.9 | Audit Service | `IAuditService`, `AuditEntry`, write-only audit trail contracts |
+| 4.10 | Platform SDK | `@acc-reliability/sdk` public API, module registration helpers, typed service resolution |
+| — | Owner Control Center | First app; depends on SDK and all service contracts |
+| — | Module Migration | oil-lubrication, vibration-analysis, etc.; requires 4.3 and 4.4 stable first |
+| — | Event Bus (Future Phase 9) | Prepare code only; do not implement yet |
+| — | AI Integration | Future Phase 10 |
+| — | External Integrations | Future Phase 11 |
+| — | SQL Migration | Future Phase 12 |
 
 ---
 

@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Milestone Tracker
 
-Version: 1.0  
+Version: 1.1  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.1)
+Updated By: AI Agent (Phase 2 Roadmap Alignment)
 
 ---
 
@@ -30,32 +30,45 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 
 ## Phase 2 — Platform Services
 
+> **Sequencing note:** Storage Abstraction Contracts (4.3) and Communication Contracts (4.4) are intentionally prioritised before any business-module migration work. All modules must consume platform abstractions; those contracts must be stable first.  
+> **Event Bus:** A real in-process Event Bus implementation is a Future Phase item (Phase 9). Do not implement it in Phase 2. The `NullEventBus` registered in Phase 1 is the only event-bus artifact in scope for this phase.
+
 | ID | Milestone | Status | Completed | Notes |
 |---|---|---|---|---|
-| 4.1 | Authentication Service interface | ✅ Done | 2026-06-27 | ContractorId, UserId, SessionId (branded), UserContext, SessionInfo, AuthCredentials (discriminated union), IAuthService, AuthError/AuthenticationError/SessionExpiredError |
-| 4.2 | Authorization / RBAC interface | ⏳ Planned | — | IAuthorizationService, permission checking |
-| 4.3 | Notification Service interface | ⏳ Planned | — | INotificationService |
-| 4.4 | Audit Log Service interface | ⏳ Planned | — | IAuditService, AuditEntry |
+| 4.1 | Authentication Contracts | ✅ Done | 2026-06-27 | ContractorId, UserId, SessionId (branded), UserContext, SessionInfo, AuthCredentials (discriminated union), IAuthService, AuthError/AuthenticationError/SessionExpiredError |
+| 4.2 | Authorization and Permission Contracts | ⏳ Planned | — | IAuthorizationService, permission checking, role/permission types |
+| 4.3 | Storage Abstraction Contracts | ⏳ Planned | — | IRepository<T>, QueryOptions, contractor isolation patterns, IEquipmentRepository, Equipment_ID type, Google Sheets adapter scaffold |
+| 4.4 | Communication Contracts | ⏳ Planned | — | Inter-service communication interfaces; no Event Bus implementation |
+| 4.5 | Health Service | ⏳ Planned | — | IHealthService, HealthStatus, health-check contracts |
+| 4.6 | Metrics Service | ⏳ Planned | — | IMetricsService, MetricEntry, counter/gauge/histogram contracts |
+| 4.7 | Notification Service | ⏳ Planned | — | INotificationService, NotificationPayload, channel contracts |
+| 4.8 | Action Service | ⏳ Planned | — | IActionService, ActionRequest, ActionResult contracts |
+| 4.9 | Audit Service | ⏳ Planned | — | IAuditService, AuditEntry, write-only audit trail contracts |
+| 4.10 | Platform SDK | ⏳ Planned | — | `@acc-reliability/sdk` public API surface, module registration helpers, typed service resolution |
 
 ---
 
 ## Phase 3 — Storage Abstraction
 
+> **Superseded by Phase 2 resequencing.** Storage Abstraction Contracts are now delivered as Milestone 4.3 within Phase 2, ensuring the contract is in place before business modules are migrated. This phase heading is retained for historical reference only.
+
 | ID | Milestone | Status | Completed | Notes |
 |---|---|---|---|---|
-| 5.1 | Repository base interfaces | ⏳ Planned | — | IRepository<T>, QueryOptions, contractor isolation patterns |
-| 5.2 | Equipment repository interface | ⏳ Planned | — | IEquipmentRepository, Equipment_ID type |
-| 5.3 | Google Sheets adapter scaffold | ⏳ Planned | — | GoogleSheetsAdapter, batch read/write patterns |
+| 5.1 | Repository base interfaces | ↪ Moved to 4.3 | — | Absorbed into Phase 2 — Storage Abstraction Contracts |
+| 5.2 | Equipment repository interface | ↪ Moved to 4.3 | — | Absorbed into Phase 2 — Storage Abstraction Contracts |
+| 5.3 | Google Sheets adapter scaffold | ↪ Moved to 4.3 | — | Absorbed into Phase 2 — Storage Abstraction Contracts |
 
 ---
 
 ## Phase 4 — Platform SDK
 
+> **Superseded by Phase 2 resequencing.** Platform SDK is now delivered as Milestone 4.10 within Phase 2. This phase heading is retained for historical reference only.
+
 | ID | Milestone | Status | Completed | Notes |
 |---|---|---|---|---|
-| 6.1 | SDK public API surface | ⏳ Planned | — | `@acc-reliability/sdk` package |
-| 6.2 | SDK module registration helpers | ⏳ Planned | — | Wrappers for ModuleRegistry |
-| 6.3 | SDK service access helpers | ⏳ Planned | — | Typed service resolution |
+| 6.1 | SDK public API surface | ↪ Moved to 4.10 | — | Absorbed into Phase 2 — Platform SDK |
+| 6.2 | SDK module registration helpers | ↪ Moved to 4.10 | — | Absorbed into Phase 2 — Platform SDK |
+| 6.3 | SDK service access helpers | ↪ Moved to 4.10 | — | Absorbed into Phase 2 — Platform SDK |
 
 ---
 
