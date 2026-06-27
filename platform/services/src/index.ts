@@ -254,6 +254,37 @@ export {
 // ── Notification Service — Implementation ─────────────────────────────────────
 export { NotificationService } from './notification/notification-service';
 
+// ── Action Service — Types ────────────────────────────────────────────────────
+export type {
+  ActionId,
+  ActionKind,
+  ActionPriority,
+  ActionStatus,
+  AssigneeKind,
+  ActionAssignment,
+  ActionFollower,
+  ActionComment,
+  ActionAttachment,
+  ActionApproval,
+  ActionHistoryEntry,
+  ActionRecord,
+  ActionCreateRequest,
+  ActionUpdateRequest,
+  ActionSummary,
+  ActionServiceOptions,
+  IActionService,
+} from './action/action-types';
+
+export {
+  ACTION_KINDS,
+  ACTION_PRIORITIES,
+  createActionId,
+  generateActionId,
+} from './action/action-types';
+
+// ── Action Service — Implementation ───────────────────────────────────────────
+export { ActionService } from './action/action-service';
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 export {
   AuthError,
@@ -276,4 +307,8 @@ export {
   NotificationError,
   NotificationNotFoundError,
   NotificationRecipientError,
+  ActionError,
+  ActionNotFoundError,
+  ActionScopeError,
+  ActionTransitionError,
 } from './errors';

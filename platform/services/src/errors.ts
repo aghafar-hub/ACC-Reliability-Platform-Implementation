@@ -25,9 +25,13 @@
 //     ├─ MetricsError           METRICS_ERROR               — base for all metrics service failures
 //     │    ├─ MetricNotFoundError          METRICS_NOT_FOUND          — unknown metric id
 //     │    └─ MetricAlreadyRegisteredError METRICS_ALREADY_REGISTERED — duplicate registration
-//     └─ NotificationError      NOTIFICATION_ERROR          — base for all notification service failures
-//          ├─ NotificationNotFoundError   NOTIFICATION_NOT_FOUND     — unknown notification id
-//          └─ NotificationRecipientError  NOTIFICATION_RECIPIENT     — invalid or empty recipient list
+//     ├─ NotificationError      NOTIFICATION_ERROR          — base for all notification service failures
+//     │    ├─ NotificationNotFoundError   NOTIFICATION_NOT_FOUND     — unknown notification id
+//     │    └─ NotificationRecipientError  NOTIFICATION_RECIPIENT     — invalid or empty recipient list
+//     └─ ActionError            ACTION_ERROR                — base for all action service failures
+//          ├─ ActionNotFoundError       ACTION_NOT_FOUND           — unknown action id
+//          ├─ ActionScopeError          ACTION_SCOPE_VIOLATION      — contractor scope mismatch on create
+//          └─ ActionTransitionError     ACTION_INVALID_TRANSITION   — invalid status transition attempted
 
 import { PlatformError } from '@acc-reliability/kernel';
 
@@ -422,6 +426,109 @@ export class NotificationRecipientError extends NotificationError {
   ) {
     super(message, 'NOTIFICATION_RECIPIENT', context);
     this.name = 'NotificationRecipientError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Action errors ─────────────────────────────────────────────────────────────
+
+/**
+ * Base error for all action service failures.
+ *
+ * Catch this type to handle any action-related error without enumerating
+ * sub-types.  Sub-classes supply a more specific `code`; when this class is
+ * thrown directly it uses `'ACTION_ERROR'`.
+ */
+export class ActionError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'ACTION_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'ActionError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation targets an action id that is not held in the
+ * action service (e.g. `update()`, `assign()`, `start()`, etc. with an
+ * unknown id).
+ *
+ * HTTP equivalent: 404 Not Found.
+ */
+export class ActionNotFoundError extends ActionError {
+  readonly actionId: string;
+
+  constructor(actionId: string) {
+    super(
+      `Action '${actionId}' was not found`,
+      'ACTION_NOT_FOUND',
+      { actionId },
+    );
+    this.name = 'ActionNotFoundError';
+    this.actionId = actionId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a non-ACC contractor attempts to create an action outside their
+ * own contractor scope.
+ *
+ * The `requestingContractorId` must equal the `contractorId` of the action
+ * unless the requestor is `'ACC'`.
+ *
+ * HTTP equivalent: 403 Forbidden.
+ */
+export class ActionScopeError extends ActionError {
+  readonly requestingContractorId: string;
+  readonly targetContractorId: string;
+
+  constructor(requestingContractorId: string, targetContractorId: string) {
+    super(
+      `Contractor '${requestingContractorId}' may not create actions in contractor '${targetContractorId}' scope`,
+      'ACTION_SCOPE_VIOLATION',
+      { requestingContractorId, targetContractorId },
+    );
+    this.name = 'ActionScopeError';
+    this.requestingContractorId = requestingContractorId;
+    this.targetContractorId = targetContractorId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a caller attempts a status transition that is not permitted
+ * from the action's current status.
+ *
+ * Carries the action id, the status it was in (`fromStatus`), and the
+ * status it was asked to transition to (`toStatus`).
+ *
+ * HTTP equivalent: 409 Conflict.
+ */
+export class ActionTransitionError extends ActionError {
+  readonly actionId: string;
+  readonly fromStatus: string;
+  readonly toStatus: string;
+
+  constructor(
+    actionId: string,
+    fromStatus: string,
+    toStatus: string,
+    detail?: string,
+  ) {
+    super(
+      detail ??
+        `Action '${actionId}' cannot transition from '${fromStatus}' to '${toStatus}'`,
+      'ACTION_INVALID_TRANSITION',
+      { actionId, fromStatus, toStatus },
+    );
+    this.name = 'ActionTransitionError';
+    this.actionId = actionId;
+    this.fromStatus = fromStatus;
+    this.toStatus = toStatus;
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }

@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Milestone Tracker
 
-Version: 1.7  
+Version: 1.8  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.7)
+Updated By: AI Agent (Milestone 4.8)
 
 ---
 
@@ -42,7 +42,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | 4.5 | Health Service | ✅ Done | 2026-06-27 | IHealthService, HealthService (in-memory), 6 health states, 5 categories, HealthCheckResult, HealthComponentStatus, HealthSummary, parallel checkAll, per-check timeout, HealthError hierarchy (3 classes) |
 | 4.6 | Metrics Service | ✅ Done | 2026-06-27 | IMetricsService, MetricsService (in-memory), 6 metric kinds, 10 categories, MetricDefinition, MetricSample, MetricSnapshot, MetricSummary, startTimer, flush, reset/resetAll, MetricsError hierarchy (3 classes) |
 | 4.7 | Notification Service | ✅ Done | 2026-06-27 | INotificationService, NotificationService (in-memory), 6 notification types, 3 channels, 6 statuses, NotificationRecipient (contractor-isolated), NotificationRecord, NotificationSummary, dismiss, pruneExpired, sendBatch, NotificationError hierarchy (3 classes) |
-| 4.8 | Action Service | ⏳ Planned | — | IActionService, ActionRequest, ActionResult contracts |
+| 4.8 | Action Service | ✅ Done | 2026-06-27 | IActionService, ActionService (in-memory), ActionKind (7), ActionPriority (5), ActionStatus (10), ActionAssignment (user/team), ActionFollower, ActionComment, ActionAttachment, ActionApproval, ActionHistoryEntry, ActionRecord, ActionCreateRequest, ActionUpdateRequest, ActionSummary; contractor scope enforcement, frozen records, append-only history, FIFO eviction, ActionError hierarchy (4 classes) |
 | 4.9 | Audit Service | ⏳ Planned | — | IAuditService, AuditEntry, write-only audit trail contracts |
 | 4.10 | Platform SDK | ⏳ Planned | — | `@acc-reliability/sdk` public API surface, module registration helpers, typed service resolution |
 
@@ -939,6 +939,141 @@ The types removed from `platform-messages` re-exports remain as file-internal ty
 
 ```
 services: tsc --noEmit -p platform/services/tsconfig.json → exit 0
+```
+
+---
+
+## Milestone 4.8 Detail — Action Service
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/services` (new sub-module `src/action/`)
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `platform/services/src/action/action-types.ts` | All action types, `IActionService` interface, branded id factories, constants |
+| `platform/services/src/action/action-service.ts` | `ActionService` — in-memory implementation |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/services/src/errors.ts` | Added `ActionError` hierarchy: 4 error classes |
+| `platform/services/src/index.ts` | Added all action type exports, `ActionService` class export, and action error exports |
+
+### Action Kinds (ActionKind)
+
+`work-order` · `corrective` · `preventive` · `inspection` · `calibration` · `emergency` · `other`
+
+All are open-union extensible via `ActionKind`.
+
+### Action Priority Levels
+
+`low` · `normal` · `high` · `critical` · `immediate`  (ordered lowest → highest urgency)
+
+### Action Status Lifecycle
+
+| Status | Description | Terminal |
+|---|---|---|
+| `draft` | Created but not yet opened for assignment | No |
+| `open` | Open for assignment | No |
+| `assigned` | Assigned to a user or team | No |
+| `in-progress` | Being worked on by the assigned owner | No |
+| `pending-approval` | Submitted for approval by the creator's organization | No |
+| `approved` | Approved by the creator's organization | No |
+| `rejected` | Rejected; owner may restart and resubmit | No |
+| `completed` | Fully completed after approval | No |
+| `closed` | Closed; terminal state | **Yes** |
+| `cancelled` | Cancelled before completion | **Yes** |
+
+### Contractor Scope Enforcement
+
+| Rule | Enforcement |
+|---|---|
+| ACC contractor can create actions for any scope | `requestingContractorId === 'ACC'` bypasses scope check |
+| Non-ACC contractor can only create in own scope | `requestingContractorId` must equal `contractorId` |
+| Violation | `ActionScopeError` (code: `ACTION_SCOPE_VIOLATION`) |
+
+### Assignment Model
+
+- An action holds **at most one** active assignment at a time.
+- Assignment target is either a `'user'` (by `UserId`) or a `'team'` (by name).
+- Reassignment replaces the previous assignment and appends a `'reassigned'` history entry.
+- Unassignment transitions `'assigned'` → `'open'` and appends an `'unassigned'` history entry.
+
+### Approval Model
+
+- The **assigned owner** submits the action via `submitForApproval()` → `'pending-approval'`.
+- The **creator's organization** records a decision via `recordApproval()`.
+- `decision === 'approved'` → `'approved'`; owner then calls `complete()` → `'completed'`, then `close()` → `'closed'`.
+- `decision === 'rejected'` → `'rejected'`; the assigned owner may restart (`start()`) and resubmit.
+- All `ActionApproval` records are **retained in history regardless of decision outcome**.
+
+### IActionService Contract
+
+| Group | Method | Description |
+|---|---|---|
+| Create | `create(request)` | Creates action with scope enforcement; throws `ActionScopeError` on violation |
+| Read | `getById(id)` | Returns record or `null` — does not throw |
+| Read | `getByEquipment(equipmentId, contractorId?)` | Filter by equipment, optionally by contractor |
+| Read | `getByContractor(contractorId)` | All actions owned by contractor |
+| Read | `getByStatus(status, contractorId?)` | Filter by status, optionally by contractor |
+| Read | `getByAssignee(assigneeId, contractorId)` | Always contractor-scoped to prevent leakage |
+| Update | `update(id, request)` | Updates descriptive fields; merges metadata |
+| Assignment | `assign(id, assignment)` | From `'open'` or `'assigned'`; appends history |
+| Assignment | `unassign(id, requestedBy)` | `'assigned'` → `'open'` |
+| Assignment | `addFollower(id, follower)` | No-op if already following |
+| Assignment | `removeFollower(id, userId)` | No-op if not following |
+| Lifecycle | `start(id, requestedBy)` | `'assigned'`/`'rejected'` → `'in-progress'` |
+| Lifecycle | `submitForApproval(id, requestedBy)` | `'in-progress'` → `'pending-approval'` |
+| Lifecycle | `recordApproval(id, approval)` | `'pending-approval'` → `'approved'` or `'rejected'` |
+| Lifecycle | `complete(id, requestedBy)` | `'approved'` → `'completed'` |
+| Lifecycle | `close(id, requestedBy)` | `'completed'` → `'closed'` (terminal) |
+| Lifecycle | `cancel(id, requestedBy, reason)` | Valid from draft/open/assigned/in-progress only |
+| Comments | `addComment(id, input)` | Appends frozen `ActionComment`; appends history |
+| Attachments | `addAttachment(id, input)` | Appends frozen `ActionAttachment`; appends history |
+| Summary | `getSummary(contractorId?)` | Frozen counts by status/priority/kind; optional contractor scope |
+| Summary | `listIds(contractorId?)` | Insertion-order ids; optional contractor scope |
+
+### ActionRecord Key Fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `equipmentId` | `EquipmentId` | Primary equipment — canonical platform key |
+| `relatedEquipmentIds` | `readonly EquipmentId[]` | Associated equipment (optional) |
+| `relatedActionIds` | `readonly ActionId[]` | Associated actions (optional) |
+| `sourceModule` | `PlatformModule?` | Module that originated the action |
+| `targetModule` | `PlatformModule?` | Module expected to execute the action |
+| `correlationId` | `CorrelationId?` | Links to triggering event for distributed tracing |
+| `scheduledFor` | `string?` | ISO 8601 — future-ready; not enforced |
+| `dueDate` | `string?` | ISO 8601 — future SLA tracking |
+| `history` | `readonly ActionHistoryEntry[]` | Append-only; every state change recorded |
+
+### ActionError Hierarchy
+
+| Class | Code | HTTP equiv | When thrown |
+|---|---|---|---|
+| `ActionError` | `ACTION_ERROR` | 500 | Base; catch-all |
+| `ActionNotFoundError` | `ACTION_NOT_FOUND` | 404 | Any operation on unknown action id |
+| `ActionScopeError` | `ACTION_SCOPE_VIOLATION` | 403 | Non-ACC contractor creating outside own scope |
+| `ActionTransitionError` | `ACTION_INVALID_TRANSITION` | 409 | Invalid status transition attempted |
+
+### Design Decisions
+
+- `ActionKind` (not `ActionType`) is the work-category type. `ActionType` is already used in `authz-types` for permission action kinds (`read/create/update/delete/approve/export/configure`). Using `ActionKind` avoids a naming collision and is semantically more precise.
+- The `transition()` private helper receives the existing record + overrides + a pre-built history entry. This keeps every mutating method small and the record construction logic in one place.
+- `assignment: null` in `TransitionOverrides` is the sentinel for "remove assignment". `assignment: undefined` means "keep existing". This is a deliberate three-state design rather than a separate boolean flag.
+- All sub-documents (history, comments, attachments, approvals, followers) are frozen arrays. Creating or modifying any sub-document produces a new frozen array via `Object.freeze([...existing, newItem])`.
+- Contractor scope is enforced **only on `create()`**. Assignment, approval, and query methods trust the caller's `contractorId` values. Full enforcement across all operations belongs to a future authorization integration milestone.
+- Service id `platform.actions` is reserved. Bootstrap registration is deferred to the SDK milestone.
+- Future Event Bus: when Phase 9 is active, `create()` will publish `ActionCreatedEvent` and `complete()` will publish `ActionCompletedEvent`. Callers of `IActionService` need no changes.
+
+### Compile Verification
+
+```
+services: tsc --noEmit -p platform/services/tsconfig.json → verified by manual type review
+(Shell cmd.exe restricted by Windows admin policy in this environment)
 ```
 
 ---

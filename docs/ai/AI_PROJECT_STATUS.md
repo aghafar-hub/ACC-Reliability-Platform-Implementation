@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Project Status
 
-Version: 1.7  
+Version: 1.8  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.7)
+Updated By: AI Agent (Milestone 4.8)
 
 ---
 
@@ -17,6 +17,40 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 ---
 
 ## Implemented So Far
+
+### Milestone 4.8 — Action Service
+
+**Package:** `@acc-reliability/services` (`platform/services/src/action/`)
+
+| Component | File | Status |
+|---|---|---|
+| `ActionId` — branded string identifier + `createActionId` / `generateActionId` factories | `src/action/action-types.ts` | ✅ Complete |
+| `ActionKind` — work-order / corrective / preventive / inspection / calibration / emergency / other (open union) | `src/action/action-types.ts` | ✅ Complete |
+| `ACTION_KINDS` — ordered const tuple of built-in action kinds | `src/action/action-types.ts` | ✅ Complete |
+| `ActionPriority` — low / normal / high / critical / immediate | `src/action/action-types.ts` | ✅ Complete |
+| `ACTION_PRIORITIES` — ordered const tuple of all priority levels | `src/action/action-types.ts` | ✅ Complete |
+| `ActionStatus` — draft / open / assigned / in-progress / pending-approval / approved / rejected / completed / closed / cancelled | `src/action/action-types.ts` | ✅ Complete |
+| `AssigneeKind` — user / team discriminant | `src/action/action-types.ts` | ✅ Complete |
+| `ActionAssignment` — assignee (user or team) + contractorId + assignedBy + assignedAt | `src/action/action-types.ts` | ✅ Complete |
+| `ActionFollower` — userId + contractorId + addedAt | `src/action/action-types.ts` | ✅ Complete |
+| `ActionComment` — id + actionId + authorId + contractorId + body + createdAt | `src/action/action-types.ts` | ✅ Complete |
+| `ActionAttachment` — id + actionId + uploadedBy + contractorId + fileName + fileType + url + uploadedAt | `src/action/action-types.ts` | ✅ Complete |
+| `ActionApproval` — id + actionId + decidedBy + contractorId + decision + reason? + decidedAt | `src/action/action-types.ts` | ✅ Complete |
+| `ActionHistoryEntry` — id + actionId + changedBy + contractorId + event + previousStatus? + newStatus? + timestamp + details? | `src/action/action-types.ts` | ✅ Complete |
+| `ActionRecord` — complete immutable action entity with all sub-documents and correlation metadata | `src/action/action-types.ts` | ✅ Complete |
+| `ActionCreateRequest` — create input with contractor scope enforcement fields | `src/action/action-types.ts` | ✅ Complete |
+| `ActionUpdateRequest` — partial update of non-structural fields | `src/action/action-types.ts` | ✅ Complete |
+| `ActionSummary` — aggregate counts by status / priority / kind + capturedAt | `src/action/action-types.ts` | ✅ Complete |
+| `ActionServiceOptions` — maxRecordsInMemory (default 5000) | `src/action/action-types.ts` | ✅ Complete |
+| `IActionService` — full contract: create, getById, getByEquipment, getByContractor, getByStatus, getByAssignee, update, assign, unassign, addFollower, removeFollower, start, submitForApproval, recordApproval, complete, close, cancel, addComment, addAttachment, getSummary, listIds | `src/action/action-types.ts` | ✅ Complete |
+| `ActionService` — in-memory implementation; FIFO eviction; frozen records; append-only history; scope enforcement | `src/action/action-service.ts` | ✅ Complete |
+| `ActionError` — base action error (`ACTION_ERROR`) | `src/errors.ts` | ✅ Complete |
+| `ActionNotFoundError` — unknown actionId (`ACTION_NOT_FOUND`) | `src/errors.ts` | ✅ Complete |
+| `ActionScopeError` — non-ACC contractor scope violation (`ACTION_SCOPE_VIOLATION`) | `src/errors.ts` | ✅ Complete |
+| `ActionTransitionError` — invalid status transition (`ACTION_INVALID_TRANSITION`) | `src/errors.ts` | ✅ Complete |
+| Public barrel updated | `src/index.ts` | ✅ Updated |
+
+---
 
 ### Milestone 4.7 — Notification Service
 
@@ -305,7 +339,7 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 | 4.5 | Health Service | ✅ Done — `IHealthService`, `HealthService` (in-memory), 6 health states, 5 categories, `HealthSummary`, timeout + parallel checks, 3 error classes |
 | 4.6 | Metrics Service | ✅ Done — `IMetricsService`, `MetricsService` (in-memory), 6 metric kinds, 10 categories, `MetricSnapshot`, `MetricSummary`, startTimer, flush, reset, 3 error classes |
 | 4.7 | Notification Service | ✅ Done — `INotificationService`, `NotificationService` (in-memory), 6 notification types, 3 channels, 6 statuses, `NotificationRecipient` (contractor-isolated), `NotificationRecord`, `NotificationSummary`, dismiss, pruneExpired, sendBatch, 3 error classes |
-| 4.8 | Action Service | `IActionService`, `ActionRequest`, `ActionResult` contracts |
+| 4.8 | Action Service | ✅ Done — `IActionService`, `ActionService` (in-memory), 10 lifecycle statuses, scope enforcement, assignment (user/team), followers, comments, attachments, approvals, audit history, 4 error classes |
 | 4.9 | Audit Service | `IAuditService`, `AuditEntry`, write-only audit trail contracts |
 | 4.10 | Platform SDK | `@acc-reliability/sdk` public API, module registration helpers, typed service resolution |
 | — | Owner Control Center | First app; depends on SDK and all service contracts |
@@ -387,6 +421,16 @@ As of Milestone 3.2, the platform supports 8 strongly typed configuration groups
 38. `NotificationRecord` objects are frozen on creation. Status transitions produce a new frozen object; the previous object is replaced in the internal Map.
 39. `sendBatch()` processes requests independently. A `NotificationRecipientError` on one request is recorded as a `'failed'` record; other requests in the batch continue processing.
 40. `NotificationChannel` is an open union. New channels (e.g. `'sms'`, `'webhook'`, `'teams'`) are added by platform integration milestones without a core type change. The three built-in channels (`inApp`, `email`, `mobilePush`) are the only channels recognized by the current implementation.
+41. `ActionKind` (not `ActionType`) is the domain type for action work categories. The name avoids collision with the existing `ActionType` exported from `authz-types`, which represents permission action kinds (`read / create / update / delete / approve / export / configure`). Both are open unions and serve different semantic roles.
+42. `ActionService` is an in-memory implementation. All records are lost on process restart. The service id `platform.actions` is reserved in the Service Registry; no registration occurs until the SDK milestone wires it into bootstrap.
+43. Contractor scope enforcement in `create()` compares `requestingContractorId` as a string against the literal `'ACC'`. The `'ACC'` code matches `KnownContractorCode` from `auth-types`. Implementations consuming a real `UserContext` must pass `userContext.contractorId` as `requestingContractorId`.
+44. `recordApproval()` trusts the caller's `contractorId`. Future implementations must cross-reference `approval.contractorId` against `action.contractorId` before accepting an approval decision.
+45. `ActionAssignment.contractorId` must equal `action.contractorId` for proper isolation. The current in-memory implementation does not enforce this at the assignment level; cross-contractor assignment validation is a future hardening milestone.
+46. `scheduledFor` and `dueDate` on `ActionRecord` and `ActionCreateRequest` are future-ready fields stored but not enforced. The recurring-action scheduler is not yet implemented.
+47. `ActionKind` is an open union. New kinds (module-specific categories) are added by platform modules without a core type change. The seven built-in kinds cover all common maintenance action categories.
+48. `ActionHistoryEntry.event` is a plain `string`. Defined event names (`'created'`, `'assigned'`, `'started'`, `'submitted-for-approval'`, `'approved'`, `'rejected'`, `'completed'`, `'closed'`, `'cancelled'`, `'comment-added'`, `'attachment-added'`, `'follower-added'`, `'follower-removed'`, `'updated'`, `'reassigned'`, `'unassigned'`) are conventions only. Callers may emit additional event names for module-specific audit needs.
+49. `removeFollower()` and `addFollower()` are no-ops when the user is already a follower (or not one) respectively, returning the unchanged record. This avoids spurious history entries.
+50. FIFO eviction uses insertion order (Map iteration order). When `maxRecordsInMemory` (default 5 000) is reached, the oldest record is removed. Evicted records are gone permanently in the in-memory implementation.
 
 ---
 
