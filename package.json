@@ -1,0 +1,19 @@
+{
+  "name": "acc-reliability-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ACC Reliability Platform Implementation Workspace",
+  "license": "Proprietary",
+  "workspaces": [
+    "apps/*",
+    "modules/*",
+    "platform/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "echo Development environment will be configured later",
+    "build": "echo Build pipeline will be configured later",
+    "test": "echo Test pipeline will be configured later",
+    "lint": "echo Linting will be configured later"
+  }
+}
