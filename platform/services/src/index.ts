@@ -170,8 +170,6 @@ export {
 export type {
   OilChangeRequestedPayload,
   OilChangeRequestedMessage,
-  NotificationChannel,
-  NotificationRecipient,
   NotificationRequestedPayload,
   NotificationRequestedMessage,
   AnyPlatformMessage,
@@ -231,6 +229,31 @@ export {
 // ── Metrics Service — Implementation ─────────────────────────────────────────
 export { MetricsService } from './metrics/metrics-service';
 
+// ── Notification Service — Types ──────────────────────────────────────────────
+export type {
+  NotificationId,
+  NotificationType,
+  NotificationChannel,
+  NotificationStatus,
+  NotificationRecipient,
+  NotificationPayload,
+  NotificationRequest,
+  NotificationRecord,
+  NotificationSummary,
+  NotificationServiceOptions,
+  INotificationService,
+} from './notification/notification-types';
+
+export {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_CHANNELS,
+  createNotificationId,
+  generateNotificationId,
+} from './notification/notification-types';
+
+// ── Notification Service — Implementation ─────────────────────────────────────
+export { NotificationService } from './notification/notification-service';
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 export {
   AuthError,
@@ -250,4 +273,7 @@ export {
   MetricsError,
   MetricNotFoundError,
   MetricAlreadyRegisteredError,
+  NotificationError,
+  NotificationNotFoundError,
+  NotificationRecipientError,
 } from './errors';

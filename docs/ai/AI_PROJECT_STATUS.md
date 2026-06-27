@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Project Status
 
-Version: 1.6  
+Version: 1.7  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.6)
+Updated By: AI Agent (Milestone 4.7)
 
 ---
 
@@ -17,6 +17,33 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 ---
 
 ## Implemented So Far
+
+### Milestone 4.7 — Notification Service
+
+**Package:** `@acc-reliability/services` (`platform/services/src/notification/`)
+
+| Component | File | Status |
+|---|---|---|
+| `NotificationId` — branded string identifier + `createNotificationId` / `generateNotificationId` factories | `src/notification/notification-types.ts` | ✅ Complete |
+| `NotificationType` — info / warning / alert / critical / reminder / system | `src/notification/notification-types.ts` | ✅ Complete |
+| `NOTIFICATION_TYPES` — ordered const tuple of all built-in notification types | `src/notification/notification-types.ts` | ✅ Complete |
+| `NotificationChannel` — inApp / email / mobilePush (open union for future channels) | `src/notification/notification-types.ts` | ✅ Complete |
+| `NOTIFICATION_CHANNELS` — const tuple of the three built-in channels | `src/notification/notification-types.ts` | ✅ Complete |
+| `NotificationStatus` — pending / queued / sent / failed / dismissed / expired | `src/notification/notification-types.ts` | ✅ Complete |
+| `NotificationRecipient` — userId + contractorId + channels; contractor-isolated | `src/notification/notification-types.ts` | ✅ Complete |
+| `NotificationPayload` — type, subject, body, category, actionUrl?, expiresAt?, metadata? | `src/notification/notification-types.ts` | ✅ Complete |
+| `NotificationRequest` — recipients, payload, priority, correlationId?, requestedBy?, requestingModule? | `src/notification/notification-types.ts` | ✅ Complete |
+| `NotificationRecord` — id, request, status, createdAt, updatedAt, sentAt?, failureReason?, deliveryAttempts | `src/notification/notification-types.ts` | ✅ Complete |
+| `NotificationSummary` — totalRecords, byStatus, byType, capturedAt | `src/notification/notification-types.ts` | ✅ Complete |
+| `NotificationServiceOptions` — maxRecordsInMemory (default 1000) | `src/notification/notification-types.ts` | ✅ Complete |
+| `INotificationService` — send, sendBatch, getRecord, getRecordsForRecipient, getRecordsByStatus, getRecordsByModule, dismiss, pruneExpired, getSummary, listIds | `src/notification/notification-types.ts` | ✅ Complete |
+| `NotificationService` — in-memory implementation; FIFO eviction; contractor-isolated queries; frozen records | `src/notification/notification-service.ts` | ✅ Complete |
+| `NotificationError` — base notification error (`NOTIFICATION_ERROR`) | `src/errors.ts` | ✅ Complete |
+| `NotificationNotFoundError` — unknown notificationId (`NOTIFICATION_NOT_FOUND`) | `src/errors.ts` | ✅ Complete |
+| `NotificationRecipientError` — invalid or empty recipient list (`NOTIFICATION_RECIPIENT`) | `src/errors.ts` | ✅ Complete |
+| Public barrel updated | `src/index.ts` | ✅ Updated |
+
+---
 
 ### Milestone 4.6 — Metrics Service
 
@@ -277,7 +304,7 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 | 4.4 | Communication Contracts | ✅ Done — 4 contract files, 6 identifier types, 13 events, 2 messages, `AnyPlatformEvent` union |
 | 4.5 | Health Service | ✅ Done — `IHealthService`, `HealthService` (in-memory), 6 health states, 5 categories, `HealthSummary`, timeout + parallel checks, 3 error classes |
 | 4.6 | Metrics Service | ✅ Done — `IMetricsService`, `MetricsService` (in-memory), 6 metric kinds, 10 categories, `MetricSnapshot`, `MetricSummary`, startTimer, flush, reset, 3 error classes |
-| 4.7 | Notification Service | `INotificationService`, `NotificationPayload`, channel contracts |
+| 4.7 | Notification Service | ✅ Done — `INotificationService`, `NotificationService` (in-memory), 6 notification types, 3 channels, 6 statuses, `NotificationRecipient` (contractor-isolated), `NotificationRecord`, `NotificationSummary`, dismiss, pruneExpired, sendBatch, 3 error classes |
 | 4.8 | Action Service | `IActionService`, `ActionRequest`, `ActionResult` contracts |
 | 4.9 | Audit Service | `IAuditService`, `AuditEntry`, write-only audit trail contracts |
 | 4.10 | Platform SDK | `@acc-reliability/sdk` public API, module registration helpers, typed service resolution |
@@ -351,6 +378,15 @@ As of Milestone 3.2, the platform supports 8 strongly typed configuration groups
 29. `flush()` drains the per-metric rolling buffer (bounded by `maxSamplesPerMetric`, default 100). The aggregate state (`sampleCount`, `sum`, `min`, `max`) is not affected by flush. If `flush()` is never called, the buffer self-manages via FIFO eviction.
 30. `startTimer()` uses `performance.now()` for sub-millisecond precision. It is available globally in Node.js 16+. The timer records elapsed milliseconds as a floating-point `MetricValue`.
 31. `MetricCategory` is an open union. New categories (module-specific or future platform categories) can be added without modifying the core type. Existing `KnownMetricCategory` values map directly to the 10 platform domain areas.
+32. `NotificationService` is an in-memory implementation. All records are lost on process restart. The service id `platform.notifications` is reserved in the Service Registry; no registration occurs until the SDK milestone wires it into bootstrap.
+33. `NotificationChannel` in `notification-types.ts` (`'inApp' | 'email' | 'mobilePush'`) supersedes the simpler `NotificationChannel` previously re-exported from `platform-messages.ts`. The `platform-messages.ts` internal type is retained for `NotificationRequestedPayload.recipients` structural compatibility; it is no longer re-exported from `index.ts`.
+34. `NotificationRecipient` in `notification-types.ts` is the canonical platform type. It adds `contractorId` to enforce contractor isolation. The lightweight `NotificationRecipient` previously defined inside `platform-messages.ts` is no longer re-exported from `index.ts`; it remains an internal type for the `NotificationRequestedPayload` contract.
+35. `send()` and `sendBatch()` in the in-memory implementation transition records immediately to `'sent'`. No real email or push delivery occurs. Future milestones will replace the no-op delivery paths with real adapters.
+36. `dismiss()` in the current implementation trusts the caller's `userId`. Future implementations must verify the user appears in the notification's recipient list before allowing dismissal.
+37. `pruneExpired()` is designed for periodic invocation by a platform scheduler (future milestone). Callers must invoke it explicitly; the in-memory service does not run background timers.
+38. `NotificationRecord` objects are frozen on creation. Status transitions produce a new frozen object; the previous object is replaced in the internal Map.
+39. `sendBatch()` processes requests independently. A `NotificationRecipientError` on one request is recorded as a `'failed'` record; other requests in the batch continue processing.
+40. `NotificationChannel` is an open union. New channels (e.g. `'sms'`, `'webhook'`, `'teams'`) are added by platform integration milestones without a core type change. The three built-in channels (`inApp`, `email`, `mobilePush`) are the only channels recognized by the current implementation.
 
 ---
 

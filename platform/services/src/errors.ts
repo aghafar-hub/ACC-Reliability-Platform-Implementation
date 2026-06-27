@@ -22,9 +22,12 @@
 //     ├─ HealthError            HEALTH_ERROR                — base for all health service failures
 //     │    ├─ HealthCheckTimeoutError    HEALTH_CHECK_TIMEOUT     — check exceeded time limit
 //     │    └─ HealthComponentNotFoundError HEALTH_COMPONENT_NOT_FOUND — unknown component id
-//     └─ MetricsError           METRICS_ERROR               — base for all metrics service failures
-//          ├─ MetricNotFoundError          METRICS_NOT_FOUND          — unknown metric id
-//          └─ MetricAlreadyRegisteredError METRICS_ALREADY_REGISTERED — duplicate registration
+//     ├─ MetricsError           METRICS_ERROR               — base for all metrics service failures
+//     │    ├─ MetricNotFoundError          METRICS_NOT_FOUND          — unknown metric id
+//     │    └─ MetricAlreadyRegisteredError METRICS_ALREADY_REGISTERED — duplicate registration
+//     └─ NotificationError      NOTIFICATION_ERROR          — base for all notification service failures
+//          ├─ NotificationNotFoundError   NOTIFICATION_NOT_FOUND     — unknown notification id
+//          └─ NotificationRecipientError  NOTIFICATION_RECIPIENT     — invalid or empty recipient list
 
 import { PlatformError } from '@acc-reliability/kernel';
 
@@ -356,6 +359,69 @@ export class MetricAlreadyRegisteredError extends MetricsError {
     );
     this.name = 'MetricAlreadyRegisteredError';
     this.metricId = metricId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Notification errors ───────────────────────────────────────────────────────
+
+/**
+ * Base error for all notification service failures.
+ *
+ * Catch this type to handle any notification-related error without
+ * enumerating sub-types.  Sub-classes supply a more specific `code`;
+ * when this class is thrown directly it uses `'NOTIFICATION_ERROR'`.
+ */
+export class NotificationError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'NOTIFICATION_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'NotificationError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation targets a notification record whose id is not held
+ * in the notification service (e.g. a `dismiss()` call with an unknown id).
+ *
+ * HTTP equivalent: 404 Not Found.
+ */
+export class NotificationNotFoundError extends NotificationError {
+  readonly notificationId: string;
+
+  constructor(notificationId: string) {
+    super(
+      `Notification '${notificationId}' was not found`,
+      'NOTIFICATION_NOT_FOUND',
+      { notificationId },
+    );
+    this.name = 'NotificationNotFoundError';
+    this.notificationId = notificationId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a {@link NotificationRequest} contains an invalid or empty
+ * recipient list.
+ *
+ * Every notification must target at least one recipient.  This error is
+ * also thrown when recipient data is structurally invalid (e.g. missing
+ * `contractorId`).
+ *
+ * HTTP equivalent: 400 Bad Request.
+ */
+export class NotificationRecipientError extends NotificationError {
+  constructor(
+    message: string = 'Notification request must include at least one valid recipient',
+    context?: Record<string, unknown>
+  ) {
+    super(message, 'NOTIFICATION_RECIPIENT', context);
+    this.name = 'NotificationRecipientError';
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }

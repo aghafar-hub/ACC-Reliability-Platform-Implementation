@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Milestone Tracker
 
-Version: 1.6  
+Version: 1.7  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.6)
+Updated By: AI Agent (Milestone 4.7)
 
 ---
 
@@ -41,7 +41,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | 4.4 | Communication Contracts | ✅ Done | 2026-06-27 | CorrelationId/MessageId/RequestId/EventId/TraceId/OperationId, EquipmentId, PlatformModule (9), MessageMetadata, PlatformEvent\<T\>/PlatformMessage\<T\>, 13 domain events, 2 command messages, AnyPlatformEvent union |
 | 4.5 | Health Service | ✅ Done | 2026-06-27 | IHealthService, HealthService (in-memory), 6 health states, 5 categories, HealthCheckResult, HealthComponentStatus, HealthSummary, parallel checkAll, per-check timeout, HealthError hierarchy (3 classes) |
 | 4.6 | Metrics Service | ✅ Done | 2026-06-27 | IMetricsService, MetricsService (in-memory), 6 metric kinds, 10 categories, MetricDefinition, MetricSample, MetricSnapshot, MetricSummary, startTimer, flush, reset/resetAll, MetricsError hierarchy (3 classes) |
-| 4.7 | Notification Service | ⏳ Planned | — | INotificationService, NotificationPayload, channel contracts |
+| 4.7 | Notification Service | ✅ Done | 2026-06-27 | INotificationService, NotificationService (in-memory), 6 notification types, 3 channels, 6 statuses, NotificationRecipient (contractor-isolated), NotificationRecord, NotificationSummary, dismiss, pruneExpired, sendBatch, NotificationError hierarchy (3 classes) |
 | 4.8 | Action Service | ⏳ Planned | — | IActionService, ActionRequest, ActionResult contracts |
 | 4.9 | Audit Service | ⏳ Planned | — | IAuditService, AuditEntry, write-only audit trail contracts |
 | 4.10 | Platform SDK | ⏳ Planned | — | `@acc-reliability/sdk` public API surface, module registration helpers, typed service resolution |
@@ -855,6 +855,90 @@ The following metric ids are **not yet registered** — they are reserved for wi
 
 ```
 services: tsc --noEmit platform/services/tsconfig.json → exit 0
+```
+
+---
+
+## Milestone 4.7 Detail — Notification Service
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/services` (new sub-module `src/notification/`)
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `platform/services/src/notification/notification-types.ts` | All notification types, `INotificationService` interface, branded id factories, constants |
+| `platform/services/src/notification/notification-service.ts` | `NotificationService` — in-memory implementation |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/services/src/errors.ts` | Added `NotificationError` hierarchy: 3 error classes |
+| `platform/services/src/index.ts` | Added all notification type exports, `NotificationService` class export, and notification error exports; removed `NotificationChannel` and `NotificationRecipient` re-exports from `platform-messages` (superseded by notification-types) |
+
+### Notification Types
+
+| Type | Kind | Values / Shape |
+|---|---|---|
+| `NotificationType` | union | `info` · `warning` · `alert` · `critical` · `reminder` · `system` |
+| `NotificationChannel` | open union | `inApp` · `email` · `mobilePush` · `(string)` |
+| `NotificationStatus` | union | `pending` · `queued` · `sent` · `failed` · `dismissed` · `expired` |
+
+### INotificationService Contract
+
+| Group | Method | Description |
+|---|---|---|
+| Dispatch | `send(request)` | Submit one notification; returns frozen `NotificationRecord` with status `sent` |
+| Dispatch | `sendBatch(requests)` | Submit multiple notifications independently; failures are recorded, not thrown |
+| Query | `getRecord(id)` | Returns record or `null` — does not throw |
+| Query | `getRecordsForRecipient(userId, contractorId)` | Contractor-scoped recipient query |
+| Query | `getRecordsByStatus(status)` | Filter by lifecycle status |
+| Query | `getRecordsByModule(module)` | Filter by requesting module |
+| Lifecycle | `dismiss(id, userId)` | Transition record to `dismissed`; throws `NotificationNotFoundError` if not found |
+| Lifecycle | `pruneExpired()` | Transition all past-`expiresAt` records to `expired`; returns count |
+| Summary | `getSummary()` | Frozen summary: totalRecords, byStatus, byType, capturedAt |
+| Summary | `listIds()` | All record ids in insertion order |
+
+### NotificationError Hierarchy
+
+| Class | Code | HTTP equiv | When thrown |
+|---|---|---|---|
+| `NotificationError` | `NOTIFICATION_ERROR` | 500 | Base; catch-all |
+| `NotificationNotFoundError` | `NOTIFICATION_NOT_FOUND` | 404 | `dismiss()` with unknown id |
+| `NotificationRecipientError` | `NOTIFICATION_RECIPIENT` | 400 | `send()` / `sendBatch()` with empty recipient list |
+
+### Contractor Isolation
+
+- `NotificationRecipient` carries both `userId` and `contractorId`.
+- `getRecordsForRecipient(userId, contractorId)` returns only records where both values match a recipient entry.
+- A caller cannot retrieve records belonging to a different contractor without supplying that contractor's `ContractorId`.
+
+### Breaking Changes to Existing Exports
+
+| Removed export | From | Replaced by |
+|---|---|---|
+| `NotificationChannel` | `./contracts/platform-messages` | `NotificationChannel` from `./notification/notification-types` |
+| `NotificationRecipient` | `./contracts/platform-messages` | `NotificationRecipient` from `./notification/notification-types` |
+
+The types removed from `platform-messages` re-exports remain as file-internal types used by `NotificationRequestedPayload`. Callers that previously imported them directly should switch to the notification-types versions.
+
+### Design Decisions
+
+- `send()` is `async` to allow future adapters (SMTP, FCM, etc.) to be dropped in without changing the contract signature. The in-memory implementation resolves immediately.
+- `sendBatch()` catches `NotificationError` per-request so one bad request never silences the rest. Non-notification errors are re-thrown.
+- `NotificationRecord` is frozen at creation and on every status transition. The internal Map always holds the latest frozen state for each id.
+- FIFO eviction: when `maxRecordsInMemory` is reached the oldest record (first in Map insertion order) is removed. This prevents unbounded memory growth in long-running processes.
+- `pruneExpired()` uses ISO 8601 string comparison (`expiresAt < now`). Both strings are UTC ISO 8601, so lexicographic ordering is chronologically correct.
+- `dismiss()` accepts `_userId` but does not currently verify the caller is a recipient. The parameter is present to communicate intent and to allow enforcement in a future implementation without changing the contract signature.
+- Service id `platform.notifications` is reserved. Bootstrap registration is deferred to the SDK milestone.
+- Future Event Bus: when Phase 9 is active, `send()` will publish `NotificationDeliveredEvent` or `NotificationFailedEvent`. Callers of `INotificationService` need no changes.
+
+### Compile Verification
+
+```
+services: tsc --noEmit -p platform/services/tsconfig.json → exit 0
 ```
 
 ---
