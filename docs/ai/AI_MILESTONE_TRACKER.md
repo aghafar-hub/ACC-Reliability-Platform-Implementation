@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Milestone Tracker
 
-Version: 1.3  
+Version: 1.4  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.3)
+Updated By: AI Agent (Milestone 4.4)
 
 ---
 
@@ -38,7 +38,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | 4.1 | Authentication Contracts | ✅ Done | 2026-06-27 | ContractorId, UserId, SessionId (branded), UserContext, SessionInfo, AuthCredentials (discriminated union), IAuthService, AuthError/AuthenticationError/SessionExpiredError |
 | 4.2 | Authorization and Permission Contracts | ✅ Done | 2026-06-27 | AppRole (6 roles), ContractorScope, ModuleId (5 modules), ActionType (7 actions), PermissionEntry, PermissionRequest, IPermissionService, AuthorizationError, PermissionDeniedError |
 | 4.3 | Storage Abstraction Contracts | ✅ Done | 2026-06-27 | FilterExpression (field/composite), QueryOptions (filter+sort+page), PageRequest, PageResult, PagedQueryOptions, SortClause, Entity, IRepository<T>, ITransaction, IStorageProvider, StorageProviderConfig (5 providers), StorageHealthStatus, StorageError hierarchy (6 classes) |
-| 4.4 | Communication Contracts | ⏳ Planned | — | Inter-service communication interfaces; no Event Bus implementation |
+| 4.4 | Communication Contracts | ✅ Done | 2026-06-27 | CorrelationId/MessageId/RequestId/EventId/TraceId/OperationId, EquipmentId, PlatformModule (9), MessageMetadata, PlatformEvent\<T\>/PlatformMessage\<T\>, 13 domain events, 2 command messages, AnyPlatformEvent union |
 | 4.5 | Health Service | ⏳ Planned | — | IHealthService, HealthStatus, health-check contracts |
 | 4.6 | Metrics Service | ⏳ Planned | — | IMetricsService, MetricEntry, counter/gauge/histogram contracts |
 | 4.7 | Notification Service | ⏳ Planned | — | INotificationService, NotificationPayload, channel contracts |
@@ -600,6 +600,88 @@ All types are open unions (`string & Record<never, never>` extension); module-sp
 - `IPermissionService` methods are synchronous — permission checks are on the hot path of every module operation. Implementations cache the effective permission set when the session is established.
 - The service id `platform.permissions` is reserved. No registration in this milestone.
 - Future Event Bus: when Phase 9 is active, role changes will publish to `platform.events.permissions.roles-changed` so dependent services can invalidate caches without polling. Callers of `IPermissionService` need no changes.
+
+---
+
+## Milestone 4.4 Detail — Communication Contracts
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/services` (new sub-module `src/contracts/`)
+
+Satisfies the AI_DEVELOPMENT_GUIDE requirement: *"Prepare code for future event-driven architecture but do not implement it yet."*  
+All contracts are transport-independent and storage-independent. They will be reused without modification when the Event Bus is introduced in Phase 9.
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `platform/services/src/contracts/correlation.ts` | 6 branded identifier types (CorrelationId, MessageId, RequestId, EventId, TraceId, OperationId) + factories |
+| `platform/services/src/contracts/communication-types.ts` | EquipmentId, PlatformModule (9 modules), MessagePriority, ContractVersion, MessageMetadata, PlatformEvent\<T\>, PlatformMessage\<T\> |
+| `platform/services/src/contracts/platform-events.ts` | 13 domain events with typed payloads, discriminants, version constants, AnyPlatformEvent union |
+| `platform/services/src/contracts/platform-messages.ts` | 2 command messages with typed payloads, discriminants, version constants, AnyPlatformMessage union |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/services/src/index.ts` | Added all contract type exports, value exports, and version constant exports |
+
+### Identifier Types (correlation.ts)
+
+| Type | Brand | Purpose |
+|---|---|---|
+| `CorrelationId` | `'CorrelationId'` | Links all messages produced by one user action |
+| `MessageId` | `'MessageId'` | Unique id for a single message envelope |
+| `RequestId` | `'RequestId'` | Matches request to response in future request-reply patterns |
+| `EventId` | `'EventId'` | Unique id for a single event envelope |
+| `TraceId` | `'TraceId'` | Distributed trace across all hops (OpenTelemetry-compatible) |
+| `OperationId` | `'OperationId'` | Single named step within a larger trace |
+
+### Platform Modules (communication-types.ts)
+
+`oil-lubrication` · `oil-analysis` · `vibration-analysis` · `reliability-measurements` · `compressors` · `owner-center` · `contractor-portal` · `notification-service` · `action-service`
+
+All are open-union extensible via `PlatformModule`.
+
+### Domain Events (platform-events.ts)
+
+| Event | Source Module | Key Payload Fields |
+|---|---|---|
+| `OilChangeCompleted` | `oil-lubrication` | equipmentId, completedBy, oilType, quantityLitres |
+| `OilAnalysisCompleted` | `oil-analysis` | sampleId, parameters\[\], overallCondition |
+| `OilAnalysisCritical` | `oil-analysis` | sampleId, criticalParameters\[\], severity, finding |
+| `ResampleRequired` | `oil-analysis` | originalSampleId, requiredBy, urgency |
+| `ActionCreated` | `action-service` | actionId, actionType, assignedTo, dueDate, priority |
+| `ActionCompleted` | `action-service` | actionId, completedBy, outcome, completedOnTime |
+| `EquipmentStatusChanged` | any module | equipmentId, previousStatus, newStatus, reason |
+| `RouteAssigned` | `oil-lubrication` | routeId, assignedTo, equipmentIds\[\], scheduledDate |
+| `RouteCompleted` | `oil-lubrication` | routeId, completedBy, completedItems, totalItems |
+| `HealthStatusChanged` | platform infra | componentId, previousStatus, newStatus, reason |
+| `UserCreated` | platform identity | userId, contractorId, roles\[\] |
+| `UserUpdated` | platform identity | userId, changedFields\[\] (no PII values) |
+| `PermissionChanged` | platform authz | userId, changes\[\] (grant/revoke per module+action) |
+
+### Command Messages (platform-messages.ts)
+
+| Message | Target Module | Key Payload Fields |
+|---|---|---|
+| `OilChangeRequested` | `oil-lubrication` | equipmentId, requestedBy, requiredBy, reason, oilType? |
+| `NotificationRequested` | `notification-service` | recipients\[\], subject, body, priority, category |
+
+### Design Decisions
+
+- `MessageMetadata` is the single shared header for all contracts. Transport adapters (direct call today, Event Bus in Phase 9) attach this header; business payloads never carry routing concerns.
+- Every event and message has a `type` string literal discriminant. `AnyPlatformEvent` and `AnyPlatformMessage` are discriminated unions — exhaustive switch/narrowing is supported by the TypeScript compiler.
+- `UserUpdatedEvent` intentionally omits new field values from the payload to prevent PII leakage in the event stream. Consumers that need current values must query the auth service.
+- `EquipmentId` is now the canonical branded type for equipment identity in contracts, replacing raw strings. Consistent with the AI_DEVELOPMENT_GUIDE: "Equipment_ID is the master equipment identifier across the entire platform."
+- All version constants follow the `"major.minor"` format. Consumers must tolerate unknown minor versions within the same major.
+
+### Compile Verification
+
+```
+kernel:   tsc --build platform/kernel/tsconfig.json       → exit 0
+services: tsc --noEmit platform/services/tsconfig.json    → exit 0
+```
 
 ---
 

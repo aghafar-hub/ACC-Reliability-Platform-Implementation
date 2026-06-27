@@ -2,9 +2,9 @@
 
 # ACC Reliability Platform — Project Status
 
-Version: 1.3  
+Version: 1.4  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 4.3)
+Updated By: AI Agent (Milestone 4.4)
 
 ---
 
@@ -17,6 +17,42 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 ---
 
 ## Implemented So Far
+
+### Milestone 4.4 — Communication Contracts
+
+**Package:** `@acc-reliability/services` (`platform/services/src/contracts/`)
+
+| Component | File | Status |
+|---|---|---|
+| `CorrelationId`, `MessageId`, `RequestId`, `EventId`, `TraceId`, `OperationId` — branded tracing identifiers | `src/contracts/correlation.ts` | ✅ Complete |
+| `createCorrelationId`, `createMessageId`, `createRequestId`, `createEventId`, `createTraceId`, `createOperationId` — factories | `src/contracts/correlation.ts` | ✅ Complete |
+| `EquipmentId` — master cross-platform equipment identifier | `src/contracts/communication-types.ts` | ✅ Complete |
+| `PlatformModule` / `KnownPlatformModule` / `PLATFORM_MODULES` — 9 known modules + extensible | `src/contracts/communication-types.ts` | ✅ Complete |
+| `MessagePriority` — low / normal / high / critical | `src/contracts/communication-types.ts` | ✅ Complete |
+| `ContractVersion` / `CONTRACT_VERSION_1_0` — versioning token | `src/contracts/communication-types.ts` | ✅ Complete |
+| `MessageMetadata` — immutable header (messageId, correlationId, traceId, timestamp, sourceModule, targetModule, userId, contractorId, equipmentId, priority, version) | `src/contracts/communication-types.ts` | ✅ Complete |
+| `PlatformEvent<T>` — base domain event envelope | `src/contracts/communication-types.ts` | ✅ Complete |
+| `PlatformMessage<T>` — base command/request envelope | `src/contracts/communication-types.ts` | ✅ Complete |
+| `OilChangeCompletedEvent` — oil change recorded | `src/contracts/platform-events.ts` | ✅ Complete |
+| `OilAnalysisCompletedEvent` — analysis report received | `src/contracts/platform-events.ts` | ✅ Complete |
+| `OilAnalysisCriticalEvent` — critical finding detected | `src/contracts/platform-events.ts` | ✅ Complete |
+| `ResampleRequiredEvent` — re-sample needed | `src/contracts/platform-events.ts` | ✅ Complete |
+| `ActionCreatedEvent` — action assigned | `src/contracts/platform-events.ts` | ✅ Complete |
+| `ActionCompletedEvent` — action finished | `src/contracts/platform-events.ts` | ✅ Complete |
+| `EquipmentStatusChangedEvent` — equipment state transition | `src/contracts/platform-events.ts` | ✅ Complete |
+| `RouteAssignedEvent` — route assigned to technician | `src/contracts/platform-events.ts` | ✅ Complete |
+| `RouteCompletedEvent` — route work finished | `src/contracts/platform-events.ts` | ✅ Complete |
+| `HealthStatusChangedEvent` — component health transition | `src/contracts/platform-events.ts` | ✅ Complete |
+| `UserCreatedEvent` — new user account | `src/contracts/platform-events.ts` | ✅ Complete |
+| `UserUpdatedEvent` — user profile changed | `src/contracts/platform-events.ts` | ✅ Complete |
+| `PermissionChangedEvent` — permission grant/revoke | `src/contracts/platform-events.ts` | ✅ Complete |
+| `AnyPlatformEvent` — discriminated union of all events | `src/contracts/platform-events.ts` | ✅ Complete |
+| `OilChangeRequestedMessage` — request an oil change | `src/contracts/platform-messages.ts` | ✅ Complete |
+| `NotificationRequestedMessage` — request notification delivery | `src/contracts/platform-messages.ts` | ✅ Complete |
+| `AnyPlatformMessage` — discriminated union of all messages | `src/contracts/platform-messages.ts` | ✅ Complete |
+| Public barrel updated | `src/index.ts` | ✅ Updated |
+
+---
 
 ### Milestone 4.3 — Storage Abstraction Contracts
 
@@ -187,7 +223,7 @@ Active work is on Platform Services (`platform/services`). The Platform Kernel i
 
 | Milestone | Capability | Notes |
 |---|---|---|
-| 4.4 | Communication Contracts | Inter-service communication interfaces; no Event Bus implementation |
+| 4.4 | Communication Contracts | ✅ Done — 4 contract files, 6 identifier types, 13 events, 2 messages, `AnyPlatformEvent` union |
 | 4.5 | Health Service | `IHealthService`, `HealthStatus`, health-check contracts |
 | 4.6 | Metrics Service | `IMetricsService`, `MetricEntry`, counter/gauge/histogram contracts |
 | 4.7 | Notification Service | `INotificationService`, `NotificationPayload`, channel contracts |
@@ -252,6 +288,10 @@ As of Milestone 3.2, the platform supports 8 strongly typed configuration groups
 19. `SqlServerProviderConfig.password` and `GoogleSheetsProviderConfig.credentialsJson` must be sourced from environment variables or a secret store — never hardcoded.
 9. `NullEventBus` is a no-op placeholder. A real in-process event bus will be introduced in Phase 9.
 10. `LifecycleManager` is registered at `platform.lifecycle`. Platform Services will implement `ILifecycleComponent` as they are built.
+20. All communication contracts in `src/contracts/` are type-only — no transport, no publish/subscribe, no queuing. They define the shape of data; delivery mechanism is not yet implemented.
+21. `EquipmentId` is now the canonical branded type for equipment identity in contracts. Business modules must use `createEquipmentId()` to produce values; never cast raw strings.
+22. `AnyPlatformEvent` and `AnyPlatformMessage` are discriminated unions. Adding a new event requires: (a) payload interface, (b) typed envelope interface, (c) version constant, (d) add to the union, (e) re-export from `index.ts`.
+23. `PlatformModule` is an open union. New modules are added to `PLATFORM_MODULES` in `communication-types.ts` without requiring changes in event or message files.
 
 ---
 

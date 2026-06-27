@@ -77,6 +77,112 @@ export type {
   IStorageProvider,
 } from './storage/storage-types';
 
+// ── Communication Contracts — Correlation identifiers ─────────────────────────
+export type {
+  CorrelationId,
+  MessageId,
+  RequestId,
+  EventId,
+  TraceId,
+  OperationId,
+} from './contracts/correlation';
+
+export {
+  createCorrelationId,
+  createMessageId,
+  createRequestId,
+  createEventId,
+  createTraceId,
+  createOperationId,
+} from './contracts/correlation';
+
+// ── Communication Contracts — Shared types ────────────────────────────────────
+export type {
+  EquipmentId,
+  KnownPlatformModule,
+  PlatformModule,
+  MessagePriority,
+  ContractVersion,
+  MessageMetadata,
+  PlatformEvent,
+  PlatformMessage,
+} from './contracts/communication-types';
+
+export {
+  PLATFORM_MODULES,
+  CONTRACT_VERSION_1_0,
+  createEquipmentId,
+} from './contracts/communication-types';
+
+// ── Communication Contracts — Platform events ─────────────────────────────────
+export type {
+  OilChangeCompletedPayload,
+  OilChangeCompletedEvent,
+  OilAnalysisParameter,
+  OilAnalysisCompletedPayload,
+  OilAnalysisCompletedEvent,
+  OilAnalysisCriticalPayload,
+  OilAnalysisCriticalEvent,
+  ResampleRequiredPayload,
+  ResampleRequiredEvent,
+  ActionCreatedPayload,
+  ActionCreatedEvent,
+  ActionCompletedPayload,
+  ActionCompletedEvent,
+  EquipmentStatus,
+  EquipmentStatusChangedPayload,
+  EquipmentStatusChangedEvent,
+  RouteAssignedPayload,
+  RouteAssignedEvent,
+  RouteCompletedPayload,
+  RouteCompletedEvent,
+  ComponentHealthStatus,
+  HealthStatusChangedPayload,
+  HealthStatusChangedEvent,
+  UserCreatedPayload,
+  UserCreatedEvent,
+  UserUpdatedPayload,
+  UserUpdatedEvent,
+  PermissionChange,
+  PermissionChangedPayload,
+  PermissionChangedEvent,
+  AnyPlatformEvent,
+  PlatformEventType,
+} from './contracts/platform-events';
+
+export {
+  OIL_CHANGE_COMPLETED_VERSION,
+  OIL_ANALYSIS_COMPLETED_VERSION,
+  OIL_ANALYSIS_CRITICAL_VERSION,
+  RESAMPLE_REQUIRED_VERSION,
+  ACTION_CREATED_VERSION,
+  ACTION_COMPLETED_VERSION,
+  EQUIPMENT_STATUS_CHANGED_VERSION,
+  ROUTE_ASSIGNED_VERSION,
+  ROUTE_COMPLETED_VERSION,
+  HEALTH_STATUS_CHANGED_VERSION,
+  USER_CREATED_VERSION,
+  USER_UPDATED_VERSION,
+  PERMISSION_CHANGED_VERSION,
+} from './contracts/platform-events';
+
+// ── Communication Contracts — Platform messages ───────────────────────────────
+export type {
+  OilChangeRequestedPayload,
+  OilChangeRequestedMessage,
+  NotificationChannel,
+  NotificationRecipient,
+  NotificationRequestedPayload,
+  NotificationRequestedMessage,
+  AnyPlatformMessage,
+  PlatformMessageType,
+} from './contracts/platform-messages';
+
+export {
+  OIL_CHANGE_REQUESTED_VERSION,
+  NOTIFICATION_REQUESTED_VERSION,
+} from './contracts/platform-messages';
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 export {
   AuthError,
