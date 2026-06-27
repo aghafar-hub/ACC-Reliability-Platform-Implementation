@@ -79,3 +79,12 @@ export class EventBusError extends PlatformError {
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
+
+/** Thrown when a lifecycle management operation fails (invalid transition, circular dependency, component error, etc.). */
+export class LifecycleError extends PlatformError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'LIFECYCLE_ERROR', context);
+    this.name = 'LifecycleError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}

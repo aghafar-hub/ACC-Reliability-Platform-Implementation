@@ -77,6 +77,19 @@ export type {
   EventChannelInfo,
 } from './events/event-bus-types';
 
+// ── Lifecycle Manager ─────────────────────────────────────────────────────────
+export { LifecycleManager } from './lifecycle/lifecycle-manager';
+export type { LifecycleManagerOptions } from './lifecycle/lifecycle-manager';
+export type {
+  ILifecycleManager,
+  ILifecycleComponent,
+  ComponentStatus,
+  LifecycleStatus,
+  LifecycleState,
+  ManagerState,
+} from './lifecycle/lifecycle-types';
+export { isTransitionAllowed, allowedTransitionsFrom } from './lifecycle/lifecycle-state';
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 export {
   PlatformError,
@@ -85,4 +98,5 @@ export {
   ModuleError,
   ContainerError,
   EventBusError,
+  LifecycleError,
 } from './errors';

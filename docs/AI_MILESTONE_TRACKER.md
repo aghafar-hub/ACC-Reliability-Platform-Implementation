@@ -4,7 +4,7 @@
 
 Version: 1.0  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 3.5)
+Updated By: AI Agent (Milestone 3.6)
 
 ---
 
@@ -24,6 +24,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | 3.3 | Service Registry Hardening | ✅ Done | 2026-06-27 | ServiceStatus, lifecycle timestamps, tryRegister, getRequired, setStatus, listByStatus, clear |
 | 3.4 | Dependency Injection Container | ✅ Done | 2026-06-27 | Token<T>, Container (singleton/lazy-singleton/transient), circular-dep detection, ContainerError |
 | 3.5 | Platform Event Bus Interfaces | ✅ Done | 2026-06-27 | EventToken<T>, IEventBus, IEventHandler<T>, EventSubscription, NullEventBus, EventBusError |
+| 3.6 | Platform Lifecycle Manager | ✅ Done | 2026-06-27 | LifecycleManager, ILifecycleComponent, 9 lifecycle states, dependency-ordered init, graceful shutdown, restart, health transitions, LifecycleError |
 
 ---
 
@@ -285,6 +286,77 @@ The kernel now exposes the full event bus contract. Phase 9 replaces `NullEventB
 | `platform.config` | Platform Config | `running` |
 | `platform.configManager` | Platform Config Manager | `running` |
 | `platform.eventBus` | Platform Event Bus (Null Phase 1) | `running` |
+
+---
+
+## Milestone 3.6 Detail — Platform Lifecycle Manager
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/kernel`
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `platform/kernel/src/lifecycle/lifecycle-types.ts` | `LifecycleState` (9 states), `ManagerState`, `ILifecycleComponent`, `ComponentStatus`, `LifecycleStatus`, `ILifecycleManager` |
+| `platform/kernel/src/lifecycle/lifecycle-state.ts` | `isTransitionAllowed()`, `allowedTransitionsFrom()` — pure state-transition guards |
+| `platform/kernel/src/lifecycle/lifecycle-manager.ts` | `LifecycleManager` implementation, `LifecycleManagerOptions` |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/kernel/src/errors.ts` | Added `LifecycleError extends PlatformError` (code: `LIFECYCLE_ERROR`) |
+| `platform/kernel/src/bootstrap.ts` | Creates `LifecycleManager`; registers `platform.lifecycle`; marks it `running` |
+| `platform/kernel/src/index.ts` | Exports: `LifecycleManager`, `LifecycleManagerOptions`, `ILifecycleManager`, `ILifecycleComponent`, `ComponentStatus`, `LifecycleStatus`, `LifecycleState`, `ManagerState`, `isTransitionAllowed`, `allowedTransitionsFrom`, `LifecycleError` |
+
+### Lifecycle States
+
+| State | Description |
+|---|---|
+| `Created` | Component object exists; not yet registered |
+| `Registered` | Registered with the manager; awaiting initialization |
+| `Initializing` | `initialize()` in progress |
+| `Running` | Fully operational |
+| `Degraded` | Operational but with reduced capability |
+| `Maintenance` | Intentionally paused; not accepting work |
+| `Stopping` | `shutdown()` in progress |
+| `Stopped` | Orderly shutdown complete |
+| `Failed` | Unrecoverable error; terminal until restarted |
+
+### Manager API
+
+| Method | Description |
+|---|---|
+| `register(component)` | Registers a component before `initializeAll()`. Throws on duplicate or late call |
+| `initializeAll()` | Topological sort → initializes all components in dependency order. One-shot |
+| `shutdownAll()` | Reverse-order graceful shutdown. Component errors are logged, not re-thrown |
+| `restart(componentId)` | Stops then re-initializes a single component |
+| `setDegraded(id, reason)` | Transitions `Running` → `Degraded` |
+| `enterMaintenance(id)` | Transitions `Running`/`Degraded` → `Maintenance` |
+| `exitMaintenance(id)` | Transitions `Maintenance` → `Running` |
+| `getStatus()` | Returns frozen `LifecycleStatus` snapshot |
+| `getComponentStatus(id)` | Returns frozen `ComponentStatus` for one component |
+| `hasComponent(id)` | Returns `true` if component ID is registered |
+
+### Design Decisions
+
+- Dependency ordering: depth-first topological sort; circular dependencies throw `LifecycleError` with the full cycle path.
+- `initializeAll()` fails fast on the first component error; remaining components stay `Registered`.
+- `shutdownAll()` continues through failures; each shutdown error is logged individually.
+- `restart()` verifies all dependencies are `Running` before re-initializing.
+- `ServiceRegistry` sync is optional and best-effort; sync failures are logged and never propagated.
+- All public status objects are frozen. No component instance references are exposed outside the manager.
+
+### Bootstrap Services After Milestone 3.6
+
+| Service ID | Display Name | Status |
+|---|---|---|
+| `platform.logger` | Platform Logger | `running` |
+| `platform.config` | Platform Config | `running` |
+| `platform.configManager` | Platform Config Manager | `running` |
+| `platform.eventBus` | Platform Event Bus (Null Phase 1) | `running` |
+| `platform.lifecycle` | Platform Lifecycle Manager | `running` |
 
 ---
 

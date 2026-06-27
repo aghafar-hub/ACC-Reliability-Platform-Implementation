@@ -7,6 +7,7 @@ import { createPlatformContext } from './platform-context';
 import { PlatformError } from './errors';
 import { ConfigManager } from './config/config-manager';
 import { NullEventBus } from './events/null-event-bus';
+import { LifecycleManager } from './lifecycle/lifecycle-manager';
 
 import type { PlatformContext } from './platform-context';
 
@@ -61,6 +62,12 @@ export async function bootstrapPlatform(): Promise<BootstrapResult> {
     serviceRegistry.register('platform.configManager',  'Platform Config Manager',          configManager);
     serviceRegistry.register('platform.eventBus',       'Platform Event Bus (Null Phase 1)', new NullEventBus());
 
+    const lifecycleManager = new LifecycleManager({
+      logger,
+      serviceRegistry,
+    });
+    serviceRegistry.register('platform.lifecycle', 'Platform Lifecycle Manager', lifecycleManager);
+
     // ── Step 6: Build and freeze PlatformContext ───────────────────────────
     logger.debug('Creating platform context…');
     const context = createPlatformContext({
@@ -77,6 +84,7 @@ export async function bootstrapPlatform(): Promise<BootstrapResult> {
     serviceRegistry.setStatus('platform.config',        'running');
     serviceRegistry.setStatus('platform.configManager', 'running');
     serviceRegistry.setStatus('platform.eventBus',      'running');
+    serviceRegistry.setStatus('platform.lifecycle',     'running');
 
     const durationMs = Date.now() - startedAt;
 

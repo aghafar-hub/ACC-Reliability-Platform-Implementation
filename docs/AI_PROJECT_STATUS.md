@@ -4,7 +4,7 @@
 
 Version: 1.0  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 3.5)
+Updated By: AI Agent (Milestone 3.6)
 
 ---
 
@@ -31,6 +31,19 @@ Active work is on the Platform Kernel (`platform/kernel`). The kernel must be co
 | Platform Logger | `src/logger.ts` | ✅ Complete |
 | Error Hierarchy | `src/errors.ts` | ✅ Complete |
 | Public API barrel | `src/index.ts` | ✅ Complete |
+
+### Milestone 3.6 — Platform Lifecycle Manager
+
+**Package:** `@acc-reliability/kernel` (`platform/kernel/src/lifecycle/`)
+
+| Component | File | Status |
+|---|---|---|
+| Lifecycle states + component/manager types | `src/lifecycle/lifecycle-types.ts` | ✅ Complete |
+| State transition table + guards | `src/lifecycle/lifecycle-state.ts` | ✅ Complete |
+| `LifecycleManager` — register, init, shutdown, restart, health states | `src/lifecycle/lifecycle-manager.ts` | ✅ Complete |
+| `LifecycleError` | `src/errors.ts` | ✅ Complete |
+| Bootstrap: `platform.lifecycle` registered and marked `running` | `src/bootstrap.ts` | ✅ Updated |
+| Public barrel updated | `src/index.ts` | ✅ Updated |
 
 ### Milestone 3.5 — Platform Event Bus Interfaces
 
@@ -140,6 +153,7 @@ As of Milestone 3.2, the platform supports 8 strongly typed configuration groups
 3. Storage provider is configured but no implementation exists yet (`platform/storage` is a future milestone).
 4. Authentication and authorization are not implemented (`platform/services` is a future milestone).
 5. `NullEventBus` is a no-op placeholder. A real in-process event bus will be introduced in Phase 9. Resolve `platform.eventBus` from the `ServiceRegistry` — callers need no change when the real implementation is swapped in.
+6. `LifecycleManager` is registered at `platform.lifecycle`. No platform services implement `ILifecycleComponent` yet — that will happen when Platform Services (Phase 2) and future kernel services are refactored to use lifecycle management.
 
 ---
 
