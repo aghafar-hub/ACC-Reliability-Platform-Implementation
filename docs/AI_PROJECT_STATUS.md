@@ -4,7 +4,7 @@
 
 Version: 1.0  
 Last Updated: 2026-06-27  
-Updated By: AI Agent (Milestone 3.4)
+Updated By: AI Agent (Milestone 3.5)
 
 ---
 
@@ -31,6 +31,19 @@ Active work is on the Platform Kernel (`platform/kernel`). The kernel must be co
 | Platform Logger | `src/logger.ts` | ✅ Complete |
 | Error Hierarchy | `src/errors.ts` | ✅ Complete |
 | Public API barrel | `src/index.ts` | ✅ Complete |
+
+### Milestone 3.5 — Platform Event Bus Interfaces
+
+**Package:** `@acc-reliability/kernel` (`platform/kernel/src/events/`)
+
+| Component | File | Status |
+|---|---|---|
+| `EventToken<T>` — phantom-typed event channel handle | `src/events/event-token.ts` | ✅ Complete |
+| `IEventBus`, `IEventHandler<T>`, `EventSubscription`, `EventChannelInfo` | `src/events/event-bus-types.ts` | ✅ Complete |
+| `NullEventBus` — no-op Phase 1 implementation | `src/events/null-event-bus.ts` | ✅ Complete |
+| `EventBusError` | `src/errors.ts` | ✅ Complete |
+| Bootstrap: `platform.eventBus` registered and marked `running` | `src/bootstrap.ts` | ✅ Updated |
+| Public barrel updated | `src/index.ts` | ✅ Updated |
 
 ### Milestone 3.4 — Dependency Injection Container
 
@@ -126,6 +139,7 @@ As of Milestone 3.2, the platform supports 8 strongly typed configuration groups
 2. Feature flags are all `false` by default except `developerTools`. Enable per-environment via `ACC_FEATURE_*` env vars.
 3. Storage provider is configured but no implementation exists yet (`platform/storage` is a future milestone).
 4. Authentication and authorization are not implemented (`platform/services` is a future milestone).
+5. `NullEventBus` is a no-op placeholder. A real in-process event bus will be introduced in Phase 9. Resolve `platform.eventBus` from the `ServiceRegistry` — callers need no change when the real implementation is swapped in.
 
 ---
 

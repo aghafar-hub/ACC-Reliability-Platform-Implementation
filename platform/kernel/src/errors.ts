@@ -70,3 +70,12 @@ export class ContainerError extends PlatformError {
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
+
+/** Thrown when an event bus operation fails (invalid token, unregistered channel, etc.). */
+export class EventBusError extends PlatformError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'EVENT_BUS_ERROR', context);
+    this.name = 'EventBusError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}

@@ -67,6 +67,16 @@ export type {
   ContainerRegistrationInfo,
 } from './di/container-types';
 
+// ── Event Bus ─────────────────────────────────────────────────────────────────
+export { EventToken } from './events/event-token';
+export { NullEventBus } from './events/null-event-bus';
+export type {
+  IEventBus,
+  IEventHandler,
+  EventSubscription,
+  EventChannelInfo,
+} from './events/event-bus-types';
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 export {
   PlatformError,
@@ -74,4 +84,5 @@ export {
   RegistryError,
   ModuleError,
   ContainerError,
+  EventBusError,
 } from './errors';

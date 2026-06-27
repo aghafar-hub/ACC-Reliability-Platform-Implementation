@@ -3,7 +3,8 @@
 # ACC Reliability Platform — Milestone Tracker
 
 Version: 1.0  
-Last Updated: 2026-06-27
+Last Updated: 2026-06-27  
+Updated By: AI Agent (Milestone 3.5)
 
 ---
 
@@ -22,6 +23,7 @@ Each milestone is one deliverable that compiles, passes type-check, and is indep
 | 3.2 | Platform Configuration Manager | ✅ Done | 2026-06-27 | 8-group AppConfig, ConfigManager, ConfigValidator, env overrides, feature flags |
 | 3.3 | Service Registry Hardening | ✅ Done | 2026-06-27 | ServiceStatus, lifecycle timestamps, tryRegister, getRequired, setStatus, listByStatus, clear |
 | 3.4 | Dependency Injection Container | ✅ Done | 2026-06-27 | Token<T>, Container (singleton/lazy-singleton/transient), circular-dep detection, ContainerError |
+| 3.5 | Platform Event Bus Interfaces | ✅ Done | 2026-06-27 | EventToken<T>, IEventBus, IEventHandler<T>, EventSubscription, NullEventBus, EventBusError |
 
 ---
 
@@ -225,6 +227,64 @@ None. `Container` and `ServiceRegistry` are intentionally independent:
 ### Backward Compatibility
 
 `register()`, `get()`, `has()`, and `list()` signatures are unchanged. Existing callers compile without modification. `list()` now returns objects with additional fields (`status`, `statusChangedAt`, optional lifecycle timestamps).
+
+---
+
+## Milestone 3.5 Detail — Platform Event Bus Interfaces
+
+**Date:** 2026-06-27  
+**Package:** `@acc-reliability/kernel`
+
+Satisfies the AI_DEVELOPMENT_GUIDE requirement: *"Prepare code for future event-driven architecture but do not implement it yet."*  
+The kernel now exposes the full event bus contract. Phase 9 replaces `NullEventBus` with a real in-process implementation without touching any caller code.
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `platform/kernel/src/events/event-token.ts` | `EventToken<T>` — phantom-typed event channel handle keyed by name string |
+| `platform/kernel/src/events/event-bus-types.ts` | `IEventBus`, `IEventHandler<T>`, `EventSubscription`, `EventChannelInfo` interfaces |
+| `platform/kernel/src/events/null-event-bus.ts` | `NullEventBus` — no-op Phase 1 implementation; all methods are safe stubs |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `platform/kernel/src/errors.ts` | Added `EventBusError extends PlatformError` (code: `EVENT_BUS_ERROR`) |
+| `platform/kernel/src/bootstrap.ts` | Imports `NullEventBus`; registers `platform.eventBus`; marks it `running` in Step 7 |
+| `platform/kernel/src/index.ts` | Added event bus exports: `EventToken`, `NullEventBus`, `IEventBus`, `IEventHandler`, `EventSubscription`, `EventChannelInfo`, `EventBusError` |
+
+### Event Bus API
+
+| Member | Kind | Description |
+|---|---|---|
+| `EventToken<T>` | class | Phantom-typed channel handle; two instances with the same name address the same channel |
+| `IEventHandler<T>` | type | `(payload: T) => void` — synchronous event handler contract |
+| `EventSubscription` | interface | Handle returned by `subscribe()`; call `unsubscribe()` to deregister |
+| `EventChannelInfo` | interface | Public metadata for a channel (name, subscriber count, firstSubscribedAt) — no handlers exposed |
+| `IEventBus.publish<T>` | method | Publishes to all current subscribers; no-op if no subscribers exist |
+| `IEventBus.subscribe<T>` | method | Registers a handler; returns `EventSubscription` |
+| `IEventBus.unsubscribeAll<T>` | method | Removes all subscriptions for a channel (module teardown) |
+| `IEventBus.listChannels` | method | Returns `EventChannelInfo[]` for diagnostics |
+| `IEventBus.reset` | method | Clears all subscriptions (test teardown) |
+| `NullEventBus` | class | No-op implementation for Phase 1 development |
+| `EventBusError` | class | Thrown when event bus operations fail |
+
+### Design Decisions
+
+- `NullEventBus` is registered as `platform.eventBus` in `bootstrap.ts` — callers resolve it by service id, so Phase 9 swaps in the real bus transparently.
+- `publish()` is defined as synchronous — handlers run inline, in subscription order. One failing handler must not silence others (enforced in the real Phase 9 implementation via try/catch per handler).
+- No persistence, no replay — events are ephemeral by design.
+- Module-to-module direct publishing is prohibited; cross-module events must route through Platform Services (enforced by policy, not by the bus itself).
+
+### Bootstrap Services After Milestone 3.5
+
+| Service ID | Display Name | Status |
+|---|---|---|
+| `platform.logger` | Platform Logger | `running` |
+| `platform.config` | Platform Config | `running` |
+| `platform.configManager` | Platform Config Manager | `running` |
+| `platform.eventBus` | Platform Event Bus (Null Phase 1) | `running` |
 
 ---
 

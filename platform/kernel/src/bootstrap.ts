@@ -6,6 +6,7 @@ import { ModuleRegistry } from './module-registry';
 import { createPlatformContext } from './platform-context';
 import { PlatformError } from './errors';
 import { ConfigManager } from './config/config-manager';
+import { NullEventBus } from './events/null-event-bus';
 
 import type { PlatformContext } from './platform-context';
 
@@ -53,11 +54,12 @@ export async function bootstrapPlatform(): Promise<BootstrapResult> {
     const moduleRegistry = new ModuleRegistry(logger);
 
     // ── Step 5: Register kernel-provided services ─────────────────────────
-    // The logger and config manager are the first two services registered so
-    // downstream platform code can resolve them via the service registry.
-    serviceRegistry.register('platform.logger',         'Platform Logger',         logger);
-    serviceRegistry.register('platform.config',         'Platform Config',         config);
-    serviceRegistry.register('platform.configManager',  'Platform Config Manager', configManager);
+    // The logger, config manager, and event bus are registered so downstream
+    // platform code can resolve them via the service registry.
+    serviceRegistry.register('platform.logger',         'Platform Logger',                  logger);
+    serviceRegistry.register('platform.config',         'Platform Config',                  config);
+    serviceRegistry.register('platform.configManager',  'Platform Config Manager',          configManager);
+    serviceRegistry.register('platform.eventBus',       'Platform Event Bus (Null Phase 1)', new NullEventBus());
 
     // ── Step 6: Build and freeze PlatformContext ───────────────────────────
     logger.debug('Creating platform context…');
@@ -74,6 +76,7 @@ export async function bootstrapPlatform(): Promise<BootstrapResult> {
     serviceRegistry.setStatus('platform.logger',        'running');
     serviceRegistry.setStatus('platform.config',        'running');
     serviceRegistry.setStatus('platform.configManager', 'running');
+    serviceRegistry.setStatus('platform.eventBus',      'running');
 
     const durationMs = Date.now() - startedAt;
 
