@@ -7,21 +7,22 @@
   "workspaces": [
     "apps/*",
     "modules/*",
-    "platform/*",
-    "packages/*"
+    "platform/*"
   ],
   "scripts": {
-    "dev": "echo Development environment will be configured later",
-    "build": "echo Build pipeline will be configured later",
-    "test": "echo Test pipeline will be configured later",
-    "lint": "echo Linting will be configured later",
-    "kernel:build": "npm run build --workspace=platform/kernel",
-    "kernel:check": "npm run type-check --workspace=platform/kernel",
-    "kernel:clean": "npm run clean --workspace=platform/kernel",
+    "dev":            "turbo run dev",
+    "build":          "turbo run build",
+    "test":           "turbo run test",
+    "lint":           "turbo run lint",
+    "type-check":     "node node_modules/typescript/bin/tsc --build platform/kernel/tsconfig.json platform/services/tsconfig.json",
+    "kernel:build":   "npm run build --workspace=platform/kernel",
+    "kernel:check":   "node node_modules/typescript/bin/tsc --project platform/kernel/tsconfig.json --noEmit",
+    "kernel:clean":   "npm run clean --workspace=platform/kernel",
     "services:build": "npm run build --workspace=platform/services",
-    "services:check": "npm run type-check --workspace=platform/services",
+    "services:check": "node node_modules/typescript/bin/tsc --project platform/services/tsconfig.json --noEmit",
     "services:clean": "npm run clean --workspace=platform/services"
   },
+  "packageManager": "npm@11.16.0",
   "devDependencies": {
     "turbo": "^2.10.0"
   }

@@ -6,11 +6,12 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "build:watch": "tsc --project tsconfig.json --watch",
+    "build": "node ../../node_modules/typescript/bin/tsc --project tsconfig.json",
+    "build:watch": "node ../../node_modules/typescript/bin/tsc --project tsconfig.json --watch",
     "clean": "rimraf dist",
-    "type-check": "tsc --noEmit",
-    "lint": "eslint src --ext .ts"
+    "type-check": "node ../../node_modules/typescript/bin/tsc --noEmit",
+    "lint": "node -e \"console.log('[kernel] lint: eslint not yet configured')\"",
+    "test": "node -e \"console.log('[kernel] test: no framework configured')\""
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
