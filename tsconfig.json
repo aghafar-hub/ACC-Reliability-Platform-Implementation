@@ -15,6 +15,7 @@
     { "path": "platform/shared-types" },
     { "path": "platform/kernel" },
     { "path": "platform/services" },
-    { "path": "platform/storage" }
+    { "path": "platform/storage" },
+    { "path": "platform/sdk" }
   ]
 }
