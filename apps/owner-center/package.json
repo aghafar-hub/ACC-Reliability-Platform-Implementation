@@ -1,0 +1,34 @@
+{
+  "name": "@acc-reliability/owner-center",
+  "version": "0.1.0",
+  "description": "ACC Reliability Platform — Owner Center application shell",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rimraf dist",
+    "type-check": "node ../../node_modules/typescript/bin/tsc --noEmit",
+    "lint": "node -e \"console.log('[owner-center] lint: eslint not yet configured')\"",
+    "test": "node -e \"console.log('[owner-center] test: no framework configured')\""
+  },
+  "dependencies": {
+    "@acc-reliability/services": "*",
+    "@acc-reliability/shared-types": "*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.4.5",
+    "vite": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

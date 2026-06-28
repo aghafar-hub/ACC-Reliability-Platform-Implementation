@@ -39,7 +39,10 @@
     "gateway:clean":       "npm run clean --workspace=platform/gateway",
     "backend:build":       "npm run build --workspace=backend",
     "backend:check":       "node node_modules/typescript/bin/tsc --project backend/tsconfig.json --noEmit",
-    "backend:clean":       "npm run clean --workspace=backend"
+    "backend:clean":       "npm run clean --workspace=backend",
+    "app:build":           "npm run build --workspace=apps/owner-center",
+    "app:check":           "node node_modules/typescript/bin/tsc --project apps/owner-center/tsconfig.json --noEmit",
+    "app:clean":           "npm run clean --workspace=apps/owner-center"
   },
   "packageManager": "npm@11.16.0",
   "devDependencies": {
