@@ -1,0 +1,30 @@
+{
+  "name": "@acc-reliability/oil-lubrication",
+  "version": "1.0.0",
+  "description": "ACC Reliability Platform — Oil Lubrication business module",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build":       "node ../../node_modules/typescript/bin/tsc --project tsconfig.json",
+    "build:watch": "node ../../node_modules/typescript/bin/tsc --project tsconfig.json --watch",
+    "clean":       "rimraf dist",
+    "type-check":  "node ../../node_modules/typescript/bin/tsc --noEmit",
+    "lint":        "node -e \"console.log('[oil-lubrication] lint: eslint not yet configured')\"",
+    "test":        "node -e \"console.log('[oil-lubrication] test: no framework configured')\""
+  },
+  "dependencies": {
+    "@acc-reliability/kernel":       "*",
+    "@acc-reliability/sdk":          "*",
+    "@acc-reliability/services":     "*",
+    "@acc-reliability/shared-types": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "rimraf":      "^5.0.5",
+    "typescript":  "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

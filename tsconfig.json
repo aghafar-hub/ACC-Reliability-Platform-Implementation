@@ -19,6 +19,7 @@
     { "path": "platform/storage" },
     { "path": "platform/sdk" },
     { "path": "platform/gateway" },
-    { "path": "backend" }
+    { "path": "backend" },
+    { "path": "modules/oil-lubrication" }
   ]
 }

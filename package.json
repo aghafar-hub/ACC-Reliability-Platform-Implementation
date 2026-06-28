@@ -15,7 +15,7 @@
     "build":          "turbo run build",
     "test":           "turbo run test",
     "lint":           "turbo run lint",
-    "type-check":          "node node_modules/typescript/bin/tsc --build platform/shared-types/tsconfig.json platform/cache/tsconfig.json platform/kernel/tsconfig.json platform/services/tsconfig.json platform/storage/tsconfig.json platform/sdk/tsconfig.json platform/gateway/tsconfig.json backend/tsconfig.json",
+    "type-check":          "node node_modules/typescript/bin/tsc --build platform/shared-types/tsconfig.json platform/cache/tsconfig.json platform/kernel/tsconfig.json platform/services/tsconfig.json platform/storage/tsconfig.json platform/sdk/tsconfig.json platform/gateway/tsconfig.json backend/tsconfig.json modules/oil-lubrication/tsconfig.json",
     "shared-types:build":  "npm run build --workspace=platform/shared-types",
     "shared-types:check":  "node node_modules/typescript/bin/tsc --project platform/shared-types/tsconfig.json --noEmit",
     "shared-types:clean":  "npm run clean --workspace=platform/shared-types",
@@ -42,7 +42,10 @@
     "backend:clean":       "npm run clean --workspace=backend",
     "app:build":           "npm run build --workspace=apps/owner-center",
     "app:check":           "node node_modules/typescript/bin/tsc --project apps/owner-center/tsconfig.json --noEmit",
-    "app:clean":           "npm run clean --workspace=apps/owner-center"
+    "app:clean":           "npm run clean --workspace=apps/owner-center",
+    "oil-lubrication:build": "npm run build --workspace=modules/oil-lubrication",
+    "oil-lubrication:check": "node node_modules/typescript/bin/tsc --project modules/oil-lubrication/tsconfig.json --noEmit",
+    "oil-lubrication:clean": "npm run clean --workspace=modules/oil-lubrication"
   },
   "packageManager": "npm@11.16.0",
   "devDependencies": {
