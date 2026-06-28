@@ -28,10 +28,12 @@
 //     ├─ NotificationError      NOTIFICATION_ERROR          — base for all notification service failures
 //     │    ├─ NotificationNotFoundError   NOTIFICATION_NOT_FOUND     — unknown notification id
 //     │    └─ NotificationRecipientError  NOTIFICATION_RECIPIENT     — invalid or empty recipient list
-//     └─ ActionError            ACTION_ERROR                — base for all action service failures
-//          ├─ ActionNotFoundError       ACTION_NOT_FOUND           — unknown action id
-//          ├─ ActionScopeError          ACTION_SCOPE_VIOLATION      — contractor scope mismatch on create
-//          └─ ActionTransitionError     ACTION_INVALID_TRANSITION   — invalid status transition attempted
+//     ├─ ActionError            ACTION_ERROR                — base for all action service failures
+//     │    ├─ ActionNotFoundError       ACTION_NOT_FOUND           — unknown action id
+//     │    ├─ ActionScopeError          ACTION_SCOPE_VIOLATION      — contractor scope mismatch on create
+//     │    └─ ActionTransitionError     ACTION_INVALID_TRANSITION   — invalid status transition attempted
+//     └─ AuditError             AUDIT_ERROR                 — base for all audit service failures
+//          └─ AuditEntryNotFoundError   AUDIT_NOT_FOUND            — unknown audit entry id
 
 import { PlatformError } from '@acc-reliability/kernel';
 
@@ -529,6 +531,48 @@ export class ActionTransitionError extends ActionError {
     this.actionId = actionId;
     this.fromStatus = fromStatus;
     this.toStatus = toStatus;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Audit errors ──────────────────────────────────────────────────────────────
+
+/**
+ * Base error for all audit service failures.
+ *
+ * Catch this type to handle any audit-related error without enumerating
+ * sub-types.  Sub-classes supply a more specific `code`; when this class is
+ * thrown directly it uses `'AUDIT_ERROR'`.
+ */
+export class AuditError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'AUDIT_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'AuditError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation targets an audit entry id that is not held in the
+ * audit service.
+ *
+ * HTTP equivalent: 404 Not Found.
+ */
+export class AuditEntryNotFoundError extends AuditError {
+  readonly auditId: string;
+
+  constructor(auditId: string) {
+    super(
+      `Audit entry '${auditId}' was not found`,
+      'AUDIT_NOT_FOUND',
+      { auditId },
+    );
+    this.name = 'AuditEntryNotFoundError';
+    this.auditId = auditId;
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }

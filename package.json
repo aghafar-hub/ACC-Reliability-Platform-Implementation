@@ -14,7 +14,7 @@
     "build":          "turbo run build",
     "test":           "turbo run test",
     "lint":           "turbo run lint",
-    "type-check":          "node node_modules/typescript/bin/tsc --build platform/shared-types/tsconfig.json platform/cache/tsconfig.json platform/kernel/tsconfig.json platform/services/tsconfig.json platform/storage/tsconfig.json platform/sdk/tsconfig.json",
+    "type-check":          "node node_modules/typescript/bin/tsc --build platform/shared-types/tsconfig.json platform/cache/tsconfig.json platform/kernel/tsconfig.json platform/services/tsconfig.json platform/storage/tsconfig.json platform/sdk/tsconfig.json platform/gateway/tsconfig.json",
     "shared-types:build":  "npm run build --workspace=platform/shared-types",
     "shared-types:check":  "node node_modules/typescript/bin/tsc --project platform/shared-types/tsconfig.json --noEmit",
     "shared-types:clean":  "npm run clean --workspace=platform/shared-types",
@@ -32,7 +32,10 @@
     "storage:clean":       "npm run clean --workspace=platform/storage",
     "sdk:build":           "npm run build --workspace=platform/sdk",
     "sdk:check":           "node node_modules/typescript/bin/tsc --project platform/sdk/tsconfig.json --noEmit",
-    "sdk:clean":           "npm run clean --workspace=platform/sdk"
+    "sdk:clean":           "npm run clean --workspace=platform/sdk",
+    "gateway:build":       "npm run build --workspace=platform/gateway",
+    "gateway:check":       "node node_modules/typescript/bin/tsc --project platform/gateway/tsconfig.json --noEmit",
+    "gateway:clean":       "npm run clean --workspace=platform/gateway"
   },
   "packageManager": "npm@11.16.0",
   "devDependencies": {

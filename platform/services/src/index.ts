@@ -285,6 +285,29 @@ export {
 // ── Action Service — Implementation ───────────────────────────────────────────
 export { ActionService } from './action/action-service';
 
+// ── Audit Service — Types ─────────────────────────────────────────────────────
+export type {
+  AuditId,
+  AuditCategory,
+  KnownAuditCategory,
+  AuditAction,
+  KnownAuditAction,
+  AuditOutcome,
+  AuditActor,
+  AuditResource,
+  AuditRequest,
+  AuditEntry,
+  AuditQuery,
+  IAuditService,
+} from './audit/audit-types';
+
+export {
+  AUDIT_CATEGORIES,
+  AUDIT_ACTIONS,
+  createAuditId,
+  generateAuditId,
+} from './audit/audit-types';
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 export {
   AuthError,
@@ -311,4 +334,6 @@ export {
   ActionNotFoundError,
   ActionScopeError,
   ActionTransitionError,
+  AuditError,
+  AuditEntryNotFoundError,
 } from './errors';
