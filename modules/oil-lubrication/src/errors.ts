@@ -7,7 +7,7 @@
 //
 // Error code prefix: OIL_LUBRICATION_  (reserved for this module)
 
-import { PlatformError } from '@acc-reliability/kernel';
+import { PlatformError } from '@acc-reliability/sdk';
 
 // ── Base domain error ─────────────────────────────────────────────────────────
 

@@ -14,7 +14,7 @@
     "test": "node -e \"console.log('[owner-center] test: no framework configured')\""
   },
   "dependencies": {
-    "@acc-reliability/services": "*",
+    "@acc-reliability/sdk": "*",
     "@acc-reliability/shared-types": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

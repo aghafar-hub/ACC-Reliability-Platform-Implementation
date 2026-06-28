@@ -7,8 +7,7 @@
 // createOilLubricationService — wires the IRepository from the Platform SDK
 //   into the domain repository adapter and returns the configured service.
 
-import type { ModuleManifest, IPlatformSdk } from '@acc-reliability/sdk';
-import type { ILogger } from '@acc-reliability/kernel';
+import type { ModuleManifest, IPlatformSdk, ILogger } from '@acc-reliability/sdk';
 import { OilLubricationRepository, OIL_CHANGE_RECORD_ENTITY_TYPE } from './oil-lubrication.repository';
 import { OilLubricationService } from './oil-lubrication.service';
 import type { OilChangeRecord } from './types';

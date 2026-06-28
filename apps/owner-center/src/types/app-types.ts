@@ -5,7 +5,7 @@
 // the shell-level state shapes consumed by context providers.
 
 import type { ThemeId, LocaleCode } from '@acc-reliability/shared-types';
-import type { UserContext } from '@acc-reliability/services';
+import type { UserContext } from '@acc-reliability/sdk';
 
 export type { ThemeId, LocaleCode };
 

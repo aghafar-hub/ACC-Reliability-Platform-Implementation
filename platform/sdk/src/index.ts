@@ -5,6 +5,20 @@
 // from @acc-reliability/kernel, @acc-reliability/services, or
 // @acc-reliability/storage directly (PS-114 SDK-002).
 
+// ── Platform primitives (modules must not import kernel/services directly) ──────
+export type { ILogger } from '@acc-reliability/kernel';
+export { PlatformError } from '@acc-reliability/kernel';
+
+export type {
+  EquipmentId,
+  CorrelationId,
+  MessageId,
+  RequestId,
+  EventId,
+  TraceId,
+  OperationId,
+} from '@acc-reliability/services';
+
 // ── Main facade ───────────────────────────────────────────────────────────────
 export type { IPlatformSdk } from './platform-sdk';
 

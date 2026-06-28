@@ -16,6 +16,7 @@
     "test":           "turbo run test",
     "lint":           "turbo run lint",
     "type-check":          "node node_modules/typescript/bin/tsc --build platform/shared-types/tsconfig.json platform/cache/tsconfig.json platform/kernel/tsconfig.json platform/services/tsconfig.json platform/storage/tsconfig.json platform/sdk/tsconfig.json platform/gateway/tsconfig.json backend/tsconfig.json modules/oil-lubrication/tsconfig.json",
+    "build:direct":        "node scripts/build-direct.js",
     "shared-types:build":  "npm run build --workspace=platform/shared-types",
     "shared-types:check":  "node node_modules/typescript/bin/tsc --project platform/shared-types/tsconfig.json --noEmit",
     "shared-types:clean":  "npm run clean --workspace=platform/shared-types",

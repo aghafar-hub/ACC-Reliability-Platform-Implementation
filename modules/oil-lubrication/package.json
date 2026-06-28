@@ -17,7 +17,8 @@
     "@acc-reliability/kernel":       "*",
     "@acc-reliability/sdk":          "*",
     "@acc-reliability/services":     "*",
-    "@acc-reliability/shared-types": "*"
+    "@acc-reliability/shared-types": "*",
+    "@acc-reliability/storage":      "*"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",

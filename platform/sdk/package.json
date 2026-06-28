@@ -14,6 +14,7 @@
     "test": "node -e \"console.log('[sdk] test: no framework configured')\""
   },
   "dependencies": {
+    "@acc-reliability/kernel": "*",
     "@acc-reliability/services": "*",
     "@acc-reliability/storage": "*"
   },

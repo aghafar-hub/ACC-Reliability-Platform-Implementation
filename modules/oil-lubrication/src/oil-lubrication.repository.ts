@@ -11,8 +11,8 @@ import type {
   QueryOptions,
   PagedQueryOptions,
   PageResult,
+  EquipmentId,
 } from '@acc-reliability/sdk';
-import type { EquipmentId } from '@acc-reliability/services';
 import type {
   OilChangeRecord,
   OilChangeRecordUpdateRequest,

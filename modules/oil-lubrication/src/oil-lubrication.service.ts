@@ -8,12 +8,16 @@
 // Scaffold — minimal CRUD operations only.
 // Workflows, approvals, and notifications are deferred to future patches.
 
-import type { ILogger } from '@acc-reliability/kernel';
-import { PlatformError } from '@acc-reliability/kernel';
 import type { ServiceResult, IsoTimestamp } from '@acc-reliability/shared-types';
 import { ok, err, nowIso } from '@acc-reliability/shared-types';
-import type { QueryOptions, PagedQueryOptions, PageResult } from '@acc-reliability/sdk';
-import type { EquipmentId } from '@acc-reliability/services';
+import type {
+  ILogger,
+  QueryOptions,
+  PagedQueryOptions,
+  PageResult,
+  EquipmentId,
+} from '@acc-reliability/sdk';
+import { PlatformError } from '@acc-reliability/sdk';
 import type {
   OilChangeRecord,
   OilChangeRecordCreateRequest,
