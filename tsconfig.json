@@ -12,6 +12,7 @@
   },
   "files": [],
   "references": [
+    { "path": "platform/shared-types" },
     { "path": "platform/kernel" },
     { "path": "platform/services" }
   ]
