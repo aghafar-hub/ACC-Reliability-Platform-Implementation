@@ -18,6 +18,7 @@
     { "path": "platform/services" },
     { "path": "platform/storage" },
     { "path": "platform/sdk" },
-    { "path": "platform/gateway" }
+    { "path": "platform/gateway" },
+    { "path": "backend" }
   ]
 }
