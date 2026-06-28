@@ -9,7 +9,17 @@
 export type { OilChangeRecordId, LubricationPointId } from './types';
 export { createOilChangeRecordId, createLubricationPointId } from './types';
 
-// ── Domain entity and request types ──────────────────────────────────────────
+// ── Status / source / frequency ───────────────────────────────────────────────
+export type { OilChangeStatus, OilChangeSource, OilChangeFrequency } from './types';
+
+// ── Lubrication Point entity and requests ─────────────────────────────────────
+export type {
+  LubricationPoint,
+  LubricationPointCreateRequest,
+  LubricationPointUpdateRequest,
+} from './types';
+
+// ── Oil Change Record entity and requests ─────────────────────────────────────
 export type {
   OilChangeRecord,
   OilChangeRecordCreateRequest,
@@ -17,8 +27,8 @@ export type {
   OilChangeRecordSummary,
 } from './types';
 
-// ── Repository interface ──────────────────────────────────────────────────────
-export type { IOilLubricationRepository } from './types';
+// ── Repository contracts ──────────────────────────────────────────────────────
+export type { IOilChangeRecordRepository, ILubricationPointRepository } from './types';
 
 // ── Domain errors ─────────────────────────────────────────────────────────────
 export {

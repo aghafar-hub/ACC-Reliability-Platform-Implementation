@@ -22,7 +22,7 @@ import type {
   OilChangeRecord,
   OilChangeRecordCreateRequest,
   OilChangeRecordUpdateRequest,
-  IOilLubricationRepository,
+  IOilChangeRecordRepository,
   LubricationPointId,
 } from './types';
 
@@ -35,7 +35,7 @@ import type {
  */
 export class OilLubricationService {
   constructor(
-    private readonly repo: IOilLubricationRepository,
+    private readonly repo: IOilChangeRecordRepository,
     private readonly logger: ILogger
   ) {}
 
@@ -190,6 +190,8 @@ function buildCreatePayload(
   const base: {
     readonly equipmentId: typeof request.equipmentId;
     readonly contractorId: typeof request.contractorId;
+    readonly status: OilChangeRecord['status'];
+    readonly source: OilChangeRecord['source'];
     readonly oilType: string;
     readonly quantityLitres: number;
     readonly performedAt: IsoTimestamp;
@@ -200,14 +202,16 @@ function buildCreatePayload(
     workOrderId?: string;
     notes?: string;
   } = {
-    equipmentId: request.equipmentId,
-    contractorId: request.contractorId,
-    oilType: request.oilType,
-    quantityLitres: request.quantityLitres,
-    performedAt: request.performedAt,
-    completedBy: request.completedBy,
-    createdAt: now,
-    updatedAt: now,
+    equipmentId:     request.equipmentId,
+    contractorId:    request.contractorId,
+    status:          request.status  ?? 'completed',
+    source:          request.source  ?? 'manual',
+    oilType:         request.oilType,
+    quantityLitres:  request.quantityLitres,
+    performedAt:     request.performedAt,
+    completedBy:     request.completedBy,
+    createdAt:       now,
+    updatedAt:       now,
   };
 
   if (request.lubricationPointId !== undefined) {

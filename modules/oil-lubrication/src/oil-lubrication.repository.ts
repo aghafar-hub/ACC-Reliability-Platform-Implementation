@@ -16,7 +16,7 @@ import type {
 import type {
   OilChangeRecord,
   OilChangeRecordUpdateRequest,
-  IOilLubricationRepository,
+  IOilChangeRecordRepository,
 } from './types';
 
 /**
@@ -29,7 +29,7 @@ export const OIL_CHANGE_RECORD_ENTITY_TYPE = 'oilChangeRecord' as const;
  * Adapts {@link IRepository}<{@link OilChangeRecord}> into the domain
  * repository interface expected by {@link OilLubricationService}.
  */
-export class OilLubricationRepository implements IOilLubricationRepository {
+export class OilLubricationRepository implements IOilChangeRecordRepository {
   constructor(private readonly inner: IRepository<OilChangeRecord>) {}
 
   findById(id: string): Promise<OilChangeRecord | null> {
@@ -62,10 +62,24 @@ export class OilLubricationRepository implements IOilLubricationRepository {
   }
 
   update(id: string, changes: OilChangeRecordUpdateRequest): Promise<OilChangeRecord> {
-    return this.inner.update(id, changes);
+    return this.inner.update(id, toDefinedPartial(changes));
   }
 
   delete(id: string): Promise<void> {
     return this.inner.delete(id);
   }
+}
+
+function toDefinedPartial(
+  changes: OilChangeRecordUpdateRequest
+): Partial<Omit<OilChangeRecord, 'id'>> {
+  return {
+    ...(changes.status !== undefined ? { status: changes.status } : {}),
+    ...(changes.source !== undefined ? { source: changes.source } : {}),
+    ...(changes.oilType !== undefined ? { oilType: changes.oilType } : {}),
+    ...(changes.quantityLitres !== undefined ? { quantityLitres: changes.quantityLitres } : {}),
+    ...(changes.performedAt !== undefined ? { performedAt: changes.performedAt } : {}),
+    ...(changes.workOrderId !== undefined ? { workOrderId: changes.workOrderId } : {}),
+    ...(changes.notes !== undefined ? { notes: changes.notes } : {}),
+  };
 }
