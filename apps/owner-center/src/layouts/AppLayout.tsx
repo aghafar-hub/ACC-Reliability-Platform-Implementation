@@ -6,7 +6,7 @@
 // No business logic, no API calls, no data fetching.
 
 import React, { useEffect } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useBranding } from '../context/BrandingContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -123,6 +123,30 @@ function GuideMeButton(): React.ReactElement {
   );
 }
 
+/**
+ * Header notification bell — placeholder unread count only.
+ * The notification list is NOT loaded here; it loads lazily inside NotificationsPage.
+ */
+function NotificationBell({ locale }: { locale: LocaleCode }): React.ReactElement {
+  const isAr = locale === 'ar';
+  const UNREAD_PLACEHOLDER = 3;
+
+  return (
+    <Link
+      to="/notifications"
+      className="notif-bell"
+      aria-label={
+        isAr
+          ? `الإشعارات: ${UNREAD_PLACEHOLDER} غير مقروءة`
+          : `Notifications: ${UNREAD_PLACEHOLDER} unread`
+      }
+    >
+      <span className="notif-bell__icon" aria-hidden="true">&#9825;</span>
+      <span className="notif-bell__badge" aria-hidden="true">{UNREAD_PLACEHOLDER}</span>
+    </Link>
+  );
+}
+
 /** Sidebar with module navigation links. Badge dot rendered for notification items. */
 function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
   const isAr = locale === 'ar';
@@ -162,7 +186,7 @@ function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
  * `document.documentElement` so the full page responds to theme and locale.
  *
  * Structure:
- *   - app-header : BrandBlock | spacer | SearchButton LanguageToggle ThemeToggle GuideMeButton UserMenu
+ *   - app-header : BrandBlock | spacer | SearchButton NotificationBell LanguageToggle ThemeToggle GuideMeButton UserMenu
  *   - app-body   : AppSidebar | app-content (Breadcrumb + <Outlet />)
  *   - CommandPalette (position:fixed overlay, rendered last)
  */
@@ -185,6 +209,7 @@ export function AppLayout(): React.ReactElement {
         <div className="app-header__spacer" />
         <div className="app-header__actions">
           <SearchButton locale={locale} onOpen={palette.open} />
+          <NotificationBell locale={locale} />
           <LanguageToggle locale={locale} setLocale={setLocale} />
           <ThemeToggle theme={theme} setTheme={setTheme} />
           <GuideMeButton />
