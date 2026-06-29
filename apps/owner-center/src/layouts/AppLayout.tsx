@@ -5,36 +5,50 @@
 // all module pages.  Business module pages are rendered into the <Outlet />.
 // No business logic, no API calls, no data fetching.
 
-import React from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { NavLink, Outlet } from 'react-router-dom';
 import { useBranding } from '../context/BrandingContext';
+import { useLanguage } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
 import { useTour } from '../context/TourContext';
+import type { LocaleCode, ThemeId } from '../types/app-types';
+import type { GuideTourId } from '../types/tour-types';
 
-/**
- * ACC logo + optional contractor logo block shown top-left in the header.
- * Both images degrade gracefully to text when no src is configured.
- */
+// ── Sidebar nav definition ────────────────────────────────────────────────────
+
+interface NavItemDef {
+  readonly to: string;
+  readonly icon: string;
+  readonly en: string;
+  readonly ar: string;
+  readonly end?: boolean;
+}
+
+const NAV_ITEMS: readonly NavItemDef[] = [
+  { to: '/',                icon: 'H',  en: 'Home',            ar: 'الرئيسية',      end: true },
+  { to: '/oil-lubrication', icon: 'OL', en: 'Oil Lubrication', ar: 'تشحيم الزيت'             },
+  { to: '/notifications',   icon: 'N',  en: 'Notifications',   ar: 'الإشعارات'                },
+  { to: '/learning',        icon: 'LC', en: 'Learning Center',  ar: 'مركز التعلم'              },
+  { to: '/settings',        icon: 'S',  en: 'Settings',        ar: 'الإعدادات'                },
+] as const;
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+/** ACC + optional contractor logo block — top-left of the header. */
 function BrandBlock(): React.ReactElement {
   const { branding } = useBranding();
   const { acc, contractor } = branding;
 
   return (
     <div className="brand-block" aria-label="Branding">
-      {/* ACC brand */}
       <div className="brand-acc">
         {acc.logoSrc !== undefined ? (
-          <img
-            className="brand-acc__logo"
-            src={acc.logoSrc}
-            alt="ACC logo"
-            aria-label="ACC logo"
-          />
+          <img className="brand-acc__logo" src={acc.logoSrc} alt="ACC logo" />
         ) : (
           <span className="brand-acc__name">{acc.appName ?? 'Owner Center'}</span>
         )}
       </div>
 
-      {/* Contractor brand — rendered only when available */}
       {contractor !== undefined && (
         <div className="brand-contractor" aria-label="Contractor branding">
           {contractor.logoSrc !== undefined ? (
@@ -52,18 +66,59 @@ function BrandBlock(): React.ReactElement {
   );
 }
 
-/**
- * "Guide Me" button in the header.
- * Placeholder — clicking logs intent only until the tour overlay milestone.
- */
+/** Toggle between EN and AR locales. */
+function LanguageToggle({
+  locale,
+  setLocale,
+}: {
+  locale: LocaleCode;
+  setLocale: (l: LocaleCode) => void;
+}): React.ReactElement {
+  const isAr = locale === 'ar';
+  const next: LocaleCode = isAr ? 'en' : 'ar';
+
+  return (
+    <button
+      type="button"
+      className="lang-toggle"
+      onClick={() => { setLocale(next); }}
+      aria-label={isAr ? 'Switch to English' : 'Switch to Arabic'}
+    >
+      {isAr ? 'EN' : 'AR'}
+    </button>
+  );
+}
+
+/** Toggle between light and dark themes. */
+function ThemeToggle({
+  theme,
+  setTheme,
+}: {
+  theme: ThemeId;
+  setTheme: (t: ThemeId) => void;
+}): React.ReactElement {
+  const isDark = theme === 'dark';
+  const next: ThemeId = isDark ? 'light' : 'dark';
+
+  return (
+    <button
+      type="button"
+      className="theme-toggle"
+      onClick={() => { setTheme(next); }}
+      aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+    >
+      {isDark ? 'Light' : 'Dark'}
+    </button>
+  );
+}
+
+/** "Guide Me" button — placeholder until tour overlay milestone. */
 function GuideMeButton(): React.ReactElement {
   const { tourState, startTour } = useTour();
 
   function handleClick(): void {
     if (!tourState.isActive) {
-      // No tours are registered yet; this will be wired to the active page's
-      // tour registry in the guided-overlay milestone.
-      startTour('shell:welcome' as import('../types/tour-types').GuideTourId);
+      startTour('shell:welcome' as GuideTourId);
     }
   }
 
@@ -71,36 +126,76 @@ function GuideMeButton(): React.ReactElement {
     <button
       type="button"
       className="guide-me-btn"
-      aria-label="Start guided tour"
       onClick={handleClick}
       disabled={tourState.isActive}
+      aria-label="Start guided tour"
     >
       {tourState.isActive ? 'Tour active' : 'Guide Me'}
     </button>
   );
 }
 
+/** Sidebar with module navigation links. */
+function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
+  const isAr = locale === 'ar';
+
+  return (
+    <nav className="app-sidebar" aria-label="Module navigation">
+      {NAV_ITEMS.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.end}
+          className={({ isActive }: { isActive: boolean }) =>
+            `nav-item${isActive ? ' nav-item--active' : ''}`
+          }
+          aria-label={isAr ? item.ar : item.en}
+        >
+          <span className="nav-icon" aria-hidden="true">{item.icon}</span>
+          <span className="nav-label">{isAr ? item.ar : item.en}</span>
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+// ── AppLayout ─────────────────────────────────────────────────────────────────
+
 /**
  * Top-level shell layout.
  *
- * Structure (per 009 §4 — Platform Shell):
- *   - app-header   : branding block (ACC + contractor), navigation bar, Guide Me button
- *   - app-sidebar  : module navigation placeholder
- *   - app-content  : active module page rendered via React Router <Outlet />
+ * Applies `data-theme` and `dir`/`lang` on the root element and syncs them to
+ * `document.documentElement` so the full page responds to theme and locale.
+ *
+ * Structure:
+ *   - app-header : BrandBlock | spacer | LanguageToggle ThemeToggle GuideMeButton
+ *   - app-body   : AppSidebar | <Outlet />
  */
 export function AppLayout(): React.ReactElement {
+  const { theme, setTheme } = useTheme();
+  const { locale, setLocale } = useLanguage();
+
+  const dir = locale === 'ar' ? 'rtl' : 'ltr';
+
+  useEffect(() => {
+    document.documentElement.dir = dir;
+    document.documentElement.lang = locale;
+  }, [dir, locale]);
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={theme} dir={dir} lang={locale}>
       <header className="app-header" aria-label="Platform header">
         <BrandBlock />
-        <nav className="app-header__nav" aria-label="Primary navigation" />
+        <div className="app-header__spacer" />
         <div className="app-header__actions">
+          <LanguageToggle locale={locale} setLocale={setLocale} />
+          <ThemeToggle theme={theme} setTheme={setTheme} />
           <GuideMeButton />
         </div>
       </header>
 
       <div className="app-body">
-        <nav className="app-sidebar" aria-label="Module navigation" />
+        <AppSidebar locale={locale} />
         <main className="app-content">
           <Outlet />
         </main>
