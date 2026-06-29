@@ -677,6 +677,189 @@ button {
   font-weight: var(--font-weight-medium);
 }
 
+/* ── Search button (header) ───────────────────────────────────────────────── */
+.search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 5px var(--space-sm);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #ffffff;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.search-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.search-btn__kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  font-size: 0.6875rem;
+  font-family: inherit;
+  opacity: 0.75;
+  line-height: 1.4;
+}
+
+/* ── Command palette overlay ──────────────────────────────────────────────── */
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 80px;
+  z-index: 1000;
+}
+
+.palette-modal {
+  width: 100%;
+  max-width: 560px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+/* ── Palette search input row ─────────────────────────────────────────────── */
+.palette-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.palette-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  padding: var(--space-sm) 0;
+  line-height: 1.4;
+}
+
+.palette-input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.palette-esc-hint {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  font-family: inherit;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+/* ── Palette results list ─────────────────────────────────────────────────── */
+.palette-results {
+  display: flex;
+  flex-direction: column;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: var(--space-xs) 0;
+}
+
+.palette-category-label {
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  width: 100%;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.palette-item:hover,
+.palette-item--selected {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
+
+.palette-item__icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: inherit;
+  letter-spacing: -0.03em;
+  transition: background var(--transition-fast);
+}
+
+.palette-item__label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: start;
+}
+
+.palette-item__enter-hint {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  font-family: inherit;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin-inline-start: auto;
+}
+
+.palette-empty {
+  padding: var(--space-lg) var(--space-md);
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
 /* ── RTL logical-property support ─────────────────────────────────────────── */
 /* border-inline-start, margin-inline-start, padding-inline-* already flip    */
 /* automatically via CSS logical properties.  Extra overrides below if needed. */
@@ -723,5 +906,23 @@ button {
 
   .breadcrumb {
     margin-bottom: var(--space-sm);
+  }
+
+  .search-btn__label,
+  .search-btn__kbd {
+    display: none;
+  }
+
+  .palette-overlay {
+    padding-top: 0;
+    align-items: flex-end;
+  }
+
+  .palette-modal {
+    max-width: 100%;
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+    border-inline: none;
+    border-bottom: none;
   }
 }

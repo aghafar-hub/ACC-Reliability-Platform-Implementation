@@ -12,8 +12,11 @@ import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTour } from '../context/TourContext';
 import { NAV_ITEMS } from '../types/navigation-types';
+import { useCommandPalette } from '../hooks/useCommandPalette';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { UserMenu } from '../components/UserMenu';
+import { SearchButton } from '../components/SearchButton';
+import { CommandPalette } from '../components/CommandPalette';
 import type { LocaleCode, ThemeId } from '../types/app-types';
 import type { GuideTourId } from '../types/tour-types';
 
@@ -159,12 +162,14 @@ function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
  * `document.documentElement` so the full page responds to theme and locale.
  *
  * Structure:
- *   - app-header : BrandBlock | spacer | LanguageToggle ThemeToggle GuideMeButton UserMenu
+ *   - app-header : BrandBlock | spacer | SearchButton LanguageToggle ThemeToggle GuideMeButton UserMenu
  *   - app-body   : AppSidebar | app-content (Breadcrumb + <Outlet />)
+ *   - CommandPalette (position:fixed overlay, rendered last)
  */
 export function AppLayout(): React.ReactElement {
   const { theme, setTheme } = useTheme();
   const { locale, setLocale } = useLanguage();
+  const palette = useCommandPalette();
 
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
 
@@ -179,6 +184,7 @@ export function AppLayout(): React.ReactElement {
         <BrandBlock />
         <div className="app-header__spacer" />
         <div className="app-header__actions">
+          <SearchButton locale={locale} onOpen={palette.open} />
           <LanguageToggle locale={locale} setLocale={setLocale} />
           <ThemeToggle theme={theme} setTheme={setTheme} />
           <GuideMeButton />
@@ -193,6 +199,18 @@ export function AppLayout(): React.ReactElement {
           <Outlet />
         </main>
       </div>
+
+      {/* Command palette — position:fixed, overlays everything */}
+      <CommandPalette
+        isOpen={palette.isOpen}
+        query={palette.query}
+        results={palette.results}
+        selectedIndex={palette.selectedIndex}
+        locale={locale}
+        onClose={palette.close}
+        onQueryChange={palette.setQuery}
+        onSelectedIndexChange={palette.setSelectedIndex}
+      />
     </div>
   );
 }
