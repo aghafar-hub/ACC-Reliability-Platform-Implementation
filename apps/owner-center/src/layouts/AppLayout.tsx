@@ -11,26 +11,11 @@ import { useBranding } from '../context/BrandingContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTour } from '../context/TourContext';
+import { NAV_ITEMS } from '../types/navigation-types';
+import { Breadcrumb } from '../components/Breadcrumb';
+import { UserMenu } from '../components/UserMenu';
 import type { LocaleCode, ThemeId } from '../types/app-types';
 import type { GuideTourId } from '../types/tour-types';
-
-// ── Sidebar nav definition ────────────────────────────────────────────────────
-
-interface NavItemDef {
-  readonly to: string;
-  readonly icon: string;
-  readonly en: string;
-  readonly ar: string;
-  readonly end?: boolean;
-}
-
-const NAV_ITEMS: readonly NavItemDef[] = [
-  { to: '/',                icon: 'H',  en: 'Home',            ar: 'الرئيسية',      end: true },
-  { to: '/oil-lubrication', icon: 'OL', en: 'Oil Lubrication', ar: 'تشحيم الزيت'             },
-  { to: '/notifications',   icon: 'N',  en: 'Notifications',   ar: 'الإشعارات'                },
-  { to: '/learning',        icon: 'LC', en: 'Learning Center',  ar: 'مركز التعلم'              },
-  { to: '/settings',        icon: 'S',  en: 'Settings',        ar: 'الإعدادات'                },
-] as const;
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -135,7 +120,7 @@ function GuideMeButton(): React.ReactElement {
   );
 }
 
-/** Sidebar with module navigation links. */
+/** Sidebar with module navigation links. Badge dot rendered for notification items. */
 function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
   const isAr = locale === 'ar';
 
@@ -143,16 +128,22 @@ function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
     <nav className="app-sidebar" aria-label="Module navigation">
       {NAV_ITEMS.map((item) => (
         <NavLink
-          key={item.to}
-          to={item.to}
+          key={item.path}
+          to={item.path}
           end={item.end}
           className={({ isActive }: { isActive: boolean }) =>
             `nav-item${isActive ? ' nav-item--active' : ''}`
           }
-          aria-label={isAr ? item.ar : item.en}
+          aria-label={isAr ? item.label.ar : item.label.en}
         >
           <span className="nav-icon" aria-hidden="true">{item.icon}</span>
-          <span className="nav-label">{isAr ? item.ar : item.en}</span>
+          <span className="nav-label">{isAr ? item.label.ar : item.label.en}</span>
+          {item.badge === 'notification' && (
+            <span
+              className="nav-badge"
+              aria-label={isAr ? 'إشعارات جديدة' : 'New notifications'}
+            />
+          )}
         </NavLink>
       ))}
     </nav>
@@ -168,8 +159,8 @@ function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
  * `document.documentElement` so the full page responds to theme and locale.
  *
  * Structure:
- *   - app-header : BrandBlock | spacer | LanguageToggle ThemeToggle GuideMeButton
- *   - app-body   : AppSidebar | <Outlet />
+ *   - app-header : BrandBlock | spacer | LanguageToggle ThemeToggle GuideMeButton UserMenu
+ *   - app-body   : AppSidebar | app-content (Breadcrumb + <Outlet />)
  */
 export function AppLayout(): React.ReactElement {
   const { theme, setTheme } = useTheme();
@@ -191,12 +182,14 @@ export function AppLayout(): React.ReactElement {
           <LanguageToggle locale={locale} setLocale={setLocale} />
           <ThemeToggle theme={theme} setTheme={setTheme} />
           <GuideMeButton />
+          <UserMenu locale={locale} />
         </div>
       </header>
 
       <div className="app-body">
         <AppSidebar locale={locale} />
         <main className="app-content">
+          <Breadcrumb locale={locale} />
           <Outlet />
         </main>
       </div>
