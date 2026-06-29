@@ -6,6 +6,8 @@
 
 import type { ThemeId, LocaleCode } from '@acc-reliability/shared-types';
 import type { UserContext } from '@acc-reliability/sdk';
+import type { BrandingConfig } from './branding-types';
+import type { TourState, GuideTourId } from './tour-types';
 
 export type { ThemeId, LocaleCode };
 
@@ -38,4 +40,20 @@ export interface ThemeContextValue {
 export interface LanguageContextValue {
   readonly locale: LocaleCode;
   readonly setLocale: (locale: LocaleCode) => void;
+}
+
+/** Value exposed by BrandingContext. */
+export interface BrandingContextValue {
+  readonly branding: BrandingConfig;
+  /** Replace branding at runtime (e.g. after contractor profile loads). */
+  readonly setBranding: (config: BrandingConfig) => void;
+}
+
+/** Value exposed by TourContext. */
+export interface TourContextValue {
+  readonly tourState: TourState;
+  /** Begin a named guided tour from its first step. No-op if already active. */
+  readonly startTour: (tourId: GuideTourId) => void;
+  /** End any active tour and reset state. */
+  readonly endTour: () => void;
 }
