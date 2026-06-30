@@ -33,7 +33,8 @@
 //     │    ├─ ActionScopeError          ACTION_SCOPE_VIOLATION      — contractor scope mismatch on create
 //     │    └─ ActionTransitionError     ACTION_INVALID_TRANSITION   — invalid status transition attempted
 //     └─ AuditError             AUDIT_ERROR                 — base for all audit service failures
-//          └─ AuditEntryNotFoundError   AUDIT_NOT_FOUND            — unknown audit entry id
+//          ├─ AuditEntryNotFoundError   AUDIT_NOT_FOUND            — unknown audit entry id
+//          └─ AuditValidationError      AUDIT_VALIDATION_ERROR     — request violates audit constraints (e.g. missing reason)
 
 import { PlatformError } from '@acc-reliability/kernel';
 
@@ -535,6 +536,540 @@ export class ActionTransitionError extends ActionError {
   }
 }
 
+// ── User Management errors ────────────────────────────────────────────────────
+
+/**
+ * Base error for all user management failures.
+ *
+ * Catch this type to handle any user-domain error without enumerating sub-types.
+ * Sub-classes supply a more specific `code`; when this class is thrown directly
+ * it uses `'USER_ERROR'`.
+ */
+export class UserError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'USER_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'UserError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation targets a user id that is not held in the user service.
+ *
+ * HTTP equivalent: 404 Not Found.
+ */
+export class UserNotFoundError extends UserError {
+  readonly userId: string;
+
+  constructor(userId: string) {
+    super(
+      `User '${userId}' was not found`,
+      'USER_NOT_FOUND',
+      { userId },
+    );
+    this.name = 'UserNotFoundError';
+    this.userId = userId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a create operation violates the email uniqueness constraint
+ * within a contractor scope.
+ *
+ * HTTP equivalent: 409 Conflict.
+ */
+export class UserDuplicateError extends UserError {
+  readonly email: string;
+  readonly contractorId: string;
+
+  constructor(email: string, contractorId: string) {
+    super(
+      `User with email '${email}' already exists in contractor '${contractorId}'`,
+      'USER_DUPLICATE',
+      { email, contractorId },
+    );
+    this.name = 'UserDuplicateError';
+    this.email = email;
+    this.contractorId = contractorId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a lifecycle operation is not permitted from the user's current status.
+ *
+ * For example: archiving an already-archived user, or restoring an active user.
+ *
+ * HTTP equivalent: 409 Conflict.
+ */
+export class UserLifecycleError extends UserError {
+  readonly userId: string;
+  readonly currentStatus: string;
+  readonly requestedOperation: string;
+
+  constructor(userId: string, currentStatus: string, requestedOperation: string) {
+    super(
+      `Cannot perform '${requestedOperation}' on user '${userId}' — current status is '${currentStatus}'`,
+      'USER_LIFECYCLE_ERROR',
+      { userId, currentStatus, requestedOperation },
+    );
+    this.name = 'UserLifecycleError';
+    this.userId = userId;
+    this.currentStatus = currentStatus;
+    this.requestedOperation = requestedOperation;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Contractor Management errors ──────────────────────────────────────────────
+
+/**
+ * Base error for all contractor management failures.
+ *
+ * Catch this type to handle any contractor-domain error without enumerating
+ * sub-types.  Sub-classes supply a more specific `code`; when this class is
+ * thrown directly it uses `'CONTRACTOR_ERROR'`.
+ */
+export class ContractorError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'CONTRACTOR_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'ContractorError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation targets a contractor id that is not held in the
+ * contractor service.
+ *
+ * HTTP equivalent: 404 Not Found.
+ */
+export class ContractorNotFoundError extends ContractorError {
+  readonly contractorId: string;
+
+  constructor(contractorId: string) {
+    super(
+      `Contractor '${contractorId}' was not found`,
+      'CONTRACTOR_NOT_FOUND',
+      { contractorId },
+    );
+    this.name = 'ContractorNotFoundError';
+    this.contractorId = contractorId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a create operation violates the contractor code uniqueness constraint.
+ *
+ * HTTP equivalent: 409 Conflict.
+ */
+export class ContractorDuplicateError extends ContractorError {
+  readonly contractorCode: string;
+
+  constructor(contractorCode: string) {
+    super(
+      `Contractor with code '${contractorCode}' already exists`,
+      'CONTRACTOR_DUPLICATE',
+      { contractorCode },
+    );
+    this.name = 'ContractorDuplicateError';
+    this.contractorCode = contractorCode;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a lifecycle operation is not permitted from the contractor's current status.
+ *
+ * HTTP equivalent: 409 Conflict.
+ */
+export class ContractorLifecycleError extends ContractorError {
+  readonly contractorId: string;
+  readonly currentStatus: string;
+  readonly requestedOperation: string;
+
+  constructor(contractorId: string, currentStatus: string, requestedOperation: string) {
+    super(
+      `Cannot perform '${requestedOperation}' on contractor '${contractorId}' — current status is '${currentStatus}'`,
+      'CONTRACTOR_LIFECYCLE_ERROR',
+      { contractorId, currentStatus, requestedOperation },
+    );
+    this.name = 'ContractorLifecycleError';
+    this.contractorId = contractorId;
+    this.currentStatus = currentStatus;
+    this.requestedOperation = requestedOperation;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Module Registry errors ────────────────────────────────────────────────────
+
+/**
+ * Base error for all module registry failures.
+ *
+ * Catch this type to handle any module-domain error without enumerating sub-types.
+ * Sub-classes supply a more specific `code`; when this class is thrown directly
+ * it uses `'MODULE_ERROR'`.
+ */
+export class ModuleError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'MODULE_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'ModuleError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation targets a module id that is not held in the module service.
+ *
+ * HTTP equivalent: 404 Not Found.
+ */
+export class ModuleNotFoundError extends ModuleError {
+  readonly moduleId: string;
+
+  constructor(moduleId: string) {
+    super(
+      `Module '${moduleId}' was not found`,
+      'MODULE_NOT_FOUND',
+      { moduleId },
+    );
+    this.name = 'ModuleNotFoundError';
+    this.moduleId = moduleId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a register operation violates the module key uniqueness constraint.
+ *
+ * HTTP equivalent: 409 Conflict.
+ */
+export class ModuleDuplicateError extends ModuleError {
+  readonly moduleKey: string;
+
+  constructor(moduleKey: string) {
+    super(
+      `Module with key '${moduleKey}' already exists`,
+      'MODULE_DUPLICATE',
+      { moduleKey },
+    );
+    this.name = 'ModuleDuplicateError';
+    this.moduleKey = moduleKey;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a lifecycle operation is not permitted from the module's current status.
+ *
+ * HTTP equivalent: 409 Conflict.
+ */
+export class ModuleLifecycleError extends ModuleError {
+  readonly moduleId: string;
+  readonly currentStatus: string;
+  readonly requestedOperation: string;
+
+  constructor(moduleId: string, currentStatus: string, requestedOperation: string) {
+    super(
+      `Cannot perform '${requestedOperation}' on module '${moduleId}' — current status is '${currentStatus}'`,
+      'MODULE_LIFECYCLE_ERROR',
+      { moduleId, currentStatus, requestedOperation },
+    );
+    this.name = 'ModuleLifecycleError';
+    this.moduleId = moduleId;
+    this.currentStatus = currentStatus;
+    this.requestedOperation = requestedOperation;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Notification Management errors ────────────────────────────────────────────
+
+/**
+ * Base error for all notification management failures.
+ */
+export class NotificationManagementError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'NOTIFICATION_MANAGEMENT_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'NotificationManagementError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation targets a notification rule id that is not held
+ * in the notification management service.
+ */
+export class NotificationRuleNotFoundError extends NotificationManagementError {
+  readonly ruleId: string;
+
+  constructor(ruleId: string) {
+    super(
+      `Notification rule '${ruleId}' was not found`,
+      'NOTIFICATION_RULE_NOT_FOUND',
+      { ruleId },
+    );
+    this.name = 'NotificationRuleNotFoundError';
+    this.ruleId = ruleId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a create operation violates the rule key uniqueness constraint.
+ */
+export class NotificationRuleDuplicateError extends NotificationManagementError {
+  readonly objectType: string;
+  readonly ruleKey: string;
+
+  constructor(objectType: string, ruleKey: string) {
+    super(
+      `Notification configuration '${objectType}/${ruleKey}' already exists`,
+      'NOTIFICATION_RULE_DUPLICATE',
+      { objectType, ruleKey },
+    );
+    this.name = 'NotificationRuleDuplicateError';
+    this.objectType = objectType;
+    this.ruleKey = ruleKey;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a lifecycle operation is not permitted from the record's current status.
+ */
+export class NotificationRuleLifecycleError extends NotificationManagementError {
+  readonly ruleId: string;
+  readonly currentStatus: string;
+  readonly requestedOperation: string;
+
+  constructor(ruleId: string, currentStatus: string, requestedOperation: string) {
+    super(
+      `Cannot perform '${requestedOperation}' on notification rule '${ruleId}' — current status is '${currentStatus}'`,
+      'NOTIFICATION_RULE_LIFECYCLE_ERROR',
+      { ruleId, currentStatus, requestedOperation },
+    );
+    this.name = 'NotificationRuleLifecycleError';
+    this.ruleId = ruleId;
+    this.currentStatus = currentStatus;
+    this.requestedOperation = requestedOperation;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Reporting errors ──────────────────────────────────────────────────────────
+
+/**
+ * Base error for all reporting domain failures.
+ */
+export class ReportingError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'REPORTING_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'ReportingError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation targets a report id that is not held
+ * in the reporting service.
+ */
+export class ReportNotFoundError extends ReportingError {
+  readonly reportId: string;
+
+  constructor(reportId: string) {
+    super(
+      `Report '${reportId}' was not found`,
+      'REPORT_NOT_FOUND',
+      { reportId },
+    );
+    this.name = 'ReportNotFoundError';
+    this.reportId = reportId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a create operation violates the report key uniqueness constraint.
+ */
+export class ReportDuplicateError extends ReportingError {
+  readonly objectType: string;
+  readonly reportKey: string;
+
+  constructor(objectType: string, reportKey: string) {
+    super(
+      `Reporting configuration '${objectType}/${reportKey}' already exists`,
+      'REPORT_DUPLICATE',
+      { objectType, reportKey },
+    );
+    this.name = 'ReportDuplicateError';
+    this.objectType = objectType;
+    this.reportKey = reportKey;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a lifecycle operation is not permitted from the record's current status.
+ */
+export class ReportLifecycleError extends ReportingError {
+  readonly reportId: string;
+  readonly currentStatus: string;
+  readonly requestedOperation: string;
+
+  constructor(reportId: string, currentStatus: string, requestedOperation: string) {
+    super(
+      `Cannot perform '${requestedOperation}' on report '${reportId}' — current status is '${currentStatus}'`,
+      'REPORT_LIFECYCLE_ERROR',
+      { reportId, currentStatus, requestedOperation },
+    );
+    this.name = 'ReportLifecycleError';
+    this.reportId = reportId;
+    this.currentStatus = currentStatus;
+    this.requestedOperation = requestedOperation;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Workflow & Approval errors ────────────────────────────────────────────────
+
+/**
+ * Base error for all workflow & approval domain failures.
+ */
+export class WorkflowError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'WORKFLOW_ERROR',
+    context?: Record<string, unknown>
+  ) {
+    super(message, code, context);
+    this.name = 'WorkflowError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation targets a workflow definition id that is not held
+ * in the workflow service.
+ */
+export class WorkflowDefinitionNotFoundError extends WorkflowError {
+  readonly definitionId: string;
+
+  constructor(definitionId: string) {
+    super(
+      `Workflow definition '${definitionId}' was not found`,
+      'WORKFLOW_DEFINITION_NOT_FOUND',
+      { definitionId },
+    );
+    this.name = 'WorkflowDefinitionNotFoundError';
+    this.definitionId = definitionId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an operation targets a workflow instance id that is not held
+ * in the workflow service.
+ */
+export class WorkflowInstanceNotFoundError extends WorkflowError {
+  readonly instanceId: string;
+
+  constructor(instanceId: string) {
+    super(
+      `Workflow instance '${instanceId}' was not found`,
+      'WORKFLOW_INSTANCE_NOT_FOUND',
+      { instanceId },
+    );
+    this.name = 'WorkflowInstanceNotFoundError';
+    this.instanceId = instanceId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a create operation violates the workflow key uniqueness constraint.
+ */
+export class WorkflowDefinitionDuplicateError extends WorkflowError {
+  readonly workflowKey: string;
+
+  constructor(workflowKey: string) {
+    super(
+      `Workflow definition with key '${workflowKey}' already exists`,
+      'WORKFLOW_DEFINITION_DUPLICATE',
+      { workflowKey },
+    );
+    this.name = 'WorkflowDefinitionDuplicateError';
+    this.workflowKey = workflowKey;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when a lifecycle operation is not permitted from the record's current status.
+ */
+export class WorkflowLifecycleError extends WorkflowError {
+  readonly definitionId: string;
+  readonly currentStatus: string;
+  readonly requestedOperation: string;
+
+  constructor(definitionId: string, currentStatus: string, requestedOperation: string) {
+    super(
+      `Cannot perform '${requestedOperation}' on workflow '${definitionId}' — current status is '${currentStatus}'`,
+      'WORKFLOW_LIFECYCLE_ERROR',
+      { definitionId, currentStatus, requestedOperation },
+    );
+    this.name = 'WorkflowLifecycleError';
+    this.definitionId = definitionId;
+    this.currentStatus = currentStatus;
+    this.requestedOperation = requestedOperation;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an instance operation is not permitted from the instance's current status.
+ */
+export class WorkflowInstanceLifecycleError extends WorkflowError {
+  readonly instanceId: string;
+  readonly currentStatus: string;
+  readonly requestedOperation: string;
+
+  constructor(instanceId: string, currentStatus: string, requestedOperation: string) {
+    super(
+      `Cannot perform '${requestedOperation}' on workflow instance '${instanceId}' — current status is '${currentStatus}'`,
+      'WORKFLOW_INSTANCE_LIFECYCLE_ERROR',
+      { instanceId, currentStatus, requestedOperation },
+    );
+    this.name = 'WorkflowInstanceLifecycleError';
+    this.instanceId = instanceId;
+    this.currentStatus = currentStatus;
+    this.requestedOperation = requestedOperation;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 // ── Audit errors ──────────────────────────────────────────────────────────────
 
 /**
@@ -573,6 +1108,27 @@ export class AuditEntryNotFoundError extends AuditError {
     );
     this.name = 'AuditEntryNotFoundError';
     this.auditId = auditId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Thrown when an {@link AuditRequest} violates a mandatory audit constraint.
+ *
+ * The most common cause is a missing `reason` on a high-risk or critical
+ * severity entry.  Callers can pre-validate via `AuditService.validateRequest`
+ * to surface this error before writing.  The `record()` method itself absorbs
+ * this error internally rather than propagating it.
+ *
+ * HTTP equivalent: 400 Bad Request.
+ */
+export class AuditValidationError extends AuditError {
+  constructor(
+    message: string,
+    context?: Record<string, unknown>,
+  ) {
+    super(message, 'AUDIT_VALIDATION_ERROR', context);
+    this.name = 'AuditValidationError';
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }

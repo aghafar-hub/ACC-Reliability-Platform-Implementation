@@ -14,6 +14,14 @@ import type { IAuditClient } from './clients/audit-client';
 import type { IStorageClient } from './clients/storage-client';
 import type { IWorkflowClient } from './clients/workflow-client';
 import type { IConfigClient } from './clients/config-client';
+import type { IHealthClient } from './clients/health-client';
+import type { IMetricsClient } from './clients/metrics-client';
+import type { IUserClient } from './clients/user-client';
+import type { IContractorClient } from './clients/contractor-client';
+import type { IModuleClient } from './clients/module-client';
+import type { INotificationManagementClient } from './clients/notification-management-client';
+import type { IReportingClient } from './clients/reporting-client';
+import type { IWorkflowsClient } from './clients/workflows-client';
 import type { SdkContext } from './sdk-context';
 
 /**
@@ -82,6 +90,57 @@ export interface IPlatformSdk {
    * See PS-114 §7.
    */
   readonly config: IConfigClient;
+
+  /**
+   * Health monitoring client — register component checks, query platform
+   * health status.  See PS-108.
+   */
+  readonly health: IHealthClient;
+
+  /**
+   * Telemetry client — register metrics, record observations, query snapshots.
+   * See PS-109.
+   */
+  readonly metrics: IMetricsClient;
+
+  /**
+   * User Management client — create, update, archive, restore, suspend, activate users.
+   * Manages role assignments including temporary and delegated roles.
+   * Authentication-provider-agnostic; does not implement sign-in or sessions.
+   */
+  readonly users: IUserClient;
+
+  /**
+   * Contractor Management client — create, update, activate, deactivate, archive,
+   * restore contractor organizations.
+   */
+  readonly contractors: IContractorClient;
+
+  /**
+   * Module Registry client — register, update, enable, disable, maintenance,
+   * retire, restore platform modules.
+   */
+  readonly modules: IModuleClient;
+
+  /**
+   * Notification Management client — create, update, enable, disable, archive,
+   * restore notification rules, templates, channels, reminders, and escalations.
+   * Configuration only; does not send notifications.
+   */
+  readonly notificationManagement: INotificationManagementClient;
+
+  /**
+   * Reporting client — create, update, enable, disable, archive, restore
+   * report definitions, categories, templates, export profiles, and schedule profiles.
+   * Configuration only; does not execute reports.
+   */
+  readonly reporting: IReportingClient;
+
+  /**
+   * Workflow & Approval client — manage workflow definitions, approval configuration,
+   * and basic instance lifecycle.
+   */
+  readonly workflows: IWorkflowsClient;
 
   /**
    * Runtime context for the current session — current user, contractor scope,

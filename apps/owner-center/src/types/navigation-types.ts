@@ -8,8 +8,12 @@
 
 /**
  * Metadata for a top-level shell route.
- * `badge` drives visual indicators on the nav item (e.g. notification dot).
- * `moduleId` links the route to a platform module for future permission filtering.
+ *
+ * `moduleId`   — links the route to a platform module; enables permission filtering.
+ * `adminOnly`  — when true the route requires `contractorScope:'all'` access, which
+ *                only `AppOwner` users can satisfy.  Use for platform-administration
+ *                pages.  Ignored when `moduleId` is absent.
+ * `badge`      — drives visual indicators on the nav item (e.g. notification dot).
  */
 export interface RouteMetadata {
   readonly path: string;
@@ -17,6 +21,7 @@ export interface RouteMetadata {
   readonly label: { readonly en: string; readonly ar: string };
   readonly end?: boolean;
   readonly moduleId?: string;
+  readonly adminOnly?: boolean;
   readonly badge?: 'notification';
 }
 
@@ -34,30 +39,105 @@ export interface BreadcrumbItem {
 export const NAV_ITEMS: readonly RouteMetadata[] = [
   {
     path: '/',
-    icon: 'H',
+    icon: 'home',
     label: { en: 'Home', ar: 'الرئيسية' },
     end: true,
   },
   {
     path: '/oil-lubrication',
-    icon: 'OL',
+    icon: 'droplet',
     label: { en: 'Oil Lubrication', ar: 'تشحيم الزيت' },
     moduleId: 'oil-lubrication',
   },
   {
     path: '/notifications',
-    icon: 'N',
+    icon: 'bell',
     label: { en: 'Notifications', ar: 'الإشعارات' },
     badge: 'notification',
   },
   {
     path: '/learning',
-    icon: 'LC',
+    icon: 'book-open',
     label: { en: 'Learning Center', ar: 'مركز التعلم' },
   },
   {
+    path: '/users-roles',
+    icon: 'users',
+    label: { en: 'Users & Roles', ar: 'المستخدمون والأدوار' },
+    moduleId: 'users-roles',
+    adminOnly: true,
+  },
+  {
+    path: '/contractors',
+    icon: 'briefcase',
+    label: { en: 'Contractors', ar: 'المقاولون' },
+    moduleId: 'contractors',
+    adminOnly: true,
+  },
+  {
+    path: '/module-registry',
+    icon: 'package',
+    label: { en: 'Module Registry', ar: 'سجل الوحدات' },
+    moduleId: 'module-registry',
+    adminOnly: true,
+  },
+  {
+    path: '/branding',
+    icon: 'tag',
+    label: { en: 'Branding Center', ar: 'مركز العلامة التجارية' },
+    moduleId: 'branding',
+    adminOnly: true,
+  },
+  {
+    path: '/localization',
+    icon: 'globe',
+    label: { en: 'Localization Center', ar: 'مركز التوطين' },
+    moduleId: 'localization',
+    adminOnly: true,
+  },
+  {
+    path: '/notification-management',
+    icon: 'volume-2',
+    label: { en: 'Notification Management', ar: 'إدارة الإشعارات' },
+    moduleId: 'notification-management',
+    adminOnly: true,
+  },
+  {
+    path: '/workflow-approval',
+    icon: 'git-merge',
+    label: { en: 'Workflow & Approval', ar: 'سير العمل والموافقة' },
+    moduleId: 'workflow-approval',
+  },
+  {
+    path: '/reporting-analytics',
+    icon: 'bar-chart-2',
+    label: { en: 'Reporting & Analytics', ar: 'التقارير والتحليلات' },
+    moduleId: 'reporting-analytics',
+  },
+  {
+    path: '/audit-activity',
+    icon: 'clipboard',
+    label: { en: 'Audit & Activity', ar: 'التدقيق والنشاط' },
+    moduleId: 'audit-activity',
+    adminOnly: true,
+  },
+  {
+    path: '/system-health',
+    icon: 'activity',
+    label: { en: 'System Health', ar: 'صحة النظام' },
+    moduleId: 'system-health',
+    adminOnly: true,
+  },
+  {
+    path: '/platform-settings',
+    icon: 'settings',
+    label: { en: 'Platform Settings', ar: 'إعدادات المنصة' },
+    moduleId: 'platform-settings',
+    adminOnly: true,
+  },
+  {
     path: '/settings',
-    icon: 'S',
+    icon: 'sliders',
     label: { en: 'Settings', ar: 'الإعدادات' },
   },
 ];

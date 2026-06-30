@@ -4,7 +4,16 @@
 // Business modules write audit records through this client only (PS-114 §13).
 // Modules must never write directly to audit storage.
 //
+// The App Owner control center reads audit records through the query methods
+// on this client.  Read operations never create new audit entries.
+//
 // Audit data model per PS-110 §6.
+
+import type {
+  AuditEntry,
+  AuditQuery,
+  AuditTimeline,
+} from '@acc-reliability/services';
 
 // ── Audit event category ──────────────────────────────────────────────────────
 
@@ -94,4 +103,25 @@ export interface IAuditClient {
    *   (Audit_ID, Timestamp, User_ID, Session_ID) are added automatically.
    */
   write(entry: AuditRequest): Promise<void>;
+
+  /**
+   * Queries the audit trail using the supplied filter criteria.
+   *
+   * Returns entries ordered by `recordedAt` descending (most recent first).
+   * Read-only — never creates audit records.
+   */
+  query(filter: AuditQuery): readonly AuditEntry[];
+
+  /**
+   * Returns the count of entries matching the filter.
+   * Omit the filter to count all stored entries.
+   * Read-only — never creates audit records.
+   */
+  count(filter?: AuditQuery): number;
+
+  /**
+   * Returns a chronological view of all audit entries for a single entity.
+   * Read-only — never creates audit records.
+   */
+  getTimeline(entityType: string, entityId: string, limit?: number): AuditTimeline;
 }

@@ -5,7 +5,7 @@
 // the shell-level state shapes consumed by context providers.
 
 import type { ThemeId, LocaleCode } from '@acc-reliability/shared-types';
-import type { UserContext } from '@acc-reliability/sdk';
+import type { UserContext, AuthCredentials } from '@acc-reliability/sdk';
 import type { BrandingConfig } from './branding-types';
 import type { TourState, GuideTourId } from './tour-types';
 
@@ -26,6 +26,27 @@ export interface AuthState {
   readonly user: UserContext | null;
   /** Human-readable error message when status is 'unauthenticated' due to a failure. */
   readonly error: string | null;
+}
+
+/**
+ * Full context value exposed by {@link AuthContext}.
+ *
+ * Extends the read-only {@link AuthState} snapshot with the two auth actions
+ * that UI components may invoke.  Business logic must never bypass these
+ * functions to call platform services directly.
+ */
+export interface AuthContextValue extends AuthState {
+  /**
+   * Initiates a sign-in flow with the supplied credentials.
+   * Sets `status` to `'loading'` while in progress; resolves to
+   * `'authenticated'` on success or `'unauthenticated'` on failure.
+   */
+  readonly login: (credentials: AuthCredentials) => Promise<void>;
+  /**
+   * Terminates the current session.  Always resolves; never throws.
+   * Sets `status` to `'unauthenticated'` after completion.
+   */
+  readonly logout: () => Promise<void>;
 }
 
 // ── Context value shapes ──────────────────────────────────────────────────────

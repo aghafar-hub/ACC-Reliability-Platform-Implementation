@@ -174,6 +174,68 @@ export interface TokenCredentials {
   readonly token: string;
 }
 
+// ── Session storage abstraction ───────────────────────────────────────────────
+
+/**
+ * Persisted session data written and read by {@link IAuthRepository}.
+ *
+ * All fields are plain serialisable values so the record survives a
+ * JSON round-trip to sessionStorage or any other persistence backend.
+ */
+export interface SessionData {
+  readonly userContext: UserContext;
+  readonly sessionId: SessionId;
+  readonly createdAt: string;
+  readonly lastActivityAt: string;
+  readonly expiresAt: string;
+  /** When true the caller requested a persistent session (e.g. "remember me"). */
+  readonly rememberMe: boolean;
+}
+
+/**
+ * Abstract session persistence backing store.
+ *
+ * Implementations are free to use sessionStorage, localStorage, a server-side
+ * cookie, or an in-memory map.  {@link AuthService} never calls a storage API
+ * directly; it delegates entirely through this interface.
+ */
+export interface IAuthRepository {
+  /** Persist a session, overwriting any previously stored session. */
+  save(session: SessionData): void;
+  /** Load the most recently saved session, or `null` when none exists. */
+  load(): SessionData | null;
+  /** Remove the stored session. */
+  clear(): void;
+}
+
+// ── Credential validation abstraction ─────────────────────────────────────────
+
+/**
+ * Authentication provider contract — validates credentials and returns
+ * the user identity they represent.
+ *
+ * Implementations wrap concrete identity backends (dev mock, Microsoft Entra
+ * ID, OIDC, SAML, etc.).  {@link AuthService} delegates all credential
+ * verification here; it never performs provider-specific validation itself.
+ *
+ * The returned context does **not** include `sessionId`, `authenticatedAt`,
+ * or `expiresAt` — those are assigned by {@link AuthService} after a
+ * successful validation.
+ */
+export interface IAuthProvider {
+  /**
+   * Validates the supplied credentials.
+   *
+   * @returns a partial {@link UserContext} (identity only, no session fields)
+   *   when credentials are valid.
+   * @throws {@link AuthenticationError} when credentials are invalid or the
+   *   provider is unavailable.
+   */
+  validateCredentials(
+    credentials: AuthCredentials,
+  ): Promise<Omit<UserContext, 'sessionId' | 'authenticatedAt' | 'expiresAt'>>;
+}
+
 // ── IAuthService ──────────────────────────────────────────────────────────────
 
 /**

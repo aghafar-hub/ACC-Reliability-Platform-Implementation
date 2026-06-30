@@ -27,6 +27,7 @@ export function SearchButton({ locale, onOpen }: SearchButtonProps): React.React
       aria-label={isAr ? COPY.label.ar : COPY.label.en}
       aria-keyshortcuts="Control+k"
     >
+      <span className="search-btn__icon" aria-hidden="true">⌕</span>
       <span className="search-btn__label">
         {isAr ? COPY.label.ar : COPY.label.en}
       </span>

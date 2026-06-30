@@ -15,8 +15,11 @@
 //   - resource.module is typed as PlatformModule so cross-module attribution
 //     is unambiguous.
 //   - query() returns an empty array when no entries match; it never throws.
-//   - No implementation class in this file — the concrete provider is a future
-//     milestone once a durable backend is available.
+//   - HIGH_RISK_SEVERITIES ('high', 'critical') require a non-empty reason.
+//     record() absorbs validation failures; use AuditService.validateRequest()
+//     to surface them explicitly before recording.
+//   - Concrete in-memory implementation lives in audit-service.ts.
+//     SQL migration hook reserved for platform.audit.v2.
 
 import type { IsoTimestamp } from '@acc-reliability/shared-types';
 import type { UserId, ContractorId, SessionId } from '../auth/auth-types';
@@ -104,6 +107,48 @@ export type KnownAuditAction = (typeof AUDIT_ACTIONS)[number];
  */
 export type AuditAction = KnownAuditAction | (string & Record<never, never>);
 
+// ── AuditSeverity ─────────────────────────────────────────────────────────────
+
+/**
+ * Severity classification for an auditable event.
+ *
+ * Used to distinguish routine informational records from security-sensitive or
+ * business-critical operations that require a mandatory {@link AuditRequest.reason}.
+ */
+export const AUDIT_SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
+
+export type AuditSeverity = (typeof AUDIT_SEVERITIES)[number];
+
+/**
+ * Subset of severities that require a non-empty {@link AuditRequest.reason}.
+ * The {@link AuditService} records a `_validationWarning` metadata key when
+ * reason is absent for these levels rather than refusing to write the entry.
+ */
+export const HIGH_RISK_SEVERITIES = ['high', 'critical'] as const satisfies readonly AuditSeverity[];
+
+export type HighRiskSeverity = (typeof HIGH_RISK_SEVERITIES)[number];
+
+// ── AuditClientType ───────────────────────────────────────────────────────────
+
+/**
+ * Well-known originating client types for an auditable operation.
+ * Allows compliance queries to isolate, for example, all API-originated changes.
+ */
+export const AUDIT_CLIENT_TYPES = [
+  'web-app',
+  'mobile-app',
+  'api-client',
+  'system',
+  'scheduler',
+] as const;
+
+export type KnownAuditClientType = (typeof AUDIT_CLIENT_TYPES)[number];
+
+/**
+ * Open union: one of the known client types or a deployment-specific extension.
+ */
+export type AuditClientType = KnownAuditClientType | (string & Record<never, never>);
+
 // ── AuditOutcome ──────────────────────────────────────────────────────────────
 
 /**
@@ -156,6 +201,12 @@ export interface AuditResource {
  *
  * The service assigns the {@link AuditId} and `recordedAt` timestamp;
  * callers must not supply them.
+ *
+ * When `severity` is `'high'` or `'critical'`, `reason` is mandatory.
+ * A missing reason is not rejected — the entry is still written — but a
+ * `_validationWarning` key is appended to `metadata`.  Callers that want
+ * to enforce the rule before writing should call
+ * `AuditService.validateRequest(request)`.
  */
 export interface AuditRequest {
   /** Broad category that groups related audit actions (e.g. `'auth'`, `'data'`). */
@@ -172,6 +223,24 @@ export interface AuditRequest {
   readonly correlationId?: CorrelationId;
   /** Human-readable description of what occurred (logged, not surfaced to clients). */
   readonly description?: string;
+  /**
+   * Risk level of this operation.
+   * `'high'` and `'critical'` entries should also supply a {@link reason}.
+   */
+  readonly severity?: AuditSeverity;
+  /**
+   * Human-readable justification for why this operation was performed.
+   * Required (soft) when severity is `'high'` or `'critical'`.
+   */
+  readonly reason?: string;
+  /** Type of client that originated the request (browser, mobile app, API key, etc.). */
+  readonly clientType?: AuditClientType;
+  /** IP address of the originating client (omit if unavailable or not applicable). */
+  readonly ipAddress?: string;
+  /** Snapshot of the resource state before the operation (must not contain secrets). */
+  readonly beforeValue?: unknown;
+  /** Snapshot of the resource state after the operation (must not contain secrets). */
+  readonly afterValue?: unknown;
   /** Arbitrary structured data relevant to this entry (must not contain secrets). */
   readonly metadata?: Record<string, unknown>;
 }
@@ -182,7 +251,8 @@ export interface AuditRequest {
  * Immutable record of a single auditable event as stored by the audit service.
  *
  * Every field from {@link AuditRequest} is preserved, with the service-assigned
- * `id` and `recordedAt` timestamp appended.
+ * `id` and `recordedAt` timestamp appended.  All optional fields are omitted
+ * (never `undefined`) when not supplied by the caller.
  */
 export interface AuditEntry {
   /** Unique stable identifier assigned by the audit service at record time. */
@@ -194,6 +264,12 @@ export interface AuditEntry {
   readonly resource: AuditResource;
   readonly correlationId?: CorrelationId;
   readonly description?: string;
+  readonly severity?: AuditSeverity;
+  readonly reason?: string;
+  readonly clientType?: AuditClientType;
+  readonly ipAddress?: string;
+  readonly beforeValue?: unknown;
+  readonly afterValue?: unknown;
   readonly metadata?: Record<string, unknown>;
   /** ISO 8601 UTC timestamp set by the service when the entry was written. */
   readonly recordedAt: IsoTimestamp;
@@ -206,6 +282,7 @@ export interface AuditEntry {
  *
  * All fields are optional.  Omitting all fields returns all stored entries
  * (subject to the `limit`).  Multiple fields are combined with AND semantics.
+ * Results are ordered by `recordedAt` descending (most recent first).
  */
 export interface AuditQuery {
   /** Return only entries matching this category. */
@@ -220,14 +297,60 @@ export interface AuditQuery {
   readonly contractorId?: ContractorId;
   /** Return only entries for this platform module. */
   readonly module?: PlatformModule;
+  /** Return only entries for this entity type (e.g. `'OilRoute'`, `'User'`). */
+  readonly entityType?: string;
+  /** Return only entries for this specific entity id. */
+  readonly entityId?: string;
+  /** Return only entries matching this severity level. */
+  readonly severity?: AuditSeverity;
   /** Return only entries recorded at or after this timestamp. */
   readonly fromTimestamp?: IsoTimestamp;
   /** Return only entries recorded at or before this timestamp. */
   readonly toTimestamp?: IsoTimestamp;
   /** Return only entries linked to this correlation id. */
   readonly correlationId?: CorrelationId;
-  /** Maximum number of entries to return (most recent first). */
+  /** Number of matching entries to skip before returning results (for pagination). */
+  readonly offset?: number;
+  /** Maximum number of entries to return (most recent first). Defaults to 100. */
   readonly limit?: number;
+}
+
+// ── AuditTimeline ─────────────────────────────────────────────────────────────
+
+/**
+ * Chronological view of all audit entries for a single entity.
+ *
+ * Returned by {@link IAuditService.getTimeline}.  The `total` count reflects
+ * all matching entries in the store, not just the page returned in `entries`.
+ * Suitable as an export-ready shape for compliance review; PDF/Excel generation
+ * is a future milestone.
+ */
+export interface AuditTimeline {
+  /** Entity type that was queried (e.g. `'OilRoute'`, `'User'`). */
+  readonly entityType: string;
+  /** Specific entity id that was queried. */
+  readonly entityId: string;
+  /** Entries for this entity ordered by `recordedAt` descending. */
+  readonly entries: readonly AuditEntry[];
+  /** Total count of all audit entries for this entity in the store. */
+  readonly total: number;
+}
+
+// ── AuditServiceOptions ───────────────────────────────────────────────────────
+
+/**
+ * Construction options for the in-memory {@link AuditService}.
+ *
+ * Future SQL-backed providers will ignore `maxEntriesInMemory` and rely on
+ * their own retention policies.
+ */
+export interface AuditServiceOptions {
+  /**
+   * Maximum number of entries to hold in the in-memory store.
+   * When the limit is reached the oldest entry (FIFO) is evicted.
+   * Defaults to `10 000`.
+   */
+  readonly maxEntriesInMemory?: number;
 }
 
 // ── IAuditService ─────────────────────────────────────────────────────────────
@@ -279,4 +402,22 @@ export interface IAuditService {
    * Never throws.
    */
   count(filter?: AuditQuery): number;
+
+  /**
+   * Returns all entries linked to the given correlation id, ordered by
+   * `recordedAt` descending.  Convenience alias for
+   * `query({ correlationId, limit: 100 })`.
+   * Never throws.
+   */
+  getByCorrelationId(correlationId: CorrelationId): readonly AuditEntry[];
+
+  /**
+   * Returns a {@link AuditTimeline} for the given entity — all audit entries
+   * targeting that specific `entityType` / `entityId` pair, ordered by
+   * `recordedAt` descending.
+   *
+   * The `total` field always reflects the full un-paginated count.
+   * Never throws.
+   */
+  getTimeline(entityType: string, entityId: string, limit?: number): AuditTimeline;
 }

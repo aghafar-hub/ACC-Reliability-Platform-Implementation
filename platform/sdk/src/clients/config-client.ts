@@ -5,6 +5,43 @@
 // through this client (PS-114 §7).  Modules must not read configuration
 // storage directly or hardcode values that can be driven by configuration.
 
+/** Primitive data types exposed for configuration entries. */
+export type ConfigDataType = 'string' | 'number' | 'boolean';
+
+/**
+ * A single flattened configuration entry with metadata for display and comparison.
+ */
+export interface ConfigEntry {
+  /** Fully-qualified dotted key (e.g. `'platform.name'`). */
+  readonly key: string;
+  /** Top-level configuration group (first path segment). */
+  readonly group: string;
+  /** Current resolved value from the loaded configuration. */
+  readonly currentValue: string | number | boolean;
+  /** Static default value when available; `undefined` for keys without defaults. */
+  readonly defaultValue: string | number | boolean | undefined;
+  /** Whether the current value differs from the static default. */
+  readonly isModified: boolean;
+  /** Runtime data type of the value. */
+  readonly dataType: ConfigDataType;
+  /** Whether the configuration layer supports in-place updates for this key. */
+  readonly editable: boolean;
+}
+
+/**
+ * Aggregate counts for the platform configuration overview.
+ */
+export interface ConfigSummary {
+  /** Total number of flattened configuration keys. */
+  readonly totalKeys: number;
+  /** Keys whose current value differs from the static default. */
+  readonly modifiedCount: number;
+  /** Keys whose current value matches the static default. */
+  readonly defaultCount: number;
+  /** Number of distinct top-level configuration groups. */
+  readonly groupCount: number;
+}
+
 /**
  * SDK configuration client.
  *
@@ -42,4 +79,22 @@ export interface IConfigClient {
    * @param prefix Optional key prefix to filter results.
    */
   getSettings(prefix?: string): Record<string, unknown>;
+
+  /**
+   * Returns all flattened configuration entries with metadata for display.
+   * Read-only — no audit records are created.
+   */
+  listEntries(): readonly ConfigEntry[];
+
+  /**
+   * Returns aggregate configuration counts for summary cards.
+   * Read-only — no audit records are created.
+   */
+  getSummary(): ConfigSummary;
+
+  /**
+   * Reloads configuration from defaults, provider, and environment overrides.
+   * Read-only refresh — no audit records are created.
+   */
+  reload(): Promise<void>;
 }

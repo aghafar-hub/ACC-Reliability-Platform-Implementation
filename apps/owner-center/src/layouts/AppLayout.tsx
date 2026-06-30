@@ -5,20 +5,24 @@
 // all module pages.  Business module pages are rendered into the <Outlet />.
 // No business logic, no API calls, no data fetching.
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useBranding } from '../context/BrandingContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTour } from '../context/TourContext';
-import { NAV_ITEMS } from '../types/navigation-types';
+import { useAuth } from '../context/AuthContext';
+import { useModuleRegistry } from '../context/ModuleRegistryContext';
 import { useCommandPalette } from '../hooks/useCommandPalette';
+import { usePermissions } from '../hooks/usePermissions';
 import { Breadcrumb } from '../components/Breadcrumb';
+import { NavIcon } from '../components/NavIcon';
 import { UserMenu } from '../components/UserMenu';
 import { SearchButton } from '../components/SearchButton';
 import { CommandPalette } from '../components/CommandPalette';
 import type { LocaleCode, ThemeId } from '../types/app-types';
 import type { GuideTourId } from '../types/tour-types';
+import type { ModuleId } from '@acc-reliability/sdk';
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -33,7 +37,12 @@ function BrandBlock(): React.ReactElement {
         {acc.logoSrc !== undefined ? (
           <img className="brand-acc__logo" src={acc.logoSrc} alt="ACC logo" />
         ) : (
-          <span className="brand-acc__name">{acc.appName ?? 'Owner Center'}</span>
+          <>
+            <span className="brand-acc__name">ACC Reliability Platform</span>
+            {acc.appName !== undefined && (
+              <span className="brand-subtitle">{acc.appName}</span>
+            )}
+          </>
         )}
       </div>
 
@@ -95,7 +104,8 @@ function ThemeToggle({
       onClick={() => { setTheme(next); }}
       aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
     >
-      {isDark ? 'Light' : 'Dark'}
+      <span className="theme-toggle__icon" aria-hidden="true">{isDark ? '☀' : '◑'}</span>
+      <span className="theme-toggle__label">{isDark ? 'Light' : 'Dark'}</span>
     </button>
   );
 }
@@ -118,7 +128,8 @@ function GuideMeButton(): React.ReactElement {
       disabled={tourState.isActive}
       aria-label="Start guided tour"
     >
-      {tourState.isActive ? 'Tour active' : 'Guide Me'}
+      <span className="guide-me-btn__icon" aria-hidden="true">ⓘ</span>
+      <span className="guide-me-btn__label">{tourState.isActive ? 'Tour active' : 'Guide Me'}</span>
     </button>
   );
 }
@@ -141,29 +152,55 @@ function NotificationBell({ locale }: { locale: LocaleCode }): React.ReactElemen
           : `Notifications: ${UNREAD_PLACEHOLDER} unread`
       }
     >
-      <span className="notif-bell__icon" aria-hidden="true">&#9825;</span>
+      <span className="notif-bell__icon" aria-hidden="true">&#128276;</span>
       <span className="notif-bell__badge" aria-hidden="true">{UNREAD_PLACEHOLDER}</span>
     </Link>
   );
 }
 
-/** Sidebar with module navigation links. Badge dot rendered for notification items. */
+/**
+ * Sidebar with module navigation links.
+ *
+ * Navigation items are generated dynamically from the registered module
+ * manifests via {@link useModuleRegistry}.  No module definitions live here.
+ *
+ * Visibility rules (applied in order):
+ *  1. alwaysVisible items (Home, Notifications, Learning, Settings) — always shown.
+ *  2. Items without a moduleId — always shown.
+ *  3. Not authenticated — hide all permission-guarded items.
+ *  4. adminOnly items — shown only when canAccessAdminModule passes.
+ *  5. All other module items — shown when canAccessModule passes.
+ */
 function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
-  const isAr = locale === 'ar';
+  const isAr          = locale === 'ar';
+  const { status }    = useAuth();
+  const permissions   = usePermissions();
+  const { navItems }  = useModuleRegistry();
+
+  const visibleItems = useMemo(() =>
+    navItems.filter((item) => {
+      if (item.alwaysVisible || item.moduleId === undefined) return true;
+      if (status !== 'authenticated') return false;
+      return item.adminOnly === true
+        ? permissions.canAccessAdminModule(item.moduleId as ModuleId)
+        : permissions.canAccessModule(item.moduleId as ModuleId);
+    }),
+    [navItems, permissions, status],
+  );
 
   return (
     <nav className="app-sidebar" aria-label="Module navigation">
-      {NAV_ITEMS.map((item) => (
+      {visibleItems.map((item) => (
         <NavLink
           key={item.path}
           to={item.path}
           end={item.end}
           className={({ isActive }: { isActive: boolean }) =>
-            `nav-item${isActive ? ' nav-item--active' : ''}`
+            `nav-item${isActive ? ' nav-item--active' : ''}${item.inMaintenance ? ' nav-item--maintenance' : ''}`
           }
           aria-label={isAr ? item.label.ar : item.label.en}
         >
-          <span className="nav-icon" aria-hidden="true">{item.icon}</span>
+          <span className="nav-icon"><NavIcon id={item.icon} /></span>
           <span className="nav-label">{isAr ? item.label.ar : item.label.en}</span>
           {item.badge === 'notification' && (
             <span
@@ -210,9 +247,11 @@ export function AppLayout(): React.ReactElement {
         <div className="app-header__actions">
           <SearchButton locale={locale} onOpen={palette.open} />
           <NotificationBell locale={locale} />
+          <div className="app-header__sep" aria-hidden="true" />
           <LanguageToggle locale={locale} setLocale={setLocale} />
           <ThemeToggle theme={theme} setTheme={setTheme} />
           <GuideMeButton />
+          <div className="app-header__sep" aria-hidden="true" />
           <UserMenu locale={locale} />
         </div>
       </header>

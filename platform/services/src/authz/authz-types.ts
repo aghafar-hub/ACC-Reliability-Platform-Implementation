@@ -66,13 +66,35 @@ export type ContractorScope = ContractorId | 'all';
 
 // ── Module identifiers ────────────────────────────────────────────────────────
 
-/** Built-in business modules registered in the platform. */
+/**
+ * Built-in modules registered in the platform.
+ *
+ * Two tiers:
+ *  - Business modules (`oil-lubrication`, …) — accessible to all roles within
+ *    their contractor scope.
+ *  - Owner Center administration modules (`users-roles`, …) — gate-kept by
+ *    `contractorScope:'all'` checks so only `AppOwner` users can satisfy them.
+ */
 export const KNOWN_MODULES = [
+  // ── Business modules ──────────────────────────────────────────────────────
   'oil-lubrication',
   'oil-analysis',
   'vibration-analysis',
   'compressors',
   'reliability-measurements',
+  // ── Owner Center administration modules ───────────────────────────────────
+  'owner-center',
+  'users-roles',
+  'contractors',
+  'module-registry',
+  'branding',
+  'localization',
+  'notification-management',
+  'workflow-approval',
+  'reporting-analytics',
+  'audit-activity',
+  'system-health',
+  'platform-settings',
 ] as const;
 
 /** Union of the built-in module identifier literals. */
