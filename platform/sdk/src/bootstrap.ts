@@ -1153,14 +1153,9 @@ function validateRequiredServices(
     );
   }
 
-  const duplicateCheck = REQUIRED_SERVICE_IDS.reduce<string[]>((acc, id) => {
-    if (!registry.has(id)) acc.push(id);
-    return acc;
-  }, []);
-
   logger.debug('Platform SDK: startup validation passed', {
     required:        REQUIRED_SERVICE_IDS.length,
     running:         registry.listByStatus('running').length,
-    missingServices: duplicateCheck,
+    missingServices: missing,
   });
 }
