@@ -37,7 +37,10 @@ import type { UIModuleManifest } from '../types/module-registry-types';
 // ── Dynamic module route renderer ─────────────────────────────────────────────
 
 /**
- * Renders a single dynamic route from a UIModuleManifest.
+ * Returns a <Route> element (or null) for a UIModuleManifest.
+ *
+ * Called as a plain function — NOT as <DynamicModuleRoute /> — so React Router
+ * sees the returned <Route> node directly and passes its child-type validation.
  *
  * Rules:
  *  - The Home route (`/`) is rendered as the index route in AppRouter directly;
@@ -47,7 +50,7 @@ import type { UIModuleManifest } from '../types/module-registry-types';
  *  - Routes with a moduleId are wrapped in PermissionRoute for access control.
  *    adminOnly=true requires contractorScope:'all' (AppOwner only).
  */
-function DynamicModuleRoute({ manifest }: { manifest: UIModuleManifest }): ReactElement | null {
+function buildModuleRoute(manifest: UIModuleManifest): ReactElement | null {
   if (!manifest.component || !manifest.routePath || manifest.routePath === '/') {
     return null;
   }
@@ -59,11 +62,12 @@ function DynamicModuleRoute({ manifest }: { manifest: UIModuleManifest }): React
   // Always-visible platform entries (Notifications, Learning, Settings) need
   // no permission check.
   if (manifest.alwaysVisible || !manifest.moduleId) {
-    return <Route path={relativePath} element={<Page />} />;
+    return <Route key={manifest.routePath} path={relativePath} element={<Page />} />;
   }
 
   return (
     <Route
+      key={manifest.moduleId}
       element={
         <PermissionRoute
           moduleId={manifest.moduleId as ModuleId}
@@ -117,9 +121,7 @@ export function AppRouter(): ReactElement {
               <Route index element={<WelcomeDashboard />} />
 
               {/* Dynamic module routes from manifests */}
-              {moduleRoutes.map(m => (
-                <DynamicModuleRoute key={m.moduleId} manifest={m} />
-              ))}
+              {moduleRoutes.map(m => buildModuleRoute(m))}
 
             </Route>
           </Route>
