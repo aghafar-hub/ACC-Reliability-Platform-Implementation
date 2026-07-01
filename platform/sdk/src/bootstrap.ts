@@ -83,6 +83,11 @@ import { PlatformSdk } from './impl/platform-sdk-impl';
 import { AuthClientImpl } from './impl/auth-client-impl';
 import { SessionStorageAuthRepository } from './impl/session-storage-auth-repository';
 import { LocalStorageModuleRepository } from './impl/local-storage-module-repository';
+import { LocalStorageUserRepository } from './impl/local-storage-user-repository';
+import { LocalStorageContractorRepository } from './impl/local-storage-contractor-repository';
+import { LocalStorageNotificationManagementRepository } from './impl/local-storage-notification-management-repository';
+import { LocalStorageReportingRepository } from './impl/local-storage-reporting-repository';
+import { LocalStorageWorkflowRepository } from './impl/local-storage-workflow-repository';
 import { DevAuthProvider } from './impl/dev-auth-provider';
 import { NullStorageClient } from './impl/null-storage-client';
 import { PermissionsClientImpl } from './impl/permissions-client-impl';
@@ -213,14 +218,27 @@ export async function bootstrapPlatformSdk(): Promise<SdkBootstrapResult> {
   const eventBus = kernelContext.services.getRequired<import('@acc-reliability/kernel').IEventBus>('platform.eventBus');
 
   // User Management Service — authentication-provider-agnostic
-  const userRepository = new InMemoryUserRepository();
+  // LocalStorageUserRepository is used in browser environments so created,
+  // edited, suspended, and archived users survive page refresh.
+  // InMemoryUserRepository is the fallback for server-side or test contexts.
+  // Next provider: GoogleSheetsUserRepository (future sprint — replace here).
+  const userRepository = (typeof window !== 'undefined')
+    ? new LocalStorageUserRepository()
+    : new InMemoryUserRepository();
   const userService    = new UserService(userRepository, auditService, eventBus);
 
   // Contractor Management Service
-  const contractorRepository = new InMemoryContractorRepository();
+  // LocalStorageContractorRepository is used in browser environments so
+  // contractor changes survive page refresh.
+  // InMemoryContractorRepository is the fallback for server-side or test contexts.
+  // Next provider: GoogleSheetsContractorRepository (future sprint — replace here).
+  const contractorRepository = (typeof window !== 'undefined')
+    ? new LocalStorageContractorRepository()
+    : new InMemoryContractorRepository();
   const contractorService    = new ContractorService(contractorRepository, auditService, eventBus);
 
-  // Seed known contractors (ACC, RHI, ASEC) so the UI has real data on first load
+  // Seed known contractors (ACC, RHI, ASEC) — only creates records missing from
+  // localStorage. Existing records loaded from storage are left unchanged.
   seedContractors(contractorService);
 
   // Module Registry Service
@@ -239,32 +257,53 @@ export async function bootstrapPlatformSdk(): Promise<SdkBootstrapResult> {
   seedModules(moduleService);
 
   // Notification Management Service — configuration only, no delivery
-  const notificationManagementRepository = new InMemoryNotificationManagementRepository();
+  // LocalStorageNotificationManagementRepository is used in browser environments
+  // so rule enable/disable and template changes survive page refresh.
+  // InMemoryNotificationManagementRepository is the fallback for server-side or test contexts.
+  // Next provider: GoogleSheetsNotificationManagementRepository (future sprint — replace here).
+  const notificationManagementRepository = (typeof window !== 'undefined')
+    ? new LocalStorageNotificationManagementRepository()
+    : new InMemoryNotificationManagementRepository();
   const notificationManagementService    = new NotificationManagementService(
     notificationManagementRepository,
     auditService,
     eventBus,
   );
 
-  // Seed notification configuration so the UI has real data on first load
+  // Seed notification configuration — only creates records missing from
+  // localStorage. Existing records loaded from storage are left unchanged.
   seedNotificationManagement(notificationManagementService);
 
   // Reporting Service — configuration only, no report execution
-  const reportingRepository = new InMemoryReportingRepository();
+  // LocalStorageReportingRepository is used in browser environments so report
+  // definitions, categories, templates, and export/schedule profiles survive refresh.
+  // InMemoryReportingRepository is the fallback for server-side or test contexts.
+  // Next provider: GoogleSheetsReportingRepository (future sprint — replace here).
+  const reportingRepository = (typeof window !== 'undefined')
+    ? new LocalStorageReportingRepository()
+    : new InMemoryReportingRepository();
   const reportingService    = new ReportingService(
     reportingRepository,
     auditService,
     eventBus,
   );
 
-  // Seed reporting configuration so the UI has real data on first load
+  // Seed reporting configuration — only creates records missing from
+  // localStorage. Existing records loaded from storage are left unchanged.
   seedReporting(reportingService);
 
   // Workflow & Approval Service — definitions and basic instance lifecycle
-  const workflowRepository = new InMemoryWorkflowRepository();
+  // LocalStorageWorkflowRepository is used in browser environments so workflow
+  // definitions survive page refresh. Instances are kept in-memory (runtime state).
+  // InMemoryWorkflowRepository is the fallback for server-side or test contexts.
+  // Next provider: GoogleSheetsWorkflowRepository (future sprint — replace here).
+  const workflowRepository = (typeof window !== 'undefined')
+    ? new LocalStorageWorkflowRepository()
+    : new InMemoryWorkflowRepository();
   const workflowService    = new WorkflowService(workflowRepository, auditService, eventBus);
 
-  // Seed workflow definitions so the UI has real data on first load
+  // Seed workflow definitions — only creates records missing from
+  // localStorage. Existing records loaded from storage are left unchanged.
   seedWorkflows(workflowService);
 
   // Permission Service — derives effective permissions from UserContext roles;
