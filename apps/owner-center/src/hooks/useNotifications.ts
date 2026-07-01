@@ -1,8 +1,8 @@
 // apps/owner-center/src/hooks/useNotifications.ts
 // Notification Center state — static placeholder data + filter logic.
 //
-// Called only inside NotificationsPage.  Never imported in AppLayout or
-// called at startup.  No API calls, no backend, no push subscription.
+// Placeholder data is shared with the header notification bell preview.
+// No API calls, no backend, no push subscription.
 
 import { useState, useMemo } from 'react';
 import type {
@@ -70,6 +70,18 @@ const PLACEHOLDER_NOTIFICATIONS: readonly NotificationItem[] = [
   },
 ];
 
+// ── Shared preview helpers (header bell + Notification Center page) ───────────
+
+export function getRecentNotifications(limit = 5): readonly NotificationItem[] {
+  return [...PLACEHOLDER_NOTIFICATIONS]
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    .slice(0, limit);
+}
+
+export function getUnreadNotificationCount(): number {
+  return PLACEHOLDER_NOTIFICATIONS.filter((n) => n.status === 'unread').length;
+}
+
 // ── Hook public surface ───────────────────────────────────────────────────────
 
 export interface NotificationsState {
@@ -95,10 +107,7 @@ export function useNotifications(): NotificationsState {
     }
   }, [filter]);
 
-  const unreadCount = useMemo(
-    () => PLACEHOLDER_NOTIFICATIONS.filter((n) => n.status === 'unread').length,
-    [],
-  );
+  const unreadCount = useMemo(() => getUnreadNotificationCount(), []);
 
   return { notifications, filter, setFilter, unreadCount };
 }

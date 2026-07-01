@@ -10,6 +10,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { usePlatformSdk } from '../context/SdkContext';
 import { SummaryCard } from '../components/SummaryCard';
 import { StatusChip } from '../components/StatusChip';
+import { BackToSettingsLink } from '../components/BackToSettingsLink';
 import type { ChipStatus } from '../components/StatusChip';
 import type { NotificationRuleRecord, NotificationObjectType } from '@acc-reliability/sdk';
 import {
@@ -418,6 +419,8 @@ export default function NotificationManagementPage(): React.ReactElement {
 
   return (
     <div className="ur-page">
+
+      <BackToSettingsLink />
 
       <div className="ur-page__header">
         <div className="ur-page__header-text">

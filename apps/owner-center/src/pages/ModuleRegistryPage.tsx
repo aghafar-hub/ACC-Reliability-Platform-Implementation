@@ -5,11 +5,13 @@
 // No auth, no route guards, no permission filtering.
 // Bilingual EN/AR with RTL support.
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { usePlatformSdk } from '../context/SdkContext';
+import { useModuleRegistry } from '../context/ModuleRegistryContext';
 import { SummaryCard } from '../components/SummaryCard';
 import { StatusChip } from '../components/StatusChip';
+import { BackToSettingsLink } from '../components/BackToSettingsLink';
 import type { ChipStatus } from '../components/StatusChip';
 import type { ModuleRecord } from '@acc-reliability/sdk';
 import { ModuleLifecycleError, ModuleDuplicateError } from '@acc-reliability/sdk';
@@ -38,6 +40,9 @@ const COPY = {
   colHealth:          { en: 'Health',                                ar: 'الصحة'                                    },
   colCategory:        { en: 'Category',                              ar: 'الفئة'                                    },
   colDeps:            { en: 'Dependencies',                          ar: 'التبعيات'                                 },
+  colUiManifest:      { en: 'UI Manifest',                           ar: 'واجهة مثبتة'                              },
+  uiInstalled:        { en: 'Installed',                             ar: 'مثبتة'                                    },
+  uiBackendOnly:      { en: 'Backend Only',                          ar: 'خلفية فقط'                                },
   colUpdated:         { en: 'Last Updated',                          ar: 'آخر تحديث'                                },
   colActions:         { en: 'Actions',                               ar: 'الإجراءات'                                },
   noModules:          { en: 'No modules registered yet.',            ar: 'لا توجد وحدات مسجلة بعد.'                 },
@@ -343,6 +348,7 @@ function ConfirmDialog({ title, message, confirmLabel, locale, opError, onClose,
 export default function ModuleRegistryPage(): React.ReactElement {
   const { locale } = useLanguage();
   const sdk = usePlatformSdk();
+  const { allManifests } = useModuleRegistry();
 
   // ── State ─────────────────────────────────────────────────────────────────
 
@@ -358,6 +364,15 @@ export default function ModuleRegistryPage(): React.ReactElement {
   const enabled     = modules.filter((m) => m.status === 'enabled').length;
   const maintenance = modules.filter((m) => m.status === 'maintenance').length;
   const retired     = modules.filter((m) => m.status === 'retired').length;
+
+  // ── UI manifest sync ──────────────────────────────────────────────────────
+  // Set of all module keys that have a registered UI manifest (from platform-manifests.ts).
+  // A module in the registry without a matching manifest is backend-only —
+  // it has no sidebar entry, no route, and no UI component.
+  const manifestKeySet = useMemo(
+    () => new Set(allManifests.map(m => m.lifecycleKey ?? m.moduleId)),
+    [allManifests],
+  );
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -506,6 +521,8 @@ export default function ModuleRegistryPage(): React.ReactElement {
   return (
     <div className="ur-page">
 
+      <BackToSettingsLink />
+
       {/* ── Page header ── */}
       <div className="ur-page__header">
         <div className="ur-page__header-text">
@@ -548,20 +565,21 @@ export default function ModuleRegistryPage(): React.ReactElement {
         <table className="ur-table">
           <thead>
             <tr>
-              <th>{t(COPY.colName,    locale)}</th>
-              <th>{t(COPY.colVersion, locale)}</th>
-              <th>{t(COPY.colStatus,  locale)}</th>
-              <th>{t(COPY.colHealth,  locale)}</th>
-              <th>{t(COPY.colCategory,locale)}</th>
-              <th>{t(COPY.colDeps,    locale)}</th>
-              <th>{t(COPY.colUpdated, locale)}</th>
-              <th>{t(COPY.colActions, locale)}</th>
+              <th>{t(COPY.colName,      locale)}</th>
+              <th>{t(COPY.colVersion,   locale)}</th>
+              <th>{t(COPY.colStatus,    locale)}</th>
+              <th>{t(COPY.colHealth,    locale)}</th>
+              <th>{t(COPY.colUiManifest,locale)}</th>
+              <th>{t(COPY.colCategory,  locale)}</th>
+              <th>{t(COPY.colDeps,      locale)}</th>
+              <th>{t(COPY.colUpdated,   locale)}</th>
+              <th>{t(COPY.colActions,   locale)}</th>
             </tr>
           </thead>
           <tbody>
             {modules.length === 0 ? (
               <tr>
-                <td colSpan={8} className="ur-table__empty">
+                <td colSpan={9} className="ur-table__empty">
                   {t(COPY.noModules, locale)}
                 </td>
               </tr>
@@ -589,6 +607,17 @@ export default function ModuleRegistryPage(): React.ReactElement {
                     {/* Health */}
                     <td>
                       <StatusChip status={hChip.chipStatus} label={hChip.label} />
+                    </td>
+
+                    {/* UI Manifest — indicates whether this backend module has a UI manifest
+                        installed in platform-manifests.ts (visible in sidebar / has routes).
+                        "Backend Only" = registered in registry but no UI manifest. */}
+                    <td>
+                      {manifestKeySet.has(module.moduleKey) ? (
+                        <StatusChip status="operational" label={t(COPY.uiInstalled,   locale)} />
+                      ) : (
+                        <StatusChip status="draft"        label={t(COPY.uiBackendOnly, locale)} />
+                      )}
                     </td>
 
                     {/* Category */}

@@ -34,7 +34,12 @@ type ModuleLifecycleStatus = 'enabled' | 'maintenance' | 'disabled' | 'retired';
 /**
  * Returns the current lifecycle status of a manifest from the Module Registry.
  * Falls back to `'enabled'` when no matching module record is found, so manifests
- * without a registry entry are treated as always-enabled.
+ * without a registry entry are treated as always-enabled (correct for platform.*
+ * modules that don't participate in the lifecycle registry).
+ *
+ * Hidden modules (`visibility === 'hidden'`) are treated as `'disabled'` so
+ * they are excluded from sidebar navigation and routing even when their
+ * lifecycle `status` is `'enabled'`.
  */
 function resolveLifecycleStatus(
   sdk: ReturnType<typeof usePlatformSdk>,
@@ -44,6 +49,7 @@ function resolveLifecycleStatus(
   const registryKey = manifest.lifecycleKey ?? manifest.moduleId;
   const record = sdk.modules.findByKey(registryKey);
   if (!record) return 'enabled';
+  if (record.visibility === 'hidden') return 'disabled';
   return record.status as ModuleLifecycleStatus;
 }
 
@@ -69,6 +75,27 @@ interface ModuleRegistryContextValue {
    * AppSidebar using {@link usePermissions}.
    */
   readonly navItems: readonly ModuleNavItem[];
+
+  /**
+   * Subset of `navItems` whose `sidebarSection` is `'platform-main'`.
+   * Rendered in the persistent platform sidebar (Dashboard, Notifications,
+   * Approvals, Reporting, Settings, etc.).
+   */
+  readonly platformNavItems: readonly ModuleNavItem[];
+
+  /**
+   * Subset of `navItems` whose `sidebarSection` is `'business-module'`.
+   * Rendered in the Modules section of the platform sidebar.
+   * When the user navigates into one of these modules the sidebar
+   * switches to the module-specific context view.
+   */
+  readonly businessModuleNavItems: readonly ModuleNavItem[];
+
+  /**
+   * Subset of `navItems` whose `sidebarSection` is `'owner-control'`.
+   * Not rendered in the sidebar — accessible via Settings → Owner Control Center.
+   */
+  readonly ownerControlNavItems: readonly ModuleNavItem[];
 
   /** Validation errors detected during bootstrap.  Empty when all manifests are valid. */
   readonly validationErrors: readonly ManifestValidationError[];
@@ -134,17 +161,35 @@ export function ModuleRegistryProvider({
     enabledManifests
       .filter(m => m.routePath !== undefined && m.navigationLabel !== undefined)
       .map((m): ModuleNavItem => ({
-        path:          m.routePath!,
-        icon:          m.icon ?? 'package',
-        label:         m.navigationLabel!,
-        end:           m.navigationEnd,
-        moduleId:      m.alwaysVisible ? undefined : m.moduleId,
-        adminOnly:     m.adminOnly,
-        badge:         m.navigationBadge,
-        alwaysVisible: m.alwaysVisible ?? false,
-        inMaintenance: resolveLifecycleStatus(sdk, m) === 'maintenance',
+        path:           m.routePath!,
+        icon:           m.icon ?? 'package',
+        label:          m.navigationLabel!,
+        end:            m.navigationEnd,
+        moduleId:       m.alwaysVisible ? undefined : m.moduleId,
+        adminOnly:      m.adminOnly,
+        badge:          m.navigationBadge,
+        alwaysVisible:  m.alwaysVisible ?? false,
+        inMaintenance:  resolveLifecycleStatus(sdk, m) === 'maintenance',
+        sidebarSection: m.sidebarSection ?? 'platform-main',
+        moduleNavItems: m.moduleNavItems,
       })),
     [enabledManifests, sdk],
+  );
+
+  // ── Grouped nav item subsets ────────────────────────────────────────────
+  const platformNavItems = useMemo(
+    (): readonly ModuleNavItem[] => navItems.filter(item => item.sidebarSection === 'platform-main'),
+    [navItems],
+  );
+
+  const businessModuleNavItems = useMemo(
+    (): readonly ModuleNavItem[] => navItems.filter(item => item.sidebarSection === 'business-module'),
+    [navItems],
+  );
+
+  const ownerControlNavItems = useMemo(
+    (): readonly ModuleNavItem[] => navItems.filter(item => item.sidebarSection === 'owner-control'),
+    [navItems],
   );
 
   // ── Step 4: Register module health checks ────────────────────────────────
@@ -225,9 +270,12 @@ export function ModuleRegistryProvider({
       allManifests,
       enabledManifests,
       navItems,
+      platformNavItems,
+      businessModuleNavItems,
+      ownerControlNavItems,
       validationErrors: validationResult.errors,
     }),
-    [allManifests, enabledManifests, navItems, validationResult.errors],
+    [allManifests, enabledManifests, navItems, platformNavItems, businessModuleNavItems, ownerControlNavItems, validationResult.errors],
   );
 
   return (

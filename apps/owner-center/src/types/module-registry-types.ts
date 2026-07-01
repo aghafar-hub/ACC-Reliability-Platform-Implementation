@@ -13,6 +13,25 @@
 import type { ComponentType, LazyExoticComponent } from 'react';
 import type { ModuleManifest } from '@acc-reliability/sdk';
 
+// ── Module sub-navigation ──────────────────────────────────────────────────────
+
+/**
+ * A single navigation item displayed inside a business module's context sidebar.
+ *
+ * Used by `UIModuleManifest.moduleNavItems` to declare the module-specific
+ * sidebar items rendered when the user is inside that module.
+ */
+export interface ModuleSubNavItem {
+  /** Absolute route path, e.g. `'/oil-lubrication/oil-change'`. */
+  readonly path: string;
+  /** Icon identifier for {@link NavIcon}. */
+  readonly icon: string;
+  /** Bilingual navigation label. */
+  readonly label: { readonly en: string; readonly ar: string };
+  /** When `true`, the NavLink is only active on exact path match. */
+  readonly end?: boolean;
+}
+
 // ── UIModuleManifest ──────────────────────────────────────────────────────────
 
 /**
@@ -75,6 +94,30 @@ export interface UIModuleManifest extends ModuleManifest {
    * active when the path is exactly `/`, not on nested routes.
    */
   readonly navigationEnd?: boolean | undefined;
+
+  /**
+   * Determines which sidebar section this module belongs to.
+   *
+   * - `'platform-main'`    — rendered in the main platform sidebar
+   *                          (Dashboard, Notifications, Approvals, Reporting, Settings).
+   * - `'business-module'`  — rendered in the Modules section of the main sidebar.
+   *                          When the user navigates into the module the sidebar
+   *                          switches to the module-specific context view.
+   * - `'owner-control'`    — NOT rendered in the sidebar. Accessible via
+   *                          Settings → Owner Control Center.
+   *
+   * Defaults to `'platform-main'` when omitted.
+   */
+  readonly sidebarSection?: 'platform-main' | 'business-module' | 'owner-control' | undefined;
+
+  /**
+   * Navigation items shown in the module-specific sidebar when the user
+   * is inside this business module.
+   *
+   * Only meaningful when `sidebarSection === 'business-module'`.
+   * The sidebar will render these items below the Back to Platform button.
+   */
+  readonly moduleNavItems?: readonly ModuleSubNavItem[] | undefined;
 }
 
 // ── Validation types ──────────────────────────────────────────────────────────
@@ -132,4 +175,14 @@ export interface ModuleNavItem {
   readonly alwaysVisible: boolean;
   /** When `true`, the module is in maintenance mode (drives optional CSS class). */
   readonly inMaintenance: boolean;
+  /**
+   * Which sidebar section this item belongs to.
+   * Drives the platform/module/owner-control sidebar rendering split.
+   */
+  readonly sidebarSection: 'platform-main' | 'business-module' | 'owner-control';
+  /**
+   * Module-specific sidebar navigation items.
+   * Only present on `business-module` entries.
+   */
+  readonly moduleNavItems?: readonly ModuleSubNavItem[];
 }

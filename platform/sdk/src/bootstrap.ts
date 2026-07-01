@@ -82,6 +82,7 @@ import type { SdkContext } from './sdk-context';
 import { PlatformSdk } from './impl/platform-sdk-impl';
 import { AuthClientImpl } from './impl/auth-client-impl';
 import { SessionStorageAuthRepository } from './impl/session-storage-auth-repository';
+import { LocalStorageModuleRepository } from './impl/local-storage-module-repository';
 import { DevAuthProvider } from './impl/dev-auth-provider';
 import { NullStorageClient } from './impl/null-storage-client';
 import { PermissionsClientImpl } from './impl/permissions-client-impl';
@@ -223,10 +224,18 @@ export async function bootstrapPlatformSdk(): Promise<SdkBootstrapResult> {
   seedContractors(contractorService);
 
   // Module Registry Service
-  const moduleRepository = new InMemoryModuleRepository();
+  // LocalStorageModuleRepository is used in browser environments so lifecycle
+  // changes (disable, maintenance, retire) survive page refresh.
+  // InMemoryModuleRepository is the fallback for server-side or test contexts.
+  // Next provider: GoogleSheetsModuleRepository (future sprint — replace here).
+  const moduleRepository = (typeof window !== 'undefined')
+    ? new LocalStorageModuleRepository()
+    : new InMemoryModuleRepository();
   const moduleService    = new ModuleService(moduleRepository, auditService, eventBus);
 
-  // Seed platform modules so the UI has real data on first load
+  // Seed platform modules — only creates modules that do not yet exist in the
+  // repository. Existing records (loaded from localStorage) are left unchanged
+  // because seedModules() swallows ModuleDuplicateError for each key.
   seedModules(moduleService);
 
   // Notification Management Service — configuration only, no delivery

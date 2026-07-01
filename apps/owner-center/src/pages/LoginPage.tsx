@@ -18,7 +18,7 @@ import type { AuthCredentials } from '@acc-reliability/sdk';
 // ── Copy table — all user-visible strings ─────────────────────────────────────
 
 const COPY = {
-  pageTitle:           { en: 'Sign In — ACC Owner Center',                  ar: 'تسجيل الدخول — مركز المالك'            },
+  pageTitle:           { en: 'Sign In — ACC Reliability Platform',          ar: 'تسجيل الدخول — منصة ACC للموثوقية'     },
   brandTitle:          { en: 'ACC Reliability Platform',                     ar: 'منصة ACC للموثوقية'                    },
   brandSubtitle:       { en: 'Owner Center',                                 ar: 'مركز المالك'                           },
   formHeading:         { en: 'Sign In',                                      ar: 'تسجيل الدخول'                          },

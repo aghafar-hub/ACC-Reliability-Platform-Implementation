@@ -25,6 +25,8 @@ import type { UIModuleManifest } from '../types/module-registry-types';
 // Created at module level for stable references and correct code splitting.
 
 const OilLubricationPage         = React.lazy(() => import('../pages/OilLubricationPage'));
+const OilAnalysisPage            = React.lazy(() => import('../pages/OilAnalysisPage'));
+const VibrationAnalysisPage      = React.lazy(() => import('../pages/VibrationAnalysisPage'));
 const NotificationsPage          = React.lazy(() => import('../pages/NotificationsPage'));
 const LearningCenterPage         = React.lazy(() => import('../pages/LearningCenterPage'));
 const SettingsPage               = React.lazy(() => import('../pages/SettingsPage'));
@@ -81,10 +83,12 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     navigationLabel:         { en: 'Home', ar: 'الرئيسية' },
     alwaysVisible:           true,
     navigationEnd:           true,
+    sidebarSection:          'platform-main',
     // No component — index route handled by AppRouter with WelcomeDashboard.
   },
 
   // ── 2. Oil Lubrication ─────────────────────────────────────────────────────
+  // Business module — sidebar switches to module context when user enters.
   {
     moduleId:                'oil-lubrication',
     displayName:             'Oil Lubrication',
@@ -99,10 +103,76 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     adminOnly:               false,
     hasHealthCheck:          true,
     lifecycleKey:            'oil-lubrication',
+    sidebarSection:          'business-module',
     component:               OilLubricationPage,
+    moduleNavItems: [
+      { path: '/oil-lubrication',          icon: 'home',        label: { en: 'Dashboard',  ar: 'لوحة المعلومات' }, end: true },
+      { path: '/oil-lubrication/oil-change', icon: 'droplet',   label: { en: 'Oil Change', ar: 'تغيير الزيت'    } },
+      { path: '/oil-lubrication/sampling',   icon: 'clipboard', label: { en: 'Sampling',   ar: 'أخذ العينات'    } },
+      { path: '/oil-lubrication/routes',     icon: 'navigation',label: { en: 'Routes',     ar: 'المسارات'       } },
+      { path: '/oil-lubrication/forecast',   icon: 'trending-up',label:{ en: 'Forecast',   ar: 'التوقعات'       } },
+      { path: '/oil-lubrication/reports',    icon: 'file-text', label: { en: 'Reports',    ar: 'التقارير'       } },
+      { path: '/oil-lubrication/settings',   icon: 'sliders',   label: { en: 'Settings',   ar: 'الإعدادات'      } },
+    ],
   },
 
-  // ── 3. Notifications ───────────────────────────────────────────────────────
+  // ── 3. Oil Analysis ───────────────────────────────────────────────────────
+  // Business module — depends on oil-lubrication.
+  // Registry default: visibility='visible', status='enabled'.
+  // Visibility 'hidden' in registry → excluded from sidebar by resolveLifecycleStatus.
+  {
+    moduleId:                'oil-analysis',
+    displayName:             'Oil Analysis',
+    version:                 MODULE_VERSION,
+    requiredPlatformVersion: PLATFORM_VERSION,
+    requiredSdkVersion:      SDK_VERSION,
+    description:             'Laboratory oil analysis results and anomaly monitoring.',
+    icon:                    'activity',
+    category:                'Operations',
+    routePath:               '/oil-analysis',
+    navigationLabel:         { en: 'Oil Analysis', ar: 'تحليل الزيت' },
+    adminOnly:               false,
+    hasHealthCheck:          true,
+    lifecycleKey:            'oil-analysis',
+    sidebarSection:          'business-module',
+    component:               OilAnalysisPage,
+    moduleNavItems: [
+      { path: '/oil-analysis',          icon: 'home',       label: { en: 'Dashboard', ar: 'لوحة المعلومات' }, end: true },
+      { path: '/oil-analysis/results',  icon: 'clipboard', label: { en: 'Results',   ar: 'النتائج'         } },
+      { path: '/oil-analysis/alerts',   icon: 'bell',      label: { en: 'Alerts',    ar: 'التنبيهات'       } },
+      { path: '/oil-analysis/reports',  icon: 'file-text', label: { en: 'Reports',   ar: 'التقارير'        } },
+    ],
+  },
+
+  // ── 4. Vibration Analysis ──────────────────────────────────────────────────
+  // Business module — seeded with visibility='hidden' in the Module Registry.
+  // Does NOT appear in the sidebar until an administrator sets visibility='visible'.
+  // Manifest is registered here so the system can route to it once it is made visible.
+  {
+    moduleId:                'vibration-analysis',
+    displayName:             'Vibration Analysis',
+    version:                 MODULE_VERSION,
+    requiredPlatformVersion: PLATFORM_VERSION,
+    requiredSdkVersion:      SDK_VERSION,
+    description:             'Vibration measurement trends and threshold monitoring.',
+    icon:                    'zap',
+    category:                'Operations',
+    routePath:               '/vibration-analysis',
+    navigationLabel:         { en: 'Vibration Analysis', ar: 'تحليل الاهتزاز' },
+    adminOnly:               false,
+    hasHealthCheck:          true,
+    lifecycleKey:            'vibration-analysis',
+    sidebarSection:          'business-module',
+    component:               VibrationAnalysisPage,
+    moduleNavItems: [
+      { path: '/vibration-analysis',          icon: 'home',       label: { en: 'Dashboard', ar: 'لوحة المعلومات' }, end: true },
+      { path: '/vibration-analysis/trends',   icon: 'trending-up',label: { en: 'Trends',    ar: 'الاتجاهات'       } },
+      { path: '/vibration-analysis/alerts',   icon: 'bell',       label: { en: 'Alerts',    ar: 'التنبيهات'       } },
+      { path: '/vibration-analysis/reports',  icon: 'file-text',  label: { en: 'Reports',   ar: 'التقارير'        } },
+    ],
+  },
+
+  // ── 5. Notifications ───────────────────────────────────────────────────────
   {
     moduleId:                'platform.notifications',
     displayName:             'Notifications',
@@ -115,10 +185,11 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     navigationLabel:         { en: 'Notifications', ar: 'الإشعارات' },
     navigationBadge:         'notification',
     alwaysVisible:           true,
+    sidebarSection:          'platform-main',
     component:               NotificationsPage,
   },
 
-  // ── 4. Learning Center ─────────────────────────────────────────────────────
+  // ── 6. Learning Center ─────────────────────────────────────────────────────
   {
     moduleId:                'platform.learning',
     displayName:             'Learning Center',
@@ -130,11 +201,13 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     routePath:               '/learning',
     navigationLabel:         { en: 'Learning Center', ar: 'مركز التعلم' },
     alwaysVisible:           true,
+    sidebarSection:          'platform-main',
     component:               LearningCenterPage,
   },
 
-  // ── 5. Users & Roles ───────────────────────────────────────────────────────
+  // ── 7. Users & Roles ───────────────────────────────────────────────────────
   // lifecycleKey maps permission moduleId → Module Registry moduleKey
+  // owner-control: accessible via Settings → Owner Control Center only.
   {
     moduleId:                'users-roles',
     displayName:             'Users & Roles',
@@ -149,10 +222,11 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     adminOnly:               true,
     hasHealthCheck:          true,
     lifecycleKey:            'user-management',
+    sidebarSection:          'owner-control',
     component:               UsersRolesPage,
   },
 
-  // ── 6. Contractors ─────────────────────────────────────────────────────────
+  // ── 8. Contractors ─────────────────────────────────────────────────────────
   {
     moduleId:                'contractors',
     displayName:             'Contractors',
@@ -167,10 +241,11 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     adminOnly:               true,
     hasHealthCheck:          true,
     lifecycleKey:            'contractor-management',
+    sidebarSection:          'owner-control',
     component:               ContractorsPage,
   },
 
-  // ── 7. Module Registry ─────────────────────────────────────────────────────
+  // ── 9. Module Registry ─────────────────────────────────────────────────────
   {
     moduleId:                'module-registry',
     displayName:             'Module Registry',
@@ -185,10 +260,11 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     adminOnly:               true,
     hasHealthCheck:          true,
     lifecycleKey:            'module-registry',
+    sidebarSection:          'owner-control',
     component:               ModuleRegistryPage,
   },
 
-  // ── 8. Branding Center ─────────────────────────────────────────────────────
+  // ── 10. Branding Center ────────────────────────────────────────────────────
   {
     moduleId:                'branding',
     displayName:             'Branding Center',
@@ -202,10 +278,11 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     navigationLabel:         { en: 'Branding Center', ar: 'مركز العلامة التجارية' },
     adminOnly:               true,
     lifecycleKey:            'branding',
+    sidebarSection:          'owner-control',
     component:               BrandingCenterPage,
   },
 
-  // ── 9. Localization Center ─────────────────────────────────────────────────
+  // ── 11. Localization Center ────────────────────────────────────────────────
   {
     moduleId:                'localization',
     displayName:             'Localization Center',
@@ -219,10 +296,11 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     navigationLabel:         { en: 'Localization Center', ar: 'مركز التوطين' },
     adminOnly:               true,
     lifecycleKey:            'localization',
+    sidebarSection:          'owner-control',
     component:               LocalizationCenterPage,
   },
 
-  // ── 10. Notification Management ────────────────────────────────────────────
+  // ── 12. Notification Management ───────────────────────────────────────────
   {
     moduleId:                'notification-management',
     displayName:             'Notification Management',
@@ -237,10 +315,12 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     adminOnly:               true,
     hasHealthCheck:          true,
     lifecycleKey:            'notification-management',
+    sidebarSection:          'owner-control',
     component:               NotificationManagementPage,
   },
 
-  // ── 11. Workflow & Approval ────────────────────────────────────────────────
+  // ── 13. Workflow & Approval ────────────────────────────────────────────────
+  // Operational approvals entry in the main sidebar.
   {
     moduleId:                'workflow-approval',
     displayName:             'Workflow & Approval',
@@ -251,14 +331,16 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     icon:                    'git-merge',
     category:                'Platform',
     routePath:               '/workflow-approval',
-    navigationLabel:         { en: 'Workflow & Approval', ar: 'سير العمل والموافقة' },
+    navigationLabel:         { en: 'Approvals', ar: 'الموافقات' },
     adminOnly:               false,
     hasHealthCheck:          true,
     lifecycleKey:            'workflow-engine',
+    sidebarSection:          'platform-main',
     component:               WorkflowApprovalPage,
   },
 
-  // ── 12. Reporting & Analytics ──────────────────────────────────────────────
+  // ── 14. Reporting & Analytics ─────────────────────────────────────────────
+  // Operational reporting entry in the main sidebar.
   {
     moduleId:                'reporting-analytics',
     displayName:             'Reporting & Analytics',
@@ -269,14 +351,15 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     icon:                    'bar-chart-2',
     category:                'Analytics',
     routePath:               '/reporting-analytics',
-    navigationLabel:         { en: 'Reporting & Analytics', ar: 'التقارير والتحليلات' },
+    navigationLabel:         { en: 'Reporting', ar: 'التقارير' },
     adminOnly:               false,
     hasHealthCheck:          true,
     lifecycleKey:            'reporting-center',
+    sidebarSection:          'platform-main',
     component:               ReportingAnalyticsPage,
   },
 
-  // ── 13. Audit & Activity ───────────────────────────────────────────────────
+  // ── 15. Audit & Activity ───────────────────────────────────────────────────
   {
     moduleId:                'audit-activity',
     displayName:             'Audit & Activity',
@@ -291,10 +374,11 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     adminOnly:               true,
     hasHealthCheck:          true,
     lifecycleKey:            'audit-service',
+    sidebarSection:          'owner-control',
     component:               AuditActivityPage,
   },
 
-  // ── 14. System Health ──────────────────────────────────────────────────────
+  // ── 16. System Health ──────────────────────────────────────────────────────
   {
     moduleId:                'system-health',
     displayName:             'System Health',
@@ -309,10 +393,11 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     adminOnly:               true,
     hasHealthCheck:          true,
     lifecycleKey:            'health-monitor',
+    sidebarSection:          'owner-control',
     component:               SystemHealthPage,
   },
 
-  // ── 15. Platform Settings ──────────────────────────────────────────────────
+  // ── 17. Platform Settings ──────────────────────────────────────────────────
   {
     moduleId:                'platform-settings',
     displayName:             'Platform Settings',
@@ -328,10 +413,12 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     hasSettings:             true,
     settingsCategory:        'Platform Configuration',
     lifecycleKey:            'platform-settings',
+    sidebarSection:          'owner-control',
     component:               PlatformSettingsPage,
   },
 
-  // ── 16. Settings ───────────────────────────────────────────────────────────
+  // ── 18. Settings ───────────────────────────────────────────────────────────
+  // Gateway to Owner Control Center (admin pages).
   {
     moduleId:                'platform.settings',
     displayName:             'Settings',
@@ -343,6 +430,7 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     routePath:               '/settings',
     navigationLabel:         { en: 'Settings', ar: 'الإعدادات' },
     alwaysVisible:           true,
+    sidebarSection:          'platform-main',
     component:               SettingsPage,
   },
 ]);

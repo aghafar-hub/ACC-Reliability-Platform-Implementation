@@ -1,6 +1,6 @@
 {
-  "name": "ACC Owner Center",
-  "short_name": "Owner Center",
+  "name": "ACC Reliability Platform",
+  "short_name": "ACC Reliability",
   "description": "ACC Reliability Platform — Owner Center application shell",
   "start_url": "/",
   "scope": "/",

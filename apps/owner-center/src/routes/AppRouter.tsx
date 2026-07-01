@@ -49,6 +49,10 @@ import type { UIModuleManifest } from '../types/module-registry-types';
  *    without a PermissionRoute wrapper.
  *  - Routes with a moduleId are wrapped in PermissionRoute for access control.
  *    adminOnly=true requires contractorScope:'all' (AppOwner only).
+ *  - Business modules that declare moduleNavItems also receive a wildcard
+ *    sub-route (`<base>/*`) so links to module sub-pages (e.g. /oil-lubrication/oil-change)
+ *    render the module's placeholder page rather than falling through to the
+ *    global catch-all redirect.
  */
 function buildModuleRoute(manifest: UIModuleManifest): ReactElement | null {
   if (!manifest.component || !manifest.routePath || manifest.routePath === '/') {
@@ -58,6 +62,7 @@ function buildModuleRoute(manifest: UIModuleManifest): ReactElement | null {
   // Strip leading slash — React Router path prop is relative inside <Route path="/">
   const relativePath = manifest.routePath.replace(/^\//, '');
   const Page = manifest.component;
+  const hasSubNav = (manifest.moduleNavItems?.length ?? 0) > 0;
 
   // Always-visible platform entries (Notifications, Learning, Settings) need
   // no permission check.
@@ -76,6 +81,9 @@ function buildModuleRoute(manifest: UIModuleManifest): ReactElement | null {
       }
     >
       <Route path={relativePath} element={<Page />} />
+      {hasSubNav && (
+        <Route path={`${relativePath}/*`} element={<Page />} />
+      )}
     </Route>
   );
 }
@@ -123,10 +131,19 @@ export function AppRouter(): ReactElement {
               {/* Dynamic module routes from manifests */}
               {moduleRoutes.map(m => buildModuleRoute(m))}
 
+              {/*
+               * Inner catch-all: any path that reaches AppLayout but has no
+               * matching module route (disabled module URL, unknown path, etc.)
+               * is redirected to the dashboard.  Without this, disabled module
+               * URLs render AppLayout with an empty <Outlet /> because the
+               * parent <Route path="/"> always matches paths starting with "/".
+               */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+
             </Route>
           </Route>
 
-          {/* ── Catch-all: redirect unknown paths to the shell root ───────── */}
+          {/* ── Outer catch-all: paths that fall outside the "/" tree ─────── */}
           <Route path="*" element={<Navigate to="/" replace />} />
 
         </Routes>

@@ -10,6 +10,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { usePlatformSdk } from '../context/SdkContext';
 import { SummaryCard } from '../components/SummaryCard';
 import { StatusChip } from '../components/StatusChip';
+import { BackToSettingsLink } from '../components/BackToSettingsLink';
 import type { ChipStatus } from '../components/StatusChip';
 import type { UserRecord, ContractorId, UserRole } from '@acc-reliability/sdk';
 import { UserDuplicateError, UserLifecycleError } from '@acc-reliability/sdk';
@@ -574,6 +575,8 @@ export default function UsersRolesPage(): React.ReactElement {
 
   return (
     <div className="ur-page">
+
+      <BackToSettingsLink />
 
       {/* ── Page header ── */}
       <div className="ur-page__header">

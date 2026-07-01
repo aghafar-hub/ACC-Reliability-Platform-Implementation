@@ -10,6 +10,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { usePlatformSdk } from '../context/SdkContext';
 import { SummaryCard } from '../components/SummaryCard';
 import { StatusChip } from '../components/StatusChip';
+import { BackToSettingsLink } from '../components/BackToSettingsLink';
 import type { ChipStatus } from '../components/StatusChip';
 import type {
   AuditEntry,
@@ -307,6 +308,8 @@ export default function AuditActivityPage(): React.ReactElement {
 
   return (
     <div className="ur-page">
+
+      <BackToSettingsLink />
 
       {/* ── Page header ── */}
       <div className="ur-page__header">

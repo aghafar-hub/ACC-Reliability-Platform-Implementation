@@ -6,7 +6,7 @@
 // No business logic, no API calls, no data fetching.
 
 import React, { useEffect, useMemo } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useBranding } from '../context/BrandingContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -18,11 +18,13 @@ import { usePermissions } from '../hooks/usePermissions';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { NavIcon } from '../components/NavIcon';
 import { UserMenu } from '../components/UserMenu';
+import { NotificationBell } from '../components/NotificationBell';
 import { SearchButton } from '../components/SearchButton';
 import { CommandPalette } from '../components/CommandPalette';
 import type { LocaleCode, ThemeId } from '../types/app-types';
 import type { GuideTourId } from '../types/tour-types';
 import type { ModuleId } from '@acc-reliability/sdk';
+import type { ModuleNavItem } from '../types/module-registry-types';
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -134,82 +136,149 @@ function GuideMeButton(): React.ReactElement {
   );
 }
 
-/**
- * Header notification bell — placeholder unread count only.
- * The notification list is NOT loaded here; it loads lazily inside NotificationsPage.
- */
-function NotificationBell({ locale }: { locale: LocaleCode }): React.ReactElement {
-  const isAr = locale === 'ar';
-  const UNREAD_PLACEHOLDER = 3;
+// ── Sidebar item shape accepted by the render helper ─────────────────────────
 
+interface SidebarItem {
+  readonly path: string;
+  readonly icon: string;
+  readonly label: { readonly en: string; readonly ar: string };
+  readonly end?: boolean;
+  readonly badge?: 'notification';
+  readonly inMaintenance?: boolean;
+}
+
+/**
+ * Renders a single sidebar `<NavLink>`.  Used for both platform-level items
+ * and module-specific sub-navigation items.
+ */
+function SidebarNavLink({
+  item,
+  isAr,
+}: {
+  item: SidebarItem;
+  isAr: boolean;
+}): React.ReactElement {
   return (
-    <Link
-      to="/notifications"
-      className="notif-bell"
-      aria-label={
-        isAr
-          ? `الإشعارات: ${UNREAD_PLACEHOLDER} غير مقروءة`
-          : `Notifications: ${UNREAD_PLACEHOLDER} unread`
+    <NavLink
+      key={item.path}
+      to={item.path}
+      end={item.end}
+      className={({ isActive }: { isActive: boolean }) =>
+        `nav-item${isActive ? ' nav-item--active' : ''}${item.inMaintenance === true ? ' nav-item--maintenance' : ''}`
       }
+      aria-label={isAr ? item.label.ar : item.label.en}
     >
-      <span className="notif-bell__icon" aria-hidden="true">&#128276;</span>
-      <span className="notif-bell__badge" aria-hidden="true">{UNREAD_PLACEHOLDER}</span>
-    </Link>
+      <span className="nav-icon"><NavIcon id={item.icon} /></span>
+      <span className="nav-label">{isAr ? item.label.ar : item.label.en}</span>
+      {item.badge === 'notification' && (
+        <span className="nav-badge" aria-label={isAr ? 'إشعارات جديدة' : 'New notifications'} />
+      )}
+    </NavLink>
   );
 }
 
 /**
- * Sidebar with module navigation links.
+ * Context-aware sidebar.
  *
- * Navigation items are generated dynamically from the registered module
- * manifests via {@link useModuleRegistry}.  No module definitions live here.
+ * Rendering model:
  *
- * Visibility rules (applied in order):
- *  1. alwaysVisible items (Home, Notifications, Learning, Settings) — always shown.
- *  2. Items without a moduleId — always shown.
- *  3. Not authenticated — hide all permission-guarded items.
- *  4. adminOnly items — shown only when canAccessAdminModule passes.
- *  5. All other module items — shown when canAccessModule passes.
+ * **Platform context** (default): Shows `platform-main` items and a labelled
+ * Modules section containing `business-module` entries.  Owner-control admin
+ * pages are hidden from the sidebar and accessed via Settings.
+ *
+ * **Module context** (when the current path starts with a business module's
+ * route): Shows a "← Back to Platform" button followed by that module's own
+ * `moduleNavItems`.
+ *
+ * Visibility rules (permission filtering):
+ *  1. `alwaysVisible` items / items with no `moduleId` — always shown.
+ *  2. Not authenticated — hide all permission-guarded items.
+ *  3. `adminOnly` items — shown only when `canAccessAdminModule` passes.
+ *  4. All other items — shown when `canAccessModule` passes.
  */
 function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
-  const isAr          = locale === 'ar';
-  const { status }    = useAuth();
-  const permissions   = usePermissions();
-  const { navItems }  = useModuleRegistry();
+  const isAr = locale === 'ar';
+  const { status } = useAuth();
+  const permissions = usePermissions();
+  const { platformNavItems, businessModuleNavItems } = useModuleRegistry();
+  const location = useLocation();
 
-  const visibleItems = useMemo(() =>
-    navItems.filter((item) => {
+  function applyPermissions(items: readonly ModuleNavItem[]): readonly ModuleNavItem[] {
+    return items.filter((item) => {
       if (item.alwaysVisible || item.moduleId === undefined) return true;
       if (status !== 'authenticated') return false;
       return item.adminOnly === true
         ? permissions.canAccessAdminModule(item.moduleId as ModuleId)
         : permissions.canAccessModule(item.moduleId as ModuleId);
-    }),
-    [navItems, permissions, status],
+    });
+  }
+
+  const visiblePlatformItems = useMemo(
+    () => applyPermissions(platformNavItems),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [platformNavItems, permissions, status],
   );
 
+  const visibleModuleItems = useMemo(
+    () => applyPermissions(businessModuleNavItems),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [businessModuleNavItems, permissions, status],
+  );
+
+  // Detect whether the user is inside a business module.
+  const activeModule = useMemo(
+    () => visibleModuleItems.find(
+      (item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`),
+    ),
+    [visibleModuleItems, location.pathname],
+  );
+
+  // ── Module context sidebar ───────────────────────────────────────────────
+  if (activeModule !== undefined) {
+    const subItems = activeModule.moduleNavItems ?? [];
+
+    return (
+      <nav className="app-sidebar" aria-label="Module navigation">
+        <NavLink
+          to="/"
+          end
+          className={({ isActive }: { isActive: boolean }) =>
+            `nav-item nav-item--back${isActive ? ' nav-item--active' : ''}`
+          }
+          aria-label={isAr ? 'العودة إلى المنصة' : 'Back to Platform'}
+        >
+          <span className="nav-icon"><NavIcon id="chevron-left" /></span>
+          <span className="nav-label">{isAr ? 'العودة إلى المنصة' : 'Back to Platform'}</span>
+        </NavLink>
+
+        <div className="nav-section-divider" role="separator" />
+
+        {subItems.map((item) => (
+          <SidebarNavLink key={item.path} item={item} isAr={isAr} />
+        ))}
+      </nav>
+    );
+  }
+
+  // ── Platform context sidebar ─────────────────────────────────────────────
   return (
     <nav className="app-sidebar" aria-label="Module navigation">
-      {visibleItems.map((item) => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          end={item.end}
-          className={({ isActive }: { isActive: boolean }) =>
-            `nav-item${isActive ? ' nav-item--active' : ''}${item.inMaintenance ? ' nav-item--maintenance' : ''}`
-          }
-          aria-label={isAr ? item.label.ar : item.label.en}
-        >
-          <span className="nav-icon"><NavIcon id={item.icon} /></span>
-          <span className="nav-label">{isAr ? item.label.ar : item.label.en}</span>
-          {item.badge === 'notification' && (
-            <span
-              className="nav-badge"
-              aria-label={isAr ? 'إشعارات جديدة' : 'New notifications'}
-            />
-          )}
-        </NavLink>
+      {visiblePlatformItems.map((item) => (
+        <SidebarNavLink key={item.path} item={item} isAr={isAr} />
       ))}
+
+      {visibleModuleItems.length > 0 && (
+        <>
+          <div className="nav-section-label" role="presentation">
+            <span className="nav-section-label__text">
+              {isAr ? 'الوحدات' : 'Modules'}
+            </span>
+          </div>
+          {visibleModuleItems.map((item) => (
+            <SidebarNavLink key={item.path} item={item} isAr={isAr} />
+          ))}
+        </>
+      )}
     </nav>
   );
 }

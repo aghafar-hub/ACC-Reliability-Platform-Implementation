@@ -14,6 +14,7 @@ import { usePlatformSdk } from '../context/SdkContext';
 import { SectionCard } from '../components/SectionCard';
 import { SummaryCard } from '../components/SummaryCard';
 import { StatusChip } from '../components/StatusChip';
+import { BackToSettingsLink } from '../components/BackToSettingsLink';
 import type { ChipStatus } from '../components/StatusChip';
 import type { LocaleCode } from '../types/app-types';
 import {
@@ -167,6 +168,8 @@ export default function LocalizationCenterPage(): React.ReactElement {
 
   return (
     <div className="ur-page">
+
+      <BackToSettingsLink />
 
       {/* ── Page header ── */}
       <div className="ur-page__header">

@@ -46,7 +46,7 @@ interface ActionCard {
 // ── Static copy ───────────────────────────────────────────────────────────────
 
 const COPY = {
-  title:         { en: 'ACC Owner Center',           ar: 'مركز المالك - ACC' },
+  title:         { en: 'ACC Reliability Platform',   ar: 'منصة ACC للموثوقية' },
   subtitle:      { en: 'Platform Command Center',    ar: 'مركز قيادة المنصة' },
   lastUpdated:   { en: 'Last updated: just now',     ar: 'آخر تحديث: الآن' },
 

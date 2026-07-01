@@ -16,7 +16,7 @@ const COPY = {
   title:       { en: 'Access Denied',                               ar: 'الوصول مرفوض'                      },
   desc:        { en: "You don't have permission to view this page. Contact your administrator if you believe this is an error.", ar: 'ليس لديك صلاحية لعرض هذه الصفحة. تواصل مع المسؤول إذا كنت تعتقد أن هذا خطأ.' },
   goHome:      { en: 'Go to Dashboard',                             ar: 'الذهاب إلى لوحة التحكم'             },
-  pageTitle:   { en: '403 Unauthorized — ACC Owner Center',         ar: '٤٠٣ غير مصرح به — مركز المالك'     },
+  pageTitle:   { en: '403 Unauthorized — ACC Reliability Platform', ar: '٤٠٣ غير مصرح به — منصة ACC للموثوقية' },
 } as const;
 
 /**
