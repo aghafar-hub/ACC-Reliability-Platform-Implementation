@@ -2323,6 +2323,22 @@ button {
   box-shadow: 2px 0 16px rgba(0, 0, 0, 0.40);
 }
 
+/* ── Oil Lubrication Module — KPI grid (3 columns × 2 rows for 6 cards) ───── */
+
+.ol-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+
+@media (max-width: 1023px) {
+  .ol-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 767px) {
+  .ol-kpi-grid { grid-template-columns: 1fr; }
+}
+
 /* ── RTL logical-property support ─────────────────────────────────────────── */
 /* border-inline-start, margin-inline-start, padding-inline-* already flip    */
 /* automatically via CSS logical properties.  Extra overrides below if needed. */
