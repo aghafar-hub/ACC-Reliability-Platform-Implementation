@@ -1,13 +1,16 @@
 // apps/owner-center/src/pages/OilLubricationPage.tsx
-// Oil Lubrication Module — v2 Sprint 02
+// Oil Lubrication Module — v2 Sprint 04
 //
 // Sprint 01: Module foundation and dashboard.
 // Sprint 02: Lubrication Point Explorer (search, filters, table, CRUD dialogs).
+// Sprint 03: Oil Change Center (KPI header, task list, detail panel, 3-step wizard, history).
+// Sprint 04: Live dashboard KPIs, approval workflow, data warnings, permission guards, oc-* CSS.
 //
 // Internal sub-routing handles all module nav paths.
 // All copy is bilingual (EN/AR).
 
 import React, { useState, useCallback, useMemo } from 'react';
+import OilChangeCenter from './OilChangeCenter';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { StatusChip } from '../components/StatusChip';
@@ -22,6 +25,7 @@ import type {
   LpStatus,
   LpCreateInput,
 } from '../modules/oil-lubrication/lubrication-point.service';
+import { oilChangeService } from '../modules/oil-lubrication/oil-change.service';
 
 // ── Locale helpers ─────────────────────────────────────────────────────────────
 
@@ -147,46 +151,7 @@ const COPY = {
   btnDeact:    { en: 'Deactivate', ar: 'إلغاء التفعيل' },
 } as const;
 
-// ── KPI card data ──────────────────────────────────────────────────────────────
-
-const KPI_CARDS: readonly OilKpiCard[] = [
-  {
-    label:   { en: 'Total Lubrication Points',   ar: 'إجمالي نقاط التشحيم'     },
-    value:   { en: '0',                          ar: '٠'                        },
-    subtext: { en: 'None configured',            ar: 'لم يتم الضبط بعد'        },
-    variant: 'operational',
-  },
-  {
-    label:   { en: 'Due Soon',                   ar: 'مستحق قريباً'            },
-    value:   { en: '0',                          ar: '٠'                        },
-    subtext: { en: 'Within 7 days',              ar: 'خلال 7 أيام'              },
-    variant: 'warning',
-  },
-  {
-    label:   { en: 'Overdue',                    ar: 'متأخر'                   },
-    value:   { en: '0',                          ar: '٠'                        },
-    subtext: { en: 'Past due date',              ar: 'تجاوز الموعد المحدد'     },
-    variant: 'critical',
-  },
-  {
-    label:   { en: 'Pending Approvals',          ar: 'الموافقات المعلقة'       },
-    value:   { en: '0',                          ar: '٠'                        },
-    subtext: { en: 'Awaiting review',            ar: 'في انتظار المراجعة'      },
-    variant: 'warning',
-  },
-  {
-    label:   { en: 'Active Routes',              ar: 'المسارات النشطة'         },
-    value:   { en: '0',                          ar: '٠'                        },
-    subtext: { en: 'No routes configured',       ar: 'لا توجد مسارات مهيأة'   },
-    variant: 'maintenance',
-  },
-  {
-    label:   { en: 'Oil Consumption This Month', ar: 'استهلاك الزيت هذا الشهر' },
-    value:   { en: '0 L',                        ar: '٠ ل'                      },
-    subtext: { en: 'No records yet',             ar: 'لا توجد سجلات بعد'       },
-    variant: 'operational',
-  },
-];
+// ── KPI card type is kept for the component; data is computed live ─────────────
 
 // ── Dashboard sub-components ───────────────────────────────────────────────────
 
@@ -805,6 +770,83 @@ function OilDashboard(): React.ReactElement {
   const { locale } = useLanguage();
   const l = (bundle: L10n<string>) => t(bundle, locale);
 
+  // Live KPIs computed from persisted data
+  const kpis     = useMemo(() => oilChangeService.computeDashboardKpis(), []);
+  const tasks    = useMemo(() => oilChangeService.listTasks(), []);
+  const records  = useMemo(() => oilChangeService.listRecords(), []);
+
+  // Compliance colour
+  const compVariant: KpiVariant =
+    kpis.compliancePercent >= 90 ? 'operational' :
+    kpis.compliancePercent >= 70 ? 'warning' : 'critical';
+
+  // Build live KPI cards
+  const liveCards: readonly OilKpiCard[] = [
+    {
+      label:   { en: 'Active Lubrication Points', ar: 'نقاط التشحيم النشطة'       },
+      value:   { en: String(kpis.activeLp),        ar: String(kpis.activeLp)       },
+      subtext: { en: `${kpis.totalLp} total registered`, ar: `${kpis.totalLp} إجمالي مسجل` },
+      variant: 'operational',
+    },
+    {
+      label:   { en: 'Overdue',                    ar: 'متأخر'                   },
+      value:   { en: String(kpis.overdue),         ar: String(kpis.overdue)      },
+      subtext: { en: 'Past due date',              ar: 'تجاوز الموعد المحدد'     },
+      variant: kpis.overdue > 0 ? 'critical' : 'operational',
+    },
+    {
+      label:   { en: 'Due Today',                  ar: 'مستحق اليوم'             },
+      value:   { en: String(kpis.dueToday),        ar: String(kpis.dueToday)     },
+      subtext: { en: 'Require service today',      ar: 'تتطلب خدمة اليوم'       },
+      variant: kpis.dueToday > 0 ? 'warning' : 'operational',
+    },
+    {
+      label:   { en: 'Due Soon',                   ar: 'مستحق قريباً'            },
+      value:   { en: String(kpis.dueSoon),         ar: String(kpis.dueSoon)      },
+      subtext: { en: 'Within 7 days',              ar: 'خلال 7 أيام'              },
+      variant: 'warning',
+    },
+    {
+      label:   { en: 'Pending Approvals',          ar: 'الموافقات المعلقة'       },
+      value:   { en: String(kpis.pendingApproval), ar: String(kpis.pendingApproval) },
+      subtext: { en: 'Awaiting engineer review',   ar: 'بانتظار مراجعة المهندس' },
+      variant: kpis.pendingApproval > 0 ? 'maintenance' : 'operational',
+    },
+    {
+      label:   { en: 'Compliance This Month',      ar: 'الامتثال هذا الشهر'      },
+      value:   { en: `${kpis.compliancePercent}%`, ar: `${kpis.compliancePercent}%` },
+      subtext: { en: `${kpis.completedThisMonth} completed · ${kpis.volumeThisMonthL} L`,
+                 ar: `${kpis.completedThisMonth} مكتمل · ${kpis.volumeThisMonthL} ل` },
+      variant: compVariant,
+    },
+  ];
+
+  // Recent 5 oil changes for the activity panel
+  const recentRecords = useMemo(
+    () => [...records].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)).slice(0, 5),
+    [records],
+  );
+
+  // Upcoming tasks (overdue + due-today + due-soon), sorted by due date
+  const urgentTasks = useMemo(
+    () =>
+      tasks
+        .filter((t) => t.status === 'overdue' || t.status === 'due-today' || t.status === 'due-soon')
+        .sort((a, b) => {
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return a.dueDate.localeCompare(b.dueDate);
+        })
+        .slice(0, 5),
+    [tasks],
+  );
+
+  // Pending approval tasks
+  const pendingTasks = useMemo(
+    () => tasks.filter((t) => t.status === 'pending-approval'),
+    [tasks],
+  );
+
   return (
     <div className="dashboard">
 
@@ -821,10 +863,10 @@ function OilDashboard(): React.ReactElement {
         />
       </div>
 
-      {/* KPI summary */}
+      {/* Live KPI summary */}
       <DashboardSection heading={l(COPY.secSummary)}>
         <div className="ol-kpi-grid">
-          {KPI_CARDS.map((card) => (
+          {liveCards.map((card) => (
             <OilKpiCardItem key={card.label.en} card={card} locale={locale} />
           ))}
         </div>
@@ -837,7 +879,24 @@ function OilDashboard(): React.ReactElement {
             <span className="db-panel__title">{l(COPY.secChanges)}</span>
           </div>
           <div className="db-panel__body">
-            <EmptyPanel message={l(COPY.noChanges)} />
+            {recentRecords.length === 0 ? (
+              <EmptyPanel message={l(COPY.noChanges)} />
+            ) : (
+              <ul className="ol-db-list">
+                {recentRecords.map((r) => (
+                  <li key={r.id} className="ol-db-list__item">
+                    <span className="ol-db-list__badge">{r.lpId}</span>
+                    <span className="ol-db-list__name">{r.equipmentName}</span>
+                    <span className="ol-db-list__meta">{r.quantityUsed} L · {r.oilTypeUsed}</span>
+                    <span className={`ol-db-list__status ol-db-list__status--${r.status}`}>
+                      {r.status === 'completed' ? (locale === 'ar' ? 'مكتمل' : 'Completed') :
+                       r.status === 'pending-approval' ? (locale === 'ar' ? 'بانتظار الموافقة' : 'Pending') :
+                       r.status === 'rejected' ? (locale === 'ar' ? 'مرفوض' : 'Rejected') : r.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
         <div className="db-panel">
@@ -845,28 +904,105 @@ function OilDashboard(): React.ReactElement {
             <span className="db-panel__title">{l(COPY.secTasks)}</span>
           </div>
           <div className="db-panel__body">
-            <EmptyPanel message={l(COPY.noTasks)} />
+            {urgentTasks.length === 0 ? (
+              <EmptyPanel message={l(COPY.noTasks)} />
+            ) : (
+              <ul className="ol-db-list">
+                {urgentTasks.map((t) => (
+                  <li key={t.id} className="ol-db-list__item">
+                    <span className="ol-db-list__badge">{t.lpId}</span>
+                    <span className="ol-db-list__name">{t.equipmentName}</span>
+                    <span className="ol-db-list__meta">{t.area}</span>
+                    <span className={`ol-db-list__status ol-db-list__status--${t.status}`}>
+                      {t.status === 'overdue'   ? (locale === 'ar' ? 'متأخر' : 'Overdue') :
+                       t.status === 'due-today' ? (locale === 'ar' ? 'اليوم' : 'Today') :
+                                                  (locale === 'ar' ? 'قريباً' : 'Soon')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Route Status + Alerts */}
+      {/* Pending Approvals + Alerts */}
       <div className="db-two-col">
         <div className="db-panel">
           <div className="db-panel__head">
-            <span className="db-panel__title">{l(COPY.secRoutes)}</span>
+            <span className="db-panel__title">
+              {locale === 'ar' ? 'الموافقات المعلقة' : 'Pending Approvals'}
+            </span>
+            {pendingTasks.length > 0 && (
+              <span className="ol-db-badge ol-db-badge--warning">{pendingTasks.length}</span>
+            )}
           </div>
           <div className="db-panel__body">
-            <EmptyPanel message={l(COPY.noRoutes)} />
+            {pendingTasks.length === 0 ? (
+              <EmptyPanel message={locale === 'ar' ? 'لا توجد موافقات معلقة.' : 'No pending approvals.'} />
+            ) : (
+              <ul className="ol-db-list">
+                {pendingTasks.map((t) => (
+                  <li key={t.id} className="ol-db-list__item">
+                    <span className="ol-db-list__badge">{t.lpId}</span>
+                    <span className="ol-db-list__name">{t.equipmentName}</span>
+                    <span className="ol-db-list__meta">{t.area} · {t.contractorId}</span>
+                    <span className="ol-db-list__status ol-db-list__status--pending-approval">
+                      {locale === 'ar' ? 'بانتظار الموافقة' : 'Pending'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
         <div className="db-panel">
           <div className="db-panel__head">
             <span className="db-panel__title">{l(COPY.secAlerts)}</span>
-            <StatusChip status="operational" label={l(COPY.alertsClear)} />
+            {kpis.overdue === 0 && kpis.pendingApproval === 0 ? (
+              <StatusChip status="operational" label={l(COPY.alertsClear)} />
+            ) : null}
           </div>
           <div className="db-panel__body">
-            <EmptyPanel message={l(COPY.noAlerts)} />
+            {kpis.overdue === 0 && kpis.pendingApproval === 0 ? (
+              <EmptyPanel message={l(COPY.noAlerts)} />
+            ) : (
+              <ul className="ol-db-alerts">
+                {kpis.overdue > 0 && (
+                  <li className="ol-db-alerts__item ol-db-alerts__item--critical">
+                    <span className="ol-db-alerts__icon" aria-hidden="true">⚠</span>
+                    <span>
+                      {kpis.overdue}&nbsp;
+                      {locale === 'ar'
+                        ? 'نقطة تشحيم متأخرة — تتطلب خدمة فورية.'
+                        : 'lubrication point(s) are overdue — immediate service required.'}
+                    </span>
+                  </li>
+                )}
+                {kpis.dueToday > 0 && (
+                  <li className="ol-db-alerts__item ol-db-alerts__item--warning">
+                    <span className="ol-db-alerts__icon" aria-hidden="true">⏰</span>
+                    <span>
+                      {kpis.dueToday}&nbsp;
+                      {locale === 'ar'
+                        ? 'نقطة مستحقة اليوم.'
+                        : 'point(s) due for service today.'}
+                    </span>
+                  </li>
+                )}
+                {kpis.pendingApproval > 0 && (
+                  <li className="ol-db-alerts__item ol-db-alerts__item--info">
+                    <span className="ol-db-alerts__icon" aria-hidden="true">📋</span>
+                    <span>
+                      {kpis.pendingApproval}&nbsp;
+                      {locale === 'ar'
+                        ? 'سجل بانتظار موافقة المهندس.'
+                        : 'record(s) awaiting engineer approval.'}
+                    </span>
+                  </li>
+                )}
+              </ul>
+            )}
           </div>
         </div>
       </div>
@@ -911,10 +1047,8 @@ export default function OilLubricationPage(): React.ReactElement {
 
       <Route path="points" element={<LubricationPointExplorer />} />
 
-      <Route
-        path="oil-change"
-        element={<OilSubPage initials="OC" title={COPY.oilChangeTitle} desc={COPY.oilChangeDesc} />}
-      />
+      <Route path="oil-change"    element={<OilChangeCenter />} />
+      <Route path="oil-change/*" element={<OilChangeCenter />} />
 
       <Route
         path="sampling"

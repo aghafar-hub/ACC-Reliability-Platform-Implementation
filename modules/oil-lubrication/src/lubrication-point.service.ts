@@ -10,7 +10,7 @@
 // (apps/owner-center/src/modules/oil-lubrication/lubrication-point.service.ts)
 // because sdk.storage is not yet wired. This file provides the domain contract.
 
-import type { ILogger }            from '@acc-reliability/kernel';
+import type { ILogger }            from '@acc-reliability/sdk';
 import type { ServiceResult }       from '@acc-reliability/shared-types';
 import { ok, err }                  from '@acc-reliability/shared-types';
 import { nowIso }                   from '@acc-reliability/shared-types';
@@ -116,18 +116,7 @@ export class LubricationPointService {
         );
       }
       const now = nowIso();
-      const point = await this.repo.create({
-        lubricationPointId: request.lubricationPointId,
-        equipmentId:        request.equipmentId,
-        contractorId:       request.contractorId,
-        name:               request.name.trim(),
-        location:           request.location,
-        lubricantSpec:      request.lubricantSpec,
-        frequency:          request.frequency,
-        isActive:           true,
-        createdAt:          now,
-        updatedAt:          now,
-      });
+      const point = await this.repo.create(buildLpCreatePayload(request, now));
       this.logger.info('LubricationPointService.createPoint succeeded', { id: point.id });
       return ok(point);
     } catch (e) {
@@ -170,4 +159,53 @@ export class LubricationPointService {
       return err(ERR_INTERNAL, String(e));
     }
   }
+}
+
+// ── Private helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Builds the repository create payload from a request and server timestamp.
+ *
+ * Optional fields (Sprint 02 + Sprint 03) are included conditionally to
+ * satisfy exactOptionalPropertyTypes; absent request fields are omitted
+ * from the payload rather than set to undefined.
+ */
+function buildLpCreatePayload(
+  request: LubricationPointCreateRequest,
+  now: ReturnType<typeof nowIso>,
+): Omit<LubricationPoint, 'id'> {
+  const base: {
+    readonly lubricationPointId: LubricationPoint['lubricationPointId'];
+    readonly equipmentId: LubricationPoint['equipmentId'];
+    readonly contractorId: LubricationPoint['contractorId'];
+    readonly name: string;
+    readonly isActive: boolean;
+    readonly createdAt: LubricationPoint['createdAt'];
+    readonly updatedAt: LubricationPoint['updatedAt'];
+    location?: string;
+    lubricantSpec?: string;
+    frequency?: LubricationPoint['frequency'];
+    standardQuantityL?: number;
+    areaName?: string;
+    pointCode?: string;
+    position?: string;
+  } = {
+    lubricationPointId: request.lubricationPointId,
+    equipmentId:        request.equipmentId,
+    contractorId:       request.contractorId,
+    name:               request.name.trim(),
+    isActive:           true,
+    createdAt:          now,
+    updatedAt:          now,
+  };
+
+  if (request.location          !== undefined) { base.location          = request.location;          }
+  if (request.lubricantSpec     !== undefined) { base.lubricantSpec     = request.lubricantSpec;     }
+  if (request.frequency         !== undefined) { base.frequency         = request.frequency;         }
+  if (request.standardQuantityL !== undefined) { base.standardQuantityL = request.standardQuantityL; }
+  if (request.areaName          !== undefined) { base.areaName          = request.areaName;          }
+  if (request.pointCode         !== undefined) { base.pointCode         = request.pointCode;         }
+  if (request.position          !== undefined) { base.position          = request.position;          }
+
+  return base;
 }

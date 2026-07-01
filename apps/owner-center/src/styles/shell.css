@@ -2419,6 +2419,1163 @@ button {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Oil Lubrication — Dashboard panels (Sprint 04)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Two-column panel row */
+.db-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+@media (max-width: 767px) {
+  .db-two-col { grid-template-columns: 1fr; }
+}
+
+/* Panel card */
+.db-panel {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.db-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.db-panel__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.db-panel__body {
+  padding: var(--space-sm) var(--space-md);
+  min-height: 120px;
+}
+
+.db-panel__empty {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  padding: var(--space-md) 0;
+  text-align: center;
+}
+
+/* Dashboard section heading */
+.dashboard-section {
+  margin-bottom: var(--space-md);
+}
+
+.dashboard-section__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--space-sm);
+}
+
+/* Status dots on KPI cards */
+.db-status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.db-status-dot--operational { background: var(--chip-operational-text); }
+.db-status-dot--warning     { background: var(--chip-warning-text);     }
+.db-status-dot--critical    { background: var(--chip-critical-text);    }
+.db-status-dot--maintenance { background: var(--chip-maintenance-text); }
+
+/* KPI card grid (Oil Lubrication dashboard) */
+.db-kpi-card__label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--space-xs);
+}
+
+.db-kpi-card__value {
+  font-size: 2rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  line-height: 1.1;
+  margin-bottom: var(--space-xs);
+}
+
+.db-kpi-card__status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+/* Dashboard list items */
+.ol-db-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ol-db-list__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  min-width: 0;
+}
+
+.ol-db-list__item:last-child { border-bottom: none; }
+
+.ol-db-list__badge {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.ol-db-list__name {
+  flex: 1 1 0;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ol-db-list__meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.ol-db-list__status {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.ol-db-list__status--completed         { background: var(--chip-operational-bg); color: var(--chip-operational-text); }
+.ol-db-list__status--pending-approval  { background: var(--chip-maintenance-bg); color: var(--chip-maintenance-text); }
+.ol-db-list__status--rejected          { background: var(--chip-critical-bg);    color: var(--chip-critical-text); }
+.ol-db-list__status--overdue           { background: var(--chip-critical-bg);    color: var(--chip-critical-text); }
+.ol-db-list__status--due-today         { background: var(--chip-warning-bg);     color: var(--chip-warning-text); }
+.ol-db-list__status--due-soon          { background: var(--chip-warning-bg);     color: var(--chip-warning-text); }
+
+/* Dashboard alerts list */
+.ol-db-alerts {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.ol-db-alerts__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+
+.ol-db-alerts__item--critical { background: var(--chip-critical-bg);    color: var(--chip-critical-text); }
+.ol-db-alerts__item--warning  { background: var(--chip-warning-bg);     color: var(--chip-warning-text);  }
+.ol-db-alerts__item--info     { background: var(--chip-maintenance-bg); color: var(--chip-maintenance-text); }
+
+.ol-db-alerts__icon { flex-shrink: 0; font-size: 1rem; }
+
+/* Dashboard badge (count pill beside panel title) */
+.ol-db-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.ol-db-badge--warning { background: var(--chip-warning-bg); color: var(--chip-warning-text); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Oil Change Center (OCC) — oc-* classes (Sprint 04)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Page wrapper ─────────────────────────────────────────────────────────── */
+
+.oc-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* ── KPI strip ────────────────────────────────────────────────────────────── */
+
+.oc-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-md);
+}
+
+@media (max-width: 1199px) { .oc-kpi-strip { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 767px)  { .oc-kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 479px)  { .oc-kpi-strip { grid-template-columns: 1fr; } }
+
+.oc-kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-inline-start: 3px solid transparent;
+  border-radius: var(--radius);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.oc-kpi-card--info        { border-inline-start-color: var(--chip-maintenance-text); }
+.oc-kpi-card--critical    { border-inline-start-color: var(--chip-critical-text);    }
+.oc-kpi-card--warning     { border-inline-start-color: var(--chip-warning-text);     }
+.oc-kpi-card--operational { border-inline-start-color: var(--chip-operational-text); }
+.oc-kpi-card--maintenance { border-inline-start-color: var(--chip-maintenance-text); }
+
+.oc-kpi-card__value {
+  font-size: 1.875rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.oc-kpi-card__label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.oc-kpi-card__sub {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────────── */
+
+.oc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.oc-toolbar__search {
+  flex: 1 1 240px;
+  min-width: 160px;
+  max-width: 340px;
+}
+
+.oc-toolbar__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1 1 auto;
+}
+
+.oc-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 15px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.oc-chip:hover {
+  background: var(--color-hover-overlay);
+  color: var(--color-text);
+}
+
+.oc-chip--active {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.oc-toolbar__dropdowns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.oc-toolbar__select {
+  flex: 0 1 150px;
+  min-width: 120px;
+}
+
+.oc-toolbar__record-btn {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+}
+
+@media (max-width: 767px) {
+  .oc-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .oc-toolbar__search { max-width: 100%; }
+  .oc-toolbar__chips  { flex-wrap: wrap; }
+  .oc-toolbar__record-btn { margin-inline-start: 0; align-self: flex-start; }
+}
+
+/* ── Task list & table ────────────────────────────────────────────────────── */
+
+.oc-task-list {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.oc-table {
+  table-layout: auto;
+}
+
+.oc-task-row {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.oc-task-row:hover { background: var(--color-hover-overlay); }
+
+.oc-task-row--selected {
+  background: var(--color-accent-bg);
+}
+
+.oc-task-row--selected td { color: var(--color-accent); }
+
+.oc-task-row__equip-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.oc-task-row__equip-id {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.oc-task-row__position {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.oc-task-row__oil {
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.oc-task-row__due { white-space: nowrap; }
+
+.oc-task-row__due--overdue {
+  color: var(--chip-critical-text);
+  font-weight: var(--font-weight-bold);
+}
+
+/* ── Priority badges ──────────────────────────────────────────────────────── */
+
+.oc-priority {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.oc-priority--low      { background: rgba(90,  100, 120, 0.10); color: #5a6478; }
+.oc-priority--medium   { background: var(--chip-warning-bg);    color: var(--chip-warning-text); }
+.oc-priority--high     { background: rgba(220, 38,  38,  0.10); color: #b91c1c; }
+.oc-priority--critical { background: var(--chip-critical-bg);   color: var(--chip-critical-text); font-size: calc(var(--font-size-xs) - 1px); }
+
+[data-theme="dark"] .oc-priority--low {
+  background: rgba(136, 146, 164, 0.12);
+  color: #8892a4;
+}
+
+/* ── Workspace (list + detail panel side-by-side) ────────────────────────── */
+
+.oc-workspace {
+  display: flex;
+  gap: var(--space-md);
+  min-height: 300px;
+}
+
+.oc-workspace--split .oc-workspace__list {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.oc-workspace__list {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.oc-workspace__hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  padding-top: var(--space-sm);
+  text-align: center;
+}
+
+@media (max-width: 1023px) {
+  .oc-workspace--split {
+    flex-direction: column;
+  }
+}
+
+/* ── Detail panel ─────────────────────────────────────────────────────────── */
+
+.oc-detail-panel {
+  width: 320px;
+  flex-shrink: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+@media (max-width: 1023px) {
+  .oc-detail-panel {
+    width: 100%;
+  }
+}
+
+.oc-detail-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.oc-detail-panel__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.oc-detail-panel__status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.oc-detail-panel__fields {
+  padding: 0 var(--space-md);
+  margin: 0;
+  overflow-y: auto;
+  max-height: 260px;
+}
+
+.oc-detail-panel__field {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--space-xs);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+
+.oc-detail-panel__field:last-child { border-bottom: none; }
+
+.oc-detail-panel__field dt {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.oc-detail-panel__field dd {
+  color: var(--color-text);
+  margin: 0;
+  word-break: break-word;
+}
+
+.oc-detail-panel__equip-name {
+  display: block;
+  font-weight: var(--font-weight-medium);
+}
+
+.oc-detail-panel__equip-id {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.oc-detail-panel__overdue {
+  color: var(--chip-critical-text);
+  font-weight: var(--font-weight-bold);
+}
+
+.oc-detail-panel__actions {
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.oc-detail-panel__record-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* History inside detail panel */
+.oc-detail-panel__history {
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  border-top: 1px solid var(--color-border);
+  overflow-y: auto;
+  flex: 1 1 0;
+}
+
+.oc-detail-panel__history-title {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-sm);
+}
+
+.oc-detail-panel__history-empty {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.oc-detail-panel__history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.oc-detail-panel__history-item {
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.oc-detail-panel__history-item:last-child { border-bottom: none; }
+
+.oc-detail-panel__history-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.oc-detail-panel__history-date {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.oc-detail-panel__history-meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.oc-detail-panel__history-reject {
+  font-size: var(--font-size-xs);
+  color: var(--chip-critical-text);
+  background: var(--chip-critical-bg);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  margin-top: 3px;
+}
+
+.oc-detail-panel__history-reviewer {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+/* ── Approval actions inside detail panel ─────────────────────────────────── */
+
+.oc-approval-actions {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--chip-maintenance-bg);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.oc-approval-actions__label {
+  font-size: var(--font-size-xs);
+  color: var(--chip-maintenance-text);
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--space-xs);
+}
+
+.oc-approval-actions__btns {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.oc-approval-actions__approve-btn {
+  background: var(--chip-operational-text);
+  border-color: var(--chip-operational-text);
+  color: #ffffff;
+}
+
+.oc-approval-actions__approve-btn:hover {
+  opacity: 0.9;
+}
+
+.oc-approval-actions__reject-btn {
+  border-color: var(--chip-critical-text);
+  color: var(--chip-critical-text);
+}
+
+.oc-approval-actions__reject-btn:hover {
+  background: var(--chip-critical-bg);
+}
+
+/* ── Reject dialog (inline) ───────────────────────────────────────────────── */
+
+.oc-reject-dialog {
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.oc-reject-dialog__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--chip-critical-text);
+  margin-bottom: var(--space-xs);
+}
+
+.oc-reject-dialog__record-meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.oc-reject-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.oc-reject-dialog__confirm-btn {
+  background: var(--chip-critical-text);
+  border-color: var(--chip-critical-text);
+  color: #ffffff;
+}
+
+.oc-reject-dialog__confirm-btn:hover {
+  opacity: 0.9;
+}
+
+/* ── 3-Step Wizard ────────────────────────────────────────────────────────── */
+
+.oc-wizard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  animation: auth-fade-in 0.15s ease both;
+}
+
+.oc-wizard {
+  width: 100%;
+  max-width: 660px;
+  max-height: 90vh;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.oc-wizard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-shrink: 0;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.oc-wizard__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+/* Step progress bar */
+.oc-wizard__steps {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.oc-wizard__step {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  border-bottom: 2px solid transparent;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.oc-wizard__step--active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.oc-wizard__step--done {
+  color: var(--chip-operational-text);
+}
+
+.oc-wizard__step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  flex-shrink: 0;
+}
+
+.oc-wizard__step-label {
+  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+}
+
+/* Wizard body */
+.oc-wizard__body {
+  flex: 1 1 0;
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
+
+.oc-wizard__step-body { display: flex; flex-direction: column; gap: var(--space-md); }
+
+/* LP review card in step 1 */
+.oc-wizard__lp-review {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.oc-wizard__lp-review-title {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-sm);
+}
+
+.oc-wizard__lp-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xs) var(--space-md);
+  margin: 0;
+}
+
+.oc-wizard__lp-fields > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.oc-wizard__lp-fields dt {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.oc-wizard__lp-fields dd {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  margin: 0;
+}
+
+@media (max-width: 479px) {
+  .oc-wizard__lp-fields { grid-template-columns: 1fr; }
+}
+
+/* Step 2: form grid */
+.oc-wizard__form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+@media (max-width: 479px) {
+  .oc-wizard__form-grid { grid-template-columns: 1fr; }
+}
+
+/* Full-width form field override */
+.oc-form-field--full {
+  grid-column: 1 / -1;
+}
+
+/* Toggle field row */
+.oc-form-field--toggle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.oc-toggle-group {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.oc-toggle-btn {
+  flex: 1 1 0;
+  padding: 7px 0;
+  background: transparent;
+  border: none;
+  border-inline-end: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.oc-toggle-btn:last-child { border-inline-end: none; }
+
+.oc-toggle-btn:hover:not(.oc-toggle-btn--active) {
+  background: var(--color-hover-overlay);
+  color: var(--color-text);
+}
+
+.oc-toggle-btn--active {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Textarea */
+.oc-textarea {
+  resize: vertical;
+  min-height: 72px;
+  font-family: inherit;
+}
+
+/* Overdue date inside wizard */
+.oc-wizard__overdue {
+  color: var(--chip-critical-text);
+  font-weight: var(--font-weight-bold);
+}
+
+/* Step 3: review pane */
+.oc-wizard__review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.oc-wizard__review-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.oc-wizard__review-heading {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-sm);
+}
+
+.oc-wizard__review-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xs) var(--space-md);
+  margin: 0;
+}
+
+.oc-wizard__review-fields > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.oc-wizard__review-fields dt {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.oc-wizard__review-fields dd {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  margin: 0;
+  word-break: break-word;
+}
+
+@media (max-width: 479px) {
+  .oc-wizard__review-fields { grid-template-columns: 1fr; }
+}
+
+/* Status note at bottom of review */
+.oc-wizard__status-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--chip-maintenance-bg);
+  border-radius: var(--radius);
+}
+
+/* ── Data warnings ────────────────────────────────────────────────────────── */
+
+.oc-warnings {
+  background: var(--color-surface);
+  border: 1px solid var(--chip-warning-text);
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  transition: background var(--transition);
+}
+
+.oc-warnings__heading {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--chip-warning-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-sm);
+}
+
+.oc-warnings__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.oc-warnings__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.oc-warnings__item:last-child { border-bottom: none; }
+
+.oc-warnings__item--quantity-deviation   { color: var(--chip-warning-text); }
+.oc-warnings__item--oil-type-changed     { color: var(--chip-maintenance-text); }
+.oc-warnings__item--running-hours-regression { color: var(--chip-warning-text); }
+.oc-warnings__item--inactive-lp         { color: var(--chip-critical-text); }
+
+.oc-warnings__icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  margin-top: 1px;
+}
+
+/* ── Success state ────────────────────────────────────────────────────────── */
+
+.oc-wizard__success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xl) var(--space-lg);
+  text-align: center;
+}
+
+.oc-wizard__success-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--chip-operational-bg);
+  color: var(--chip-operational-text);
+  font-size: 2rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.oc-wizard__success-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.oc-wizard__success-msg {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.oc-success-actions {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: var(--space-sm);
+}
+
+/* ── Wizard footer ────────────────────────────────────────────────────────── */
+
+.oc-wizard__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-shrink: 0;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.oc-wizard__footer-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-inline-start: auto;
+}
+
+/* ── History strip ────────────────────────────────────────────────────────── */
+
+.oc-history {
+  margin-top: var(--space-md);
+}
+
+.oc-history__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  margin-bottom: var(--space-sm);
+}
+
+.oc-history__empty {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.oc-hist-table { table-layout: auto; }
+
+.oc-hist-reject-reason {
+  font-size: var(--font-size-xs);
+  color: var(--chip-critical-text);
+  margin-top: 2px;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Responsive: hide less-critical columns on small screens ─────────────── */
+
+@media (max-width: 767px) {
+  .oc-task-row__position { display: none; }
+  .oc-table th:nth-child(3),
+  .oc-table td:nth-child(3) { display: none; }
+}
+
+@media (max-width: 599px) {
+  .oc-kpi-strip { grid-template-columns: 1fr 1fr; }
+  .oc-table th:nth-child(7),
+  .oc-table td:nth-child(7),
+  .oc-table th:nth-child(8),
+  .oc-table td:nth-child(8) { display: none; }
+}
+
 /* ── RTL logical-property support ─────────────────────────────────────────── */
 /* border-inline-start, margin-inline-start, padding-inline-* already flip    */
 /* automatically via CSS logical properties.  Extra overrides below if needed. */

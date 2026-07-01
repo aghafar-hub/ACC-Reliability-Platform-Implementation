@@ -8,6 +8,13 @@
 //   EquipmentId        — master platform equipment key (Equipment_ID)
 //   LubricationPointId — physical lubrication point on a piece of equipment (LP_ID)
 //   OilChangeRecordId  — unique identifier for a single oil change record
+//
+// Sprint 03 additions:
+//   AttachmentReference — photo/document URI value object
+//   LpStatusBucket      — computed status classification for lubrication points
+//   LubricationPoint    — extended with standardQuantityL, areaName, pointCode, position
+//   OilChangeRecord     — extended with filterChanged, breatherServiced, runningHours,
+//                         technicianName, attachmentReference
 
 import type { IsoTimestamp } from '@acc-reliability/shared-types';
 import type {
@@ -62,7 +69,7 @@ export function createLubricationPointId(value: string): LubricationPointId {
  * - `in-progress` — work order open, not yet completed
  * - `completed`   — oil change performed and recorded
  * - `overdue`     — past scheduled date without completion
- * - `cancelled`   — voided; no oil change was performed
+ * - `cancelled`   — voided; no oil change was performed; history preserved
  */
 export type OilChangeStatus =
   | 'scheduled'
@@ -104,6 +111,49 @@ export interface OilChangeFrequency {
   readonly notes?: string | undefined;
 }
 
+// ── LP status bucket ──────────────────────────────────────────────────────────
+
+/**
+ * Computed status classification for a lubrication point.
+ *
+ * This is a derived value — never stored on the entity. Computed by
+ * {@link SchedulingService.computeStatusBucket} from the LP's next due date
+ * (derived from the latest approved oil change record) and active flag.
+ *
+ * Buckets (in priority order):
+ * - `inactive`    — point is deactivated; no scheduling applies
+ * - `no-history`  — point is active but has never been serviced
+ * - `overdue`     — past the computed next due date
+ * - `due-today`   — next due date is today
+ * - `due-soon`    — next due date is within 7 calendar days
+ * - `ok`          — next due date is more than 7 days away
+ */
+export type LpStatusBucket =
+  | 'overdue'
+  | 'due-today'
+  | 'due-soon'
+  | 'ok'
+  | 'no-history'
+  | 'inactive';
+
+// ── Attachment reference value object ─────────────────────────────────────────
+
+/**
+ * A reference to an externally stored file (photo, document, PDF).
+ *
+ * The platform does not own file storage in RC1. Attachments are referenced
+ * by URI only (e.g. a Google Drive share link pasted by the technician).
+ * No upload is implemented; this value object stores the reference metadata.
+ */
+export interface AttachmentReference {
+  /** URI pointing to the external file (e.g. Google Drive share link). */
+  readonly uri: string;
+  /** ISO 8601 UTC timestamp when the reference was recorded. */
+  readonly uploadedAt: IsoTimestamp;
+  /** Optional human-readable label (e.g. "Completion photo", "Lab PDF"). */
+  readonly label?: string | undefined;
+}
+
 // ── Lubrication Point entity ──────────────────────────────────────────────────
 
 /**
@@ -111,7 +161,12 @@ export interface OilChangeFrequency {
  * is applied (LP_ID record).
  *
  * Each LubricationPoint belongs to exactly one equipment unit and one
- * contractor.  Deactivating a point (isActive = false) retains history.
+ * contractor. Deactivating a point (isActive = false) retains history.
+ *
+ * Computed fields NOT stored on this entity:
+ *   - lastChangeDate  → derived from latest completed OilChangeRecord.performedAt
+ *   - nextDueDate     → derived by SchedulingService from lastChangeDate + frequency
+ *   - statusBucket    → derived by SchedulingService from nextDueDate + isActive
  */
 export interface LubricationPoint extends Entity {
   /** Platform-assigned unique identifier. */
@@ -136,6 +191,30 @@ export interface LubricationPoint extends Entity {
   readonly createdAt: IsoTimestamp;
   /** ISO 8601 UTC timestamp when this record was last modified. */
   readonly updatedAt: IsoTimestamp;
+
+  // ── Sprint 03 fields ────────────────────────────────────────────────────────
+
+  /**
+   * Expected oil volume in litres for a standard change at this point.
+   * Used by SchedulingService to detect quantity deviation alerts.
+   */
+  readonly standardQuantityL?: number | undefined;
+  /**
+   * Plant area or zone where this lubrication point is located
+   * (e.g. "Area-01", "Compressor Hall").
+   * Distinct from `location` which describes the physical position on the equipment.
+   */
+  readonly areaName?: string | undefined;
+  /**
+   * Internal short code for this lubrication point (e.g. "LP-011").
+   * Distinct from the stable `lubricationPointId` business key.
+   */
+  readonly pointCode?: string | undefined;
+  /**
+   * Physical position on the equipment (e.g. "Drive End", "Top mounting face").
+   * More specific than `location`; used on oil change forms and route items.
+   */
+  readonly position?: string | undefined;
 }
 
 // ── Lubrication Point create / update requests ────────────────────────────────
@@ -149,6 +228,10 @@ export interface LubricationPointCreateRequest {
   readonly location?: string | undefined;
   readonly lubricantSpec?: string | undefined;
   readonly frequency?: OilChangeFrequency | undefined;
+  readonly standardQuantityL?: number | undefined;
+  readonly areaName?: string | undefined;
+  readonly pointCode?: string | undefined;
+  readonly position?: string | undefined;
 }
 
 /**
@@ -160,6 +243,10 @@ export interface LubricationPointUpdateRequest {
   readonly location?: string | undefined;
   readonly lubricantSpec?: string | undefined;
   readonly frequency?: OilChangeFrequency | undefined;
+  readonly standardQuantityL?: number | undefined;
+  readonly areaName?: string | undefined;
+  readonly pointCode?: string | undefined;
+  readonly position?: string | undefined;
 }
 
 // ── Oil Change Record entity ──────────────────────────────────────────────────
@@ -170,6 +257,9 @@ export interface LubricationPointUpdateRequest {
  * Contractor isolation is enforced at the repository layer; every query is
  * scoped to the {@link contractorId} embedded in the repository instance.
  * This entity always belongs to exactly one contractor.
+ *
+ * Hard deletion is prohibited. Use {@link OilLubricationService.cancelRecord}
+ * to void a record; the `cancelled` status preserves the audit trail.
  */
 export interface OilChangeRecord extends Entity {
   /** Platform-assigned unique identifier. */
@@ -203,6 +293,28 @@ export interface OilChangeRecord extends Entity {
   readonly createdAt: IsoTimestamp;
   /** ISO 8601 UTC timestamp when this record was last modified. */
   readonly updatedAt: IsoTimestamp;
+
+  // ── Sprint 03 fields ────────────────────────────────────────────────────────
+
+  /** Whether the oil filter was replaced during this service. */
+  readonly filterChanged?: boolean | undefined;
+  /** Whether the breather/vent was serviced during this oil change. */
+  readonly breatherServiced?: boolean | undefined;
+  /**
+   * Equipment running hours recorded at the time of service.
+   * Used by SchedulingService for operating-hours-based scheduling.
+   */
+  readonly runningHours?: number | undefined;
+  /**
+   * Name of the technician who physically performed the service.
+   * May differ from `completedBy` when a supervisor records on behalf of a technician.
+   */
+  readonly technicianName?: string | undefined;
+  /**
+   * Optional reference to a photo or document (e.g. completion photo, lab PDF).
+   * The URI is pasted by the user; no file upload is implemented in Sprint 03.
+   */
+  readonly attachmentReference?: AttachmentReference | undefined;
 }
 
 // ── Create request ────────────────────────────────────────────────────────────
@@ -227,6 +339,11 @@ export interface OilChangeRecordCreateRequest {
   readonly completedBy: UserId;
   readonly workOrderId?: string | undefined;
   readonly notes?: string | undefined;
+  readonly filterChanged?: boolean | undefined;
+  readonly breatherServiced?: boolean | undefined;
+  readonly runningHours?: number | undefined;
+  readonly technicianName?: string | undefined;
+  readonly attachmentReference?: AttachmentReference | undefined;
 }
 
 // ── Update request ────────────────────────────────────────────────────────────
@@ -244,6 +361,11 @@ export interface OilChangeRecordUpdateRequest {
   readonly performedAt?: IsoTimestamp | undefined;
   readonly workOrderId?: string | undefined;
   readonly notes?: string | undefined;
+  readonly filterChanged?: boolean | undefined;
+  readonly breatherServiced?: boolean | undefined;
+  readonly runningHours?: number | undefined;
+  readonly technicianName?: string | undefined;
+  readonly attachmentReference?: AttachmentReference | undefined;
 }
 
 // ── Summary projection ────────────────────────────────────────────────────────

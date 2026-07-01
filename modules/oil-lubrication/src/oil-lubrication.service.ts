@@ -5,8 +5,11 @@
 // It receives dependencies via constructor injection and returns ServiceResult<T>
 // for all fallible operations — exceptions never cross the module boundary.
 //
-// Scaffold — minimal CRUD operations only.
-// Workflows, approvals, and notifications are deferred to future patches.
+// Sprint 03 changes:
+//   - cancelRecord() replaces deleteRecord() — no hard deletes on compliance records
+//   - buildCreatePayload() handles new Sprint 03 fields:
+//       filterChanged, breatherServiced, runningHours, technicianName, attachmentReference
+//   - Error codes aligned to typed constants from OIL_LUBRICATION_ERROR_CODES
 
 import type { ServiceResult, IsoTimestamp } from '@acc-reliability/shared-types';
 import { ok, err, nowIso } from '@acc-reliability/shared-types';
@@ -24,7 +27,24 @@ import type {
   OilChangeRecordUpdateRequest,
   IOilChangeRecordRepository,
   LubricationPointId,
+  AttachmentReference,
 } from './types';
+
+// ── Typed error codes ─────────────────────────────────────────────────────────
+
+/**
+ * Typed error code constants for {@link OilLubricationService}.
+ *
+ * Used as the first argument to `err()` — never raw string literals.
+ */
+export const OIL_LUBRICATION_ERROR_CODES = {
+  CREATE_FAILED:         'OIL_LUBRICATION_CREATE_FAILED',
+  FETCH_FAILED:          'OIL_LUBRICATION_FETCH_FAILED',
+  UPDATE_FAILED:         'OIL_LUBRICATION_UPDATE_FAILED',
+  CANCEL_FAILED:         'OIL_LUBRICATION_CANCEL_FAILED',
+  RECORD_NOT_FOUND:      'OIL_RECORD_NOT_FOUND',
+  ALREADY_CANCELLED:     'OIL_RECORD_ALREADY_CANCELLED',
+} as const;
 
 // ── OilLubricationService ─────────────────────────────────────────────────────
 
@@ -32,6 +52,10 @@ import type {
  * Core service for oil change record management.
  *
  * Instantiate via {@link createOilLubricationService} in `manifest.ts`.
+ *
+ * Hard deletion of oil change records is prohibited on this service.
+ * Use {@link cancelRecord} to void a record — the `cancelled` status
+ * preserves the full audit trail required for compliance reporting.
  */
 export class OilLubricationService {
   constructor(
@@ -60,7 +84,7 @@ export class OilLubricationService {
         error: error instanceof PlatformError ? error.toJSON() : String(error),
       });
       return err(
-        'OIL_LUBRICATION_CREATE_FAILED',
+        OIL_LUBRICATION_ERROR_CODES.CREATE_FAILED,
         error instanceof Error ? error.message : 'Failed to create oil change record',
       );
     }
@@ -72,7 +96,7 @@ export class OilLubricationService {
     try {
       const record = await this.repo.findById(id);
       if (record === null) {
-        return err('OIL_RECORD_NOT_FOUND', `Oil change record not found: ${id}`);
+        return err(OIL_LUBRICATION_ERROR_CODES.RECORD_NOT_FOUND, `Oil change record not found: ${id}`);
       }
       return ok(record);
     } catch (error) {
@@ -81,7 +105,7 @@ export class OilLubricationService {
         error: error instanceof PlatformError ? error.toJSON() : String(error),
       });
       return err(
-        'OIL_LUBRICATION_FETCH_FAILED',
+        OIL_LUBRICATION_ERROR_CODES.FETCH_FAILED,
         error instanceof Error ? error.message : 'Failed to fetch oil change record',
       );
     }
@@ -102,7 +126,7 @@ export class OilLubricationService {
         error: error instanceof PlatformError ? error.toJSON() : String(error),
       });
       return err(
-        'OIL_LUBRICATION_FETCH_FAILED',
+        OIL_LUBRICATION_ERROR_CODES.FETCH_FAILED,
         error instanceof Error ? error.message : 'Failed to fetch equipment oil change history',
       );
     }
@@ -121,7 +145,7 @@ export class OilLubricationService {
         error: error instanceof PlatformError ? error.toJSON() : String(error),
       });
       return err(
-        'OIL_LUBRICATION_FETCH_FAILED',
+        OIL_LUBRICATION_ERROR_CODES.FETCH_FAILED,
         error instanceof Error ? error.message : 'Failed to list oil change records',
       );
     }
@@ -136,7 +160,7 @@ export class OilLubricationService {
     try {
       const existing = await this.repo.findById(id);
       if (existing === null) {
-        return err('OIL_RECORD_NOT_FOUND', `Oil change record not found: ${id}`);
+        return err(OIL_LUBRICATION_ERROR_CODES.RECORD_NOT_FOUND, `Oil change record not found: ${id}`);
       }
       const updated = await this.repo.update(id, changes);
       return ok(updated);
@@ -146,30 +170,52 @@ export class OilLubricationService {
         error: error instanceof PlatformError ? error.toJSON() : String(error),
       });
       return err(
-        'OIL_LUBRICATION_UPDATE_FAILED',
+        OIL_LUBRICATION_ERROR_CODES.UPDATE_FAILED,
         error instanceof Error ? error.message : 'Failed to update oil change record',
       );
     }
   }
 
-  // ── Delete ─────────────────────────────────────────────────────────────────
+  // ── Cancel (replaces hard delete) ──────────────────────────────────────────
 
-  async deleteRecord(id: string): Promise<ServiceResult<void>> {
+  /**
+   * Voids an oil change record by setting its status to `cancelled`.
+   *
+   * This method replaces the former `deleteRecord()` hard delete. Cancelled
+   * records are retained in storage to preserve the equipment audit trail
+   * required for compliance and reliability reporting. Records in `cancelled`
+   * status are excluded from scheduling calculations by {@link SchedulingService}.
+   *
+   * @param id  Unique identifier of the record to cancel.
+   * @returns   The updated record with `status: 'cancelled'`, or an error result.
+   */
+  async cancelRecord(id: string): Promise<ServiceResult<OilChangeRecord>> {
     try {
       const existing = await this.repo.findById(id);
       if (existing === null) {
-        return err('OIL_RECORD_NOT_FOUND', `Oil change record not found: ${id}`);
+        return err(OIL_LUBRICATION_ERROR_CODES.RECORD_NOT_FOUND, `Oil change record not found: ${id}`);
       }
-      await this.repo.delete(id);
-      return ok(undefined);
+      if (existing.status === 'cancelled') {
+        return err(
+          OIL_LUBRICATION_ERROR_CODES.ALREADY_CANCELLED,
+          `Oil change record is already cancelled: ${id}`,
+        );
+      }
+      const updated = await this.repo.update(id, { status: 'cancelled' });
+      this.logger.info('Oil change record cancelled', {
+        id,
+        equipmentId: existing.equipmentId,
+        previousStatus: existing.status,
+      });
+      return ok(updated);
     } catch (error) {
-      this.logger.error('OilLubricationService.deleteRecord failed', {
+      this.logger.error('OilLubricationService.cancelRecord failed', {
         id,
         error: error instanceof PlatformError ? error.toJSON() : String(error),
       });
       return err(
-        'OIL_LUBRICATION_DELETE_FAILED',
-        error instanceof Error ? error.message : 'Failed to delete oil change record',
+        OIL_LUBRICATION_ERROR_CODES.CANCEL_FAILED,
+        error instanceof Error ? error.message : 'Failed to cancel oil change record',
       );
     }
   }
@@ -181,7 +227,8 @@ export class OilLubricationService {
  * Builds the create payload from a request and a server timestamp.
  *
  * Optional fields are included only when present in the request to satisfy
- * exactOptionalPropertyTypes.
+ * exactOptionalPropertyTypes. Sprint 03 fields (filterChanged, breatherServiced,
+ * runningHours, technicianName, attachmentReference) are handled the same way.
  */
 function buildCreatePayload(
   request: OilChangeRecordCreateRequest,
@@ -201,6 +248,11 @@ function buildCreatePayload(
     lubricationPointId?: LubricationPointId;
     workOrderId?: string;
     notes?: string;
+    filterChanged?: boolean;
+    breatherServiced?: boolean;
+    runningHours?: number;
+    technicianName?: string;
+    attachmentReference?: AttachmentReference;
   } = {
     equipmentId:     request.equipmentId,
     contractorId:    request.contractorId,
@@ -222,6 +274,21 @@ function buildCreatePayload(
   }
   if (request.notes !== undefined) {
     base.notes = request.notes;
+  }
+  if (request.filterChanged !== undefined) {
+    base.filterChanged = request.filterChanged;
+  }
+  if (request.breatherServiced !== undefined) {
+    base.breatherServiced = request.breatherServiced;
+  }
+  if (request.runningHours !== undefined) {
+    base.runningHours = request.runningHours;
+  }
+  if (request.technicianName !== undefined) {
+    base.technicianName = request.technicianName;
+  }
+  if (request.attachmentReference !== undefined) {
+    base.attachmentReference = request.attachmentReference;
   }
 
   return base;
