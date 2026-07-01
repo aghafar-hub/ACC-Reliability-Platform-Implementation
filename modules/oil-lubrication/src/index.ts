@@ -43,8 +43,11 @@ export {
   OIL_CHANGE_RECORD_ENTITY_TYPE,
 } from './oil-lubrication.repository';
 
-// ── Service ───────────────────────────────────────────────────────────────────
+// ── Oil change service ────────────────────────────────────────────────────────
 export { OilLubricationService } from './oil-lubrication.service';
+
+// ── Lubrication point service (Sprint 02) ─────────────────────────────────────
+export { LubricationPointService } from './lubrication-point.service';
 
 // ── Module manifest and factory ───────────────────────────────────────────────
 export { OIL_LUBRICATION_MANIFEST, createOilLubricationService } from './manifest';

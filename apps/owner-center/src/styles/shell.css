@@ -2339,6 +2339,86 @@ button {
   .ol-kpi-grid { grid-template-columns: 1fr; }
 }
 
+/* ── Oil Lubrication — Explorer (Sprint 02) ───────────────────────────────── */
+
+/* Toolbar: filters row + add button */
+.ol-explorer-toolbar {
+  display:         flex;
+  align-items:     flex-start;
+  gap:             var(--space-md);
+  margin-bottom:   var(--space-md);
+  flex-wrap:       wrap;
+}
+
+/* Filters row: search + dropdowns */
+.ol-explorer-filters {
+  display:   flex;
+  flex-wrap: wrap;
+  gap:       var(--space-sm);
+  flex:      1 1 0;
+  min-width: 0;
+}
+
+/* Search input — wider than filter dropdowns */
+.ol-explorer-search {
+  flex:      1 1 220px;
+  min-width: 180px;
+  max-width: 340px;
+}
+
+/* Filter select dropdowns */
+.ol-explorer-select {
+  flex:      0 1 160px;
+  min-width: 120px;
+}
+
+/* Oil type column — allow text wrapping on narrow viewports */
+.ol-explorer-oil-type {
+  white-space: normal;
+  min-width:   100px;
+  font-size:   var(--font-size-sm);
+}
+
+/* Next due date — colour-coded by status */
+.ol-explorer-due-date[data-status="overdue"] {
+  color:       var(--chip-critical-text);
+  font-weight: var(--font-weight-medium);
+}
+.ol-explorer-due-date[data-status="due-soon"] {
+  color:       var(--chip-warning-text);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Form grid inside add/edit dialogs — two columns on wide dialogs */
+.ol-form-grid {
+  display:               grid;
+  grid-template-columns: 1fr 1fr;
+  gap:                   var(--space-md) var(--space-lg);
+}
+
+/* Responsive — single column form on small viewports */
+@media (max-width: 600px) {
+  .ol-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Responsive — collapse explorer toolbar on small viewports */
+@media (max-width: 767px) {
+  .ol-explorer-toolbar {
+    flex-direction: column;
+    align-items:    stretch;
+  }
+
+  .ol-explorer-toolbar > .ur-btn {
+    align-self: flex-start;
+  }
+
+  .ol-explorer-search {
+    max-width: 100%;
+  }
+}
+
 /* ── RTL logical-property support ─────────────────────────────────────────── */
 /* border-inline-start, margin-inline-start, padding-inline-* already flip    */
 /* automatically via CSS logical properties.  Extra overrides below if needed. */
