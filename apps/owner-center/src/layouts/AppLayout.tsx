@@ -13,6 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useTour } from '../context/TourContext';
 import { useAuth } from '../context/AuthContext';
 import { useModuleRegistry } from '../context/ModuleRegistryContext';
+import { filterOilAnalysisSubNav } from '../modules/oil-analysis/settings-guards';
 import { useCommandPalette } from '../hooks/useCommandPalette';
 import { usePermissions } from '../hooks/usePermissions';
 import { Breadcrumb } from '../components/Breadcrumb';
@@ -235,7 +236,10 @@ function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
 
   // ── Module context sidebar ───────────────────────────────────────────────
   if (activeModule !== undefined) {
-    const subItems = activeModule.moduleNavItems ?? [];
+    const rawSubItems = activeModule.moduleNavItems ?? [];
+    const subItems = activeModule.moduleId === 'oil-analysis'
+      ? filterOilAnalysisSubNav(rawSubItems)
+      : rawSubItems;
 
     return (
       <nav className="app-sidebar" aria-label="Module navigation">

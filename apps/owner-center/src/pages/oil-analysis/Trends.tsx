@@ -18,6 +18,12 @@ import {
 } from '../../modules/oil-analysis/trend.service';
 import type { OilTrendParameterId } from '../../modules/oil-analysis/trend.service';
 import type { TrendTimeRange, TrendDirection } from '../../modules/trend-engine';
+import {
+  isTrendEngineEnabled,
+  getEnabledTrendParameters,
+  SETTINGS_GUARD_COPY,
+} from '../../modules/oil-analysis/settings-guards';
+import { SettingsDisabledPanel } from './SettingsDisabledPanel';
 
 interface L10n<T> { en: T; ar: T; }
 
@@ -281,16 +287,40 @@ function TrendChart({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Trends(): React.ReactElement {
+  if (!isTrendEngineEnabled()) {
+    return (
+      <SettingsDisabledPanel
+        title={COPY.title}
+        desc={COPY.desc}
+        message={SETTINGS_GUARD_COPY.trendEngineDisabled}
+        badge={{ en: 'Disabled', ar: 'معطّل' }}
+      />
+    );
+  }
+
+  return <TrendsContent />;
+}
+
+function TrendsContent(): React.ReactElement {
   const { locale } = useLanguage();
   const l = (bundle: L10n<string>) => t(bundle, locale);
 
   const equipmentIds = useMemo(() => listTrendableEquipmentIds(), []);
 
+  const enabledParameters = useMemo(() => getEnabledTrendParameters(), []);
+
   const [equipmentId, setEquipmentId] = useState(() => equipmentIds[0] ?? '');
   const [lpId, setLpId] = useState('');
   const [sampleId, setSampleId] = useState('');
-  const [parameterId, setParameterId] = useState<OilTrendParameterId>('iron');
+  const [parameterId, setParameterId] = useState<OilTrendParameterId>(
+    () => enabledParameters[0]?.id ?? 'iron',
+  );
   const [timeRange, setTimeRange] = useState<TrendTimeRange>('1y');
+
+  const activeParameterId = useMemo(() => {
+    if (enabledParameters.some((p) => p.id === parameterId)) return parameterId;
+    return enabledParameters[0]?.id ?? parameterId;
+  }, [enabledParameters, parameterId]);
 
   const lpIds = useMemo(
     () => (equipmentId ? listTrendableLpIds(equipmentId) : []),
@@ -302,18 +332,19 @@ export default function Trends(): React.ReactElement {
     [equipmentId, lpId],
   );
 
-  const paramDef = OIL_TREND_PARAMETERS.find((p) => p.id === parameterId)!;
+  const paramDef = enabledParameters.find((p) => p.id === activeParameterId)
+    ?? OIL_TREND_PARAMETERS.find((p) => p.id === activeParameterId)!;
 
   const analysis = useMemo(() => {
-    if (!equipmentId) return null;
+    if (!equipmentId || enabledParameters.length === 0) return null;
     return analyzeOilParameterTrend({
       equipmentId,
       lubricationPointId: lpId || null,
-      parameterId,
+      parameterId: activeParameterId,
       timeRange,
       highlightSampleId: sampleId || null,
     });
-  }, [equipmentId, lpId, parameterId, timeRange, sampleId]);
+  }, [equipmentId, lpId, activeParameterId, timeRange, sampleId, enabledParameters.length]);
 
   const oilChanges = useMemo(
     () => (equipmentId ? listOilChangeEvents(equipmentId, lpId || null) : []),
@@ -323,11 +354,11 @@ export default function Trends(): React.ReactElement {
   const insights = useMemo(() => {
     if (!analysis || !equipmentId) return [];
     return generateEngineeringInsights(
-      { equipmentId, lubricationPointId: lpId || null, parameterId, timeRange },
+      { equipmentId, lubricationPointId: lpId || null, parameterId: activeParameterId, timeRange },
       analysis,
       locale,
     );
-  }, [analysis, equipmentId, lpId, parameterId, timeRange, locale]);
+  }, [analysis, equipmentId, lpId, activeParameterId, timeRange, locale]);
 
   const timeline = useMemo(
     () => (analysis ? buildTrendTimeline(analysis, oilChanges) : []),
@@ -408,10 +439,11 @@ export default function Trends(): React.ReactElement {
             <span className="oa-trend-field__label">{l(COPY.selParam)}</span>
             <select
               className="ol-explorer-select"
-              value={parameterId}
+              value={activeParameterId}
               onChange={(e) => setParameterId(e.target.value as OilTrendParameterId)}
+              disabled={enabledParameters.length === 0}
             >
-              {OIL_TREND_PARAMETERS.map((p) => (
+              {enabledParameters.map((p) => (
                 <option key={p.id} value={p.id}>
                   {locale === 'ar' ? p.label.ar : p.label.en}
                 </option>

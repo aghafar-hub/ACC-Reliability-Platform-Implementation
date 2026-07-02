@@ -17,6 +17,12 @@ import type {
 } from '../../modules/oil-analysis/report.service';
 import { exportReportCsv, exportReportJson } from '../../modules/oil-analysis/report-export';
 import type { TrendDirection } from '../../modules/trend-engine';
+import {
+  isCsvExportEnabled,
+  isJsonExportEnabled,
+  getVisibleLabReportParamColumns,
+} from '../../modules/oil-analysis/settings-guards';
+import type { OilAnalysisParameterId } from '../../modules/oil-analysis/settings-types';
 
 interface L10n<T> { en: T; ar: T; }
 
@@ -156,6 +162,46 @@ function kpiModifier(key: string): 'neutral' | 'info' | 'warning' | 'caution' {
   return 'info';
 }
 
+const LAB_PARAM_COLUMN_LABELS: Record<OilAnalysisParameterId, L10n<string>> = {
+  iron:          COPY.colIron,
+  copper:        COPY.colCopper,
+  silicon:       COPY.colSilicon,
+  water:         COPY.colWater,
+  pqIndex:       COPY.colPq,
+  viscosity:     COPY.colVis,
+  tan:           COPY.colTan,
+  oxidation:     COPY.colOx,
+  particleCount: COPY.colParticle,
+};
+
+function labParamCellValue(
+  row: {
+    readonly ironPpm: number | null;
+    readonly copperPpm: number | null;
+    readonly siliconPpm: number | null;
+    readonly waterPercent: number | null;
+    readonly pqIndex: number | null;
+    readonly viscosity100c: number | null;
+    readonly tan: number | null;
+    readonly oxidation: number | null;
+    readonly particleCount: number | null;
+  },
+  id: OilAnalysisParameterId,
+): string {
+  switch (id) {
+    case 'iron': return formatNum(row.ironPpm);
+    case 'copper': return formatNum(row.copperPpm);
+    case 'silicon': return formatNum(row.siliconPpm);
+    case 'water': return formatNum(row.waterPercent);
+    case 'pqIndex': return formatNum(row.pqIndex);
+    case 'viscosity': return formatNum(row.viscosity100c);
+    case 'tan': return formatNum(row.tan);
+    case 'oxidation': return formatNum(row.oxidation);
+    case 'particleCount': return formatNum(row.particleCount);
+    default: return '—';
+  }
+}
+
 interface BreakdownTableProps {
   readonly title: string;
   readonly rows: readonly { key: string; count: number }[];
@@ -283,6 +329,7 @@ function ReportBody({ output }: { output: OilReportOutput }): React.ReactElement
 
   if (report.kind === 'laboratory-results') {
     if (report.rows.length === 0) return <p className="db-panel__empty">{l(COPY.empty)}</p>;
+    const paramColumns = getVisibleLabReportParamColumns();
     return (
       <div className="oa-report-table-wrap">
         <table className="ur-table oc-table oa-report-table oa-report-table--wide">
@@ -293,15 +340,9 @@ function ReportBody({ output }: { output: OilReportOutput }): React.ReactElement
               <th>{l(COPY.colLp)}</th>
               <th>{l(COPY.colLab)}</th>
               <th>{l(COPY.colDate)}</th>
-              <th>{l(COPY.colIron)}</th>
-              <th>{l(COPY.colCopper)}</th>
-              <th>{l(COPY.colSilicon)}</th>
-              <th>{l(COPY.colWater)}</th>
-              <th>{l(COPY.colPq)}</th>
-              <th>{l(COPY.colVis)}</th>
-              <th>{l(COPY.colTan)}</th>
-              <th>{l(COPY.colOx)}</th>
-              <th>{l(COPY.colParticle)}</th>
+              {paramColumns.map((col) => (
+                <th key={col.id}>{l(LAB_PARAM_COLUMN_LABELS[col.id])}</th>
+              ))}
               <th>{l(COPY.colApproval)}</th>
             </tr>
           </thead>
@@ -313,15 +354,9 @@ function ReportBody({ output }: { output: OilReportOutput }): React.ReactElement
                 <td>{row.lubricationPointId}</td>
                 <td>{row.labSampleId}</td>
                 <td>{formatDate(row.sampledAt)}</td>
-                <td>{formatNum(row.ironPpm)}</td>
-                <td>{formatNum(row.copperPpm)}</td>
-                <td>{formatNum(row.siliconPpm)}</td>
-                <td>{formatNum(row.waterPercent)}</td>
-                <td>{formatNum(row.pqIndex)}</td>
-                <td>{formatNum(row.viscosity100c)}</td>
-                <td>{formatNum(row.tan)}</td>
-                <td>{formatNum(row.oxidation)}</td>
-                <td>{formatNum(row.particleCount)}</td>
+                {paramColumns.map((col) => (
+                  <td key={col.id}>{labParamCellValue(row, col.id)}</td>
+                ))}
                 <td>{row.approvalStatus}</td>
               </tr>
             ))}
@@ -408,6 +443,8 @@ export default function Reports(): React.ReactElement {
   const output = useMemo(() => generateOilReport(filters), [filters]);
 
   const hasData = hasReportData(output);
+  const csvExportEnabled = isCsvExportEnabled();
+  const jsonExportEnabled = isJsonExportEnabled();
 
   return (
     <div className="ur-page oa-report-page">
@@ -495,7 +532,7 @@ export default function Reports(): React.ReactElement {
           <button
             type="button"
             className="ur-btn ur-btn--ghost ur-btn--sm"
-            disabled={!hasData}
+            disabled={!hasData || !csvExportEnabled}
             onClick={() => exportReportCsv(output)}
           >
             {l(COPY.btnCsv)}
@@ -503,7 +540,7 @@ export default function Reports(): React.ReactElement {
           <button
             type="button"
             className="ur-btn ur-btn--ghost ur-btn--sm"
-            disabled={!hasData}
+            disabled={!hasData || !jsonExportEnabled}
             onClick={() => exportReportJson(output)}
           >
             {l(COPY.btnJson)}

@@ -7,6 +7,8 @@ import { StatusChip } from '../../components/StatusChip';
 import type { ChipStatus } from '../../components/StatusChip';
 import { oilSampleService } from '../../modules/oil-analysis/sample.service';
 import type { OilSampleRow, PdfImportStatus } from '../../modules/oil-analysis/sample.service';
+import { isPdfImportEnabled, SETTINGS_GUARD_COPY } from '../../modules/oil-analysis/settings-guards';
+import { SettingsDisabledPanel } from './SettingsDisabledPanel';
 
 interface L10n<T> { en: T; ar: T; }
 
@@ -82,6 +84,21 @@ function pdfStatusChip(status: PdfImportStatus): ChipStatus {
 }
 
 export default function PdfImport(): React.ReactElement {
+  if (!isPdfImportEnabled()) {
+    return (
+      <SettingsDisabledPanel
+        title={COPY.title}
+        desc={COPY.desc}
+        message={SETTINGS_GUARD_COPY.pdfImportDisabled}
+        badge={{ en: 'Disabled', ar: 'معطّل' }}
+      />
+    );
+  }
+
+  return <PdfImportContent />;
+}
+
+function PdfImportContent(): React.ReactElement {
   const { locale } = useLanguage();
   const l = (b: L10n<string>) => t(b, locale);
 

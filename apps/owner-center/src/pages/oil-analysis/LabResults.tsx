@@ -17,6 +17,11 @@ import type {
   OilLabResultInput,
   OilConditionLevel,
 } from '../../modules/oil-analysis/sample.service';
+import {
+  isManualEntryEnabled,
+  isLabParameterVisible,
+  SETTINGS_GUARD_COPY,
+} from '../../modules/oil-analysis/settings-guards';
 
 interface L10n<T> { en: T; ar: T; }
 
@@ -86,6 +91,7 @@ const COPY = {
   sumLoc:      { en: 'Sampling Location',        ar: 'موقع أخذ العينة' },
   sumStatus:   { en: 'Current Status',           ar: 'الحالة الحالية' },
   lockedMsg:   { en: 'Laboratory values are locked after approval and cannot be edited.', ar: 'قيم المختبر مقفلة بعد الموافقة ولا يمكن تعديلها.' },
+  disabledMsg: SETTINGS_GUARD_COPY.manualEntryDisabled,
   none:        { en: '—',                        ar: '—' },
 } as const;
 
@@ -200,6 +206,8 @@ export default function LabResults(): React.ReactElement {
   );
 
   const isLocked = selected ? isSampleApprovalLocked(selected) : false;
+  const manualEntryEnabled = isManualEntryEnabled();
+  const entryBlocked = !manualEntryEnabled || isLocked;
 
   const previewCondition = useMemo(() => {
     if (!form.resultStatus && !form.contaminationRating.trim()
@@ -236,6 +244,7 @@ export default function LabResults(): React.ReactElement {
 
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault();
+    if (!manualEntryEnabled) return;
     if (!selectedId) {
       setError('Sample is required.');
       return;
@@ -377,6 +386,9 @@ export default function LabResults(): React.ReactElement {
                 </p>
               )}
               {error && <p className="ur-form-error" role="alert">{error}</p>}
+              {!manualEntryEnabled && (
+                <p className="oa-settings-disabled" role="status">{l(COPY.disabledMsg)}</p>
+              )}
               {isLocked && (
                 <p className="ur-form-error" role="status">{l(COPY.lockedMsg)}</p>
               )}
@@ -405,7 +417,7 @@ export default function LabResults(): React.ReactElement {
               </div>
 
               <form onSubmit={handleSubmit}>
-                <fieldset disabled={isLocked} style={{ border: 'none', margin: 0, padding: 0 }}>
+                <fieldset disabled={entryBlocked} style={{ border: 'none', margin: 0, padding: 0 }}>
                 <div className="ol-form-grid">
                   <div className="ur-form-field">
                     <label className="ur-form-label" htmlFor="lr-status">{l(COPY.fldStatus)}</label>
@@ -436,26 +448,38 @@ export default function LabResults(): React.ReactElement {
                     <label className="ur-form-label" htmlFor="lr-lub-r">{l(COPY.fldLubR)}</label>
                     <input id="lr-lub-r" className="ur-form-input" value={form.lubricantRating} onChange={(e) => updateField('lubricantRating', e.target.value)} />
                   </div>
+                  {isLabParameterVisible('pqIndex') && (
                   <div className="ur-form-field">
                     <label className="ur-form-label" htmlFor="lr-pq">{l(COPY.fldPq)}</label>
                     <input id="lr-pq" type="number" min="0" step="any" className="ur-form-input" value={form.pqIndex} onChange={(e) => updateField('pqIndex', e.target.value)} />
                   </div>
+                  )}
+                  {isLabParameterVisible('viscosity') && (
                   <div className="ur-form-field">
                     <label className="ur-form-label" htmlFor="lr-vis">{l(COPY.fldVis)}</label>
                     <input id="lr-vis" type="number" min="0" step="any" className="ur-form-input" value={form.viscosity100c} onChange={(e) => updateField('viscosity100c', e.target.value)} />
                   </div>
+                  )}
+                  {isLabParameterVisible('tan') && (
                   <div className="ur-form-field">
                     <label className="ur-form-label" htmlFor="lr-tan">{l(COPY.fldTan)}</label>
                     <input id="lr-tan" type="number" min="0" step="any" className="ur-form-input" value={form.tan} onChange={(e) => updateField('tan', e.target.value)} />
                   </div>
+                  )}
+                  {isLabParameterVisible('oxidation') && (
                   <div className="ur-form-field">
                     <label className="ur-form-label" htmlFor="lr-ox">{l(COPY.fldOx)}</label>
                     <input id="lr-ox" type="number" min="0" step="any" className="ur-form-input" value={form.oxidation} onChange={(e) => updateField('oxidation', e.target.value)} />
                   </div>
+                  )}
+                  {isLabParameterVisible('water') && (
                   <div className="ur-form-field">
                     <label className="ur-form-label" htmlFor="lr-water">{l(COPY.fldWater)}</label>
                     <input id="lr-water" type="number" min="0" step="any" className="ur-form-input" value={form.waterPercent} onChange={(e) => updateField('waterPercent', e.target.value)} />
                   </div>
+                  )}
+                  {isLabParameterVisible('particleCount') && (
+                  <>
                   <div className="ur-form-field">
                     <label className="ur-form-label" htmlFor="lr-p4">{l(COPY.fldP4)}</label>
                     <input id="lr-p4" type="number" min="0" step="any" className="ur-form-input" value={form.particle4} onChange={(e) => updateField('particle4', e.target.value)} />
@@ -468,6 +492,8 @@ export default function LabResults(): React.ReactElement {
                     <label className="ur-form-label" htmlFor="lr-p14">{l(COPY.fldP14)}</label>
                     <input id="lr-p14" type="number" min="0" step="any" className="ur-form-input" value={form.particle14} onChange={(e) => updateField('particle14', e.target.value)} />
                   </div>
+                  </>
+                  )}
                   <div className="ur-form-field">
                     <label className="ur-form-label" htmlFor="lr-alert">{l(COPY.fldAlert)}</label>
                     <input id="lr-alert" className="ur-form-input" value={form.alertType} onChange={(e) => updateField('alertType', e.target.value)} />
@@ -486,8 +512,8 @@ export default function LabResults(): React.ReactElement {
                 </div>
 
                 <div className="ur-dialog__footer">
-                  <button type="submit" className="ur-btn ur-btn--primary" disabled={isLocked}>{l(COPY.btnSave)}</button>
-                  <button type="button" className="ur-btn ur-btn--ghost" onClick={handleReset} disabled={isLocked}>{l(COPY.btnReset)}</button>
+                  <button type="submit" className="ur-btn ur-btn--primary" disabled={entryBlocked}>{l(COPY.btnSave)}</button>
+                  <button type="button" className="ur-btn ur-btn--ghost" onClick={handleReset} disabled={entryBlocked}>{l(COPY.btnReset)}</button>
                 </div>
                 </fieldset>
               </form>
