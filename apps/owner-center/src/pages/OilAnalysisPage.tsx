@@ -18,6 +18,7 @@ import SampleIntake from './oil-analysis/SampleIntake';
 import LabResults from './oil-analysis/LabResults';
 import PdfImport from './oil-analysis/PdfImport';
 import EngineerReview from './oil-analysis/EngineerReview';
+import Trends from './oil-analysis/Trends';
 
 // ── Locale helpers ─────────────────────────────────────────────────────────────
 
@@ -323,10 +324,7 @@ export default function OilAnalysisPage(): React.ReactElement {
       <Route path="lab-results" element={<LabResults />} />
       <Route path="pdf-import" element={<PdfImport />} />
       <Route path="review" element={<EngineerReview />} />
-      <Route
-        path="trends"
-        element={<OilAnalysisSubPage initials="TR" title={COPY.trendsTitle} desc={COPY.trendsDesc} />}
-      />
+      <Route path="trends" element={<Trends />} />
       <Route
         path="reports"
         element={<OilAnalysisSubPage initials="RP" title={COPY.reportsTitle} desc={COPY.reportsDesc} />}

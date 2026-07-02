@@ -4816,3 +4816,211 @@ button {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Oil Analysis — Trend Analysis (Sprint 07) — oa-trend-* classes
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.oa-trend-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.oa-trend-toolbar {
+  margin-bottom: 0;
+}
+
+.oa-trend-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.oa-trend-field__label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.oa-trend-chart {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.oa-trend-chart__svg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.oa-trend-chart--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  color: var(--color-text-muted);
+}
+
+.oa-trend-chart__grid {
+  stroke: var(--color-border);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.oa-trend-chart__axis {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.oa-trend-chart__line {
+  stroke: var(--color-accent, #0071bc);
+  stroke-width: 2;
+}
+
+.oa-trend-chart__ma {
+  stroke: var(--chip-maintenance-text);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+
+.oa-trend-chart__dot {
+  fill: var(--color-accent, #0071bc);
+}
+
+.oa-trend-chart__dot--highlight {
+  fill: var(--chip-warning-text);
+  stroke: var(--color-bg);
+  stroke-width: 2;
+}
+
+.oa-trend-chart__oil-change {
+  stroke: var(--chip-warning-text);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+
+.oa-trend-chart__oil-label {
+  fill: var(--chip-warning-text);
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+}
+
+.oa-trend-chart__unit {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.oa-trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.oa-trend-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.oa-trend-legend__swatch {
+  display: inline-block;
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.oa-trend-legend__swatch--line { background: var(--color-accent, #0071bc); }
+.oa-trend-legend__swatch--ma   { background: var(--chip-maintenance-text); opacity: 0.8; }
+.oa-trend-legend__swatch--oc   {
+  width: 3px;
+  height: 14px;
+  background: var(--chip-warning-text);
+}
+
+.oa-trend-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.oa-trend-summary__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+}
+
+.oa-trend-chip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.oa-trend-chip-row__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.oa-trend-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.oa-trend-timeline__item {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.oa-trend-timeline__item:last-child {
+  border-bottom: none;
+}
+
+.oa-trend-timeline__marker {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.oa-trend-timeline__item--oil-change .oa-trend-timeline__marker {
+  color: var(--chip-warning-text);
+  font-weight: var(--font-weight-bold);
+}
+
+.oa-trend-timeline__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-size-sm);
+}
+
+.oa-trend-timeline__kind {
+  font-weight: var(--font-weight-medium);
+}
+
+.oa-trend-timeline__date {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.oa-trend-timeline__value {
+  font-variant-numeric: tabular-nums;
+}
+
+.oa-trend-timeline__detail {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}

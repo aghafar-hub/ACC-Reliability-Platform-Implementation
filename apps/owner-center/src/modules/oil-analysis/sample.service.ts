@@ -71,6 +71,9 @@ export interface OilSampleRow {
   readonly contaminationRating: string;
   readonly equipmentRating: string;
   readonly lubricantRating: string;
+  readonly ironPpm: number | null;
+  readonly copperPpm: number | null;
+  readonly siliconPpm: number | null;
   readonly pqIndex: number | null;
   readonly viscosity100c: number | null;
   readonly tan: number | null;
@@ -164,6 +167,9 @@ export interface OilLabResultInput {
   readonly contaminationRating: string;
   readonly equipmentRating: string;
   readonly lubricantRating: string;
+  readonly ironPpm: number | null;
+  readonly copperPpm: number | null;
+  readonly siliconPpm: number | null;
   readonly pqIndex: number | null;
   readonly viscosity100c: number | null;
   readonly tan: number | null;
@@ -197,6 +203,9 @@ export interface OilSampleFilterParams {
 const STORAGE_KEY = 'acc.oil-analysis.samples.v1';
 
 const NUMERIC_LAB_FIELDS = [
+  'ironPpm',
+  'copperPpm',
+  'siliconPpm',
   'pqIndex',
   'viscosity100c',
   'tan',
@@ -353,6 +362,9 @@ function emptyLabFields(): Pick<
   | 'contaminationRating'
   | 'equipmentRating'
   | 'lubricantRating'
+  | 'ironPpm'
+  | 'copperPpm'
+  | 'siliconPpm'
   | 'pqIndex'
   | 'viscosity100c'
   | 'tan'
@@ -369,6 +381,9 @@ function emptyLabFields(): Pick<
     contaminationRating: '',
     equipmentRating: '',
     lubricantRating: '',
+    ironPpm: null,
+    copperPpm: null,
+    siliconPpm: null,
     pqIndex: null,
     viscosity100c: null,
     tan: null,
@@ -484,6 +499,9 @@ function normalizeRow(
     contaminationRating: raw.contaminationRating ?? labDefaults.contaminationRating,
     equipmentRating: raw.equipmentRating ?? labDefaults.equipmentRating,
     lubricantRating: raw.lubricantRating ?? labDefaults.lubricantRating,
+    ironPpm: normalizeNumeric(raw.ironPpm),
+    copperPpm: normalizeNumeric(raw.copperPpm),
+    siliconPpm: normalizeNumeric(raw.siliconPpm),
     pqIndex: normalizeNumeric(raw.pqIndex),
     viscosity100c: normalizeNumeric(raw.viscosity100c),
     tan: normalizeNumeric(raw.tan),
@@ -766,6 +784,9 @@ export class OilSampleLocalService {
       contaminationRating: input.contaminationRating.trim(),
       equipmentRating: input.equipmentRating.trim(),
       lubricantRating: input.lubricantRating.trim(),
+      ironPpm: input.ironPpm,
+      copperPpm: input.copperPpm,
+      siliconPpm: input.siliconPpm,
       pqIndex: input.pqIndex,
       viscosity100c: input.viscosity100c,
       tan: input.tan,

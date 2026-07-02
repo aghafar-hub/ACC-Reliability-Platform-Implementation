@@ -126,6 +126,9 @@ interface LabFormState {
   contaminationRating: string;
   equipmentRating: string;
   lubricantRating: string;
+  ironPpm: string;
+  copperPpm: string;
+  siliconPpm: string;
   pqIndex: string;
   viscosity100c: string;
   tan: string;
@@ -143,6 +146,9 @@ const EMPTY_FORM: LabFormState = {
   contaminationRating: '',
   equipmentRating: '',
   lubricantRating: '',
+  ironPpm: '',
+  copperPpm: '',
+  siliconPpm: '',
   pqIndex: '',
   viscosity100c: '',
   tan: '',
@@ -161,6 +167,9 @@ function formFromSample(row: OilSampleRow): LabFormState {
     contaminationRating: row.contaminationRating,
     equipmentRating: row.equipmentRating,
     lubricantRating: row.lubricantRating,
+    ironPpm: formatOptionalNumber(row.ironPpm),
+    copperPpm: formatOptionalNumber(row.copperPpm),
+    siliconPpm: formatOptionalNumber(row.siliconPpm),
     pqIndex: formatOptionalNumber(row.pqIndex),
     viscosity100c: formatOptionalNumber(row.viscosity100c),
     tan: formatOptionalNumber(row.tan),
@@ -237,6 +246,9 @@ export default function LabResults(): React.ReactElement {
       contaminationRating: form.contaminationRating,
       equipmentRating: form.equipmentRating,
       lubricantRating: form.lubricantRating,
+      ironPpm: parseOptionalNumber(form.ironPpm),
+      copperPpm: parseOptionalNumber(form.copperPpm),
+      siliconPpm: parseOptionalNumber(form.siliconPpm),
       pqIndex: parseOptionalNumber(form.pqIndex),
       viscosity100c: parseOptionalNumber(form.viscosity100c),
       tan: parseOptionalNumber(form.tan),
