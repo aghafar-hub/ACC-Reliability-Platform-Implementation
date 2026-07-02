@@ -138,10 +138,13 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     sidebarSection:          'business-module',
     component:               OilAnalysisPage,
     moduleNavItems: [
-      { path: '/oil-analysis',          icon: 'home',       label: { en: 'Dashboard', ar: 'لوحة المعلومات' }, end: true },
-      { path: '/oil-analysis/results',  icon: 'clipboard', label: { en: 'Results',   ar: 'النتائج'         } },
-      { path: '/oil-analysis/alerts',   icon: 'bell',      label: { en: 'Alerts',    ar: 'التنبيهات'       } },
-      { path: '/oil-analysis/reports',  icon: 'file-text', label: { en: 'Reports',   ar: 'التقارير'        } },
+      { path: '/oil-analysis',               icon: 'home',         label: { en: 'Dashboard',   ar: 'لوحة المعلومات'  }, end: true },
+      { path: '/oil-analysis/samples',       icon: 'clipboard',    label: { en: 'Samples',     ar: 'العينات'         } },
+      { path: '/oil-analysis/intake',        icon: 'package',      label: { en: 'Intake',      ar: 'الاستقبال'       } },
+      { path: '/oil-analysis/lab-results',   icon: 'activity',     label: { en: 'Lab Results', ar: 'نتائج المختبر'   } },
+      { path: '/oil-analysis/trends',        icon: 'trending-up',  label: { en: 'Trends',      ar: 'الاتجاهات'       } },
+      { path: '/oil-analysis/reports',       icon: 'file-text',    label: { en: 'Reports',     ar: 'التقارير'        } },
+      { path: '/oil-analysis/settings',      icon: 'sliders',      label: { en: 'Settings',    ar: 'الإعدادات'       } },
     ],
   },
 
