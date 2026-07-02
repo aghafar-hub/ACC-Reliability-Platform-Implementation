@@ -6,6 +6,7 @@
 // Sprint 03 — lab results manual entry.
 // Sprint 04 — PDF import shell + import review flow (metadata only).
 // Sprint 05 — condition assessment rules for manual lab results.
+// Sprint 06 — engineer review & approval workflow.
 //
 // React components MUST NOT access localStorage directly; they call the service.
 
@@ -21,6 +22,32 @@ export type PdfImportStatus =
   | 'pending-review'
   | 'reviewed'
   | 'rejected';
+
+/** Engineer review and approval lifecycle for analysed samples. */
+export type OilSampleApprovalStatus =
+  | 'pending'
+  | 'under-review'
+  | 'approved'
+  | 'locked';
+
+/** Audit action recorded in approval history. */
+export type OilSampleApprovalAction =
+  | 'opened'
+  | 'edited'
+  | 'approved'
+  | 'rejected'
+  | 'returned-for-correction'
+  | 'locked';
+
+/** Single entry in the engineer approval audit trail. */
+export interface OilSampleApprovalHistoryEntry {
+  readonly action: OilSampleApprovalAction;
+  readonly actor: string;
+  readonly at: string;
+  readonly fromStatus: OilSampleApprovalStatus;
+  readonly toStatus: OilSampleApprovalStatus;
+  readonly notes?: string;
+}
 
 /** Row used by Oil Analysis UI; flat projection of a sample record. */
 export interface OilSampleRow {
@@ -60,6 +87,11 @@ export interface OilSampleRow {
   readonly pdfUploadedAt: string | null;
   readonly pdfImportStatus: PdfImportStatus;
   readonly pdfReviewNotes: string;
+  readonly approvalStatus: OilSampleApprovalStatus | null;
+  readonly labValuesLocked: boolean;
+  readonly approvedBy: string | null;
+  readonly approvedAt: string | null;
+  readonly approvalHistory: readonly OilSampleApprovalHistoryEntry[];
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -97,6 +129,8 @@ export interface OilAnalysisDashboardKpis {
   readonly critical: number;
   readonly completedThisMonth: number;
   readonly openRecommendations: number;
+  readonly pendingApproval: number;
+  readonly approvedToday: number;
 }
 
 /** Registry KPI strip snapshot. */
@@ -140,6 +174,14 @@ export interface OilLabResultInput {
   readonly particle14: number | null;
   readonly sampleAnalysis: string;
   readonly alertType: string;
+}
+
+/** Editable sample metadata during engineer review (before approval). */
+export interface OilSampleReviewEditInput {
+  readonly notes?: string;
+  readonly lubricant?: string;
+  readonly samplingLocation?: string;
+  readonly labResults?: OilLabResultInput;
 }
 
 export interface OilSampleFilterParams {
@@ -201,6 +243,73 @@ function normalizeResultStatus(raw: unknown): OilLabResultStatus | null {
     return raw;
   }
   return null;
+}
+
+function normalizeApprovalStatus(raw: unknown): OilSampleApprovalStatus | null {
+  if (
+    raw === 'pending' ||
+    raw === 'under-review' ||
+    raw === 'approved' ||
+    raw === 'locked'
+  ) {
+    return raw;
+  }
+  return null;
+}
+
+function normalizeApprovalHistory(raw: unknown): readonly OilSampleApprovalHistoryEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((entry): entry is OilSampleApprovalHistoryEntry => {
+      if (!entry || typeof entry !== 'object') return false;
+      const e = entry as Partial<OilSampleApprovalHistoryEntry>;
+      return (
+        typeof e.action === 'string' &&
+        typeof e.actor === 'string' &&
+        typeof e.at === 'string' &&
+        typeof e.fromStatus === 'string' &&
+        typeof e.toStatus === 'string'
+      );
+    })
+    .map((entry) => ({
+      action: entry.action,
+      actor: entry.actor,
+      at: entry.at,
+      fromStatus: entry.fromStatus,
+      toStatus: entry.toStatus,
+      ...(entry.notes ? { notes: entry.notes } : {}),
+    }));
+}
+
+function isLabValuesLocked(row: OilSampleRow): boolean {
+  return (
+    row.labValuesLocked ||
+    row.approvalStatus === 'approved' ||
+    row.approvalStatus === 'locked'
+  );
+}
+
+function assertApprovalTransition(
+  current: OilSampleApprovalStatus,
+  allowed: readonly OilSampleApprovalStatus[],
+  action: string,
+): void {
+  if (!allowed.includes(current)) {
+    throw new Error(`Cannot ${action} while approval status is '${current}'.`);
+  }
+}
+
+function appendApprovalHistory(
+  row: OilSampleRow,
+  entry: Omit<OilSampleApprovalHistoryEntry, 'at'> & { at?: string },
+): readonly OilSampleApprovalHistoryEntry[] {
+  return [
+    ...row.approvalHistory,
+    {
+      ...entry,
+      at: entry.at ?? isoNow(),
+    },
+  ];
 }
 
 function emptyPdfFields(): Pick<
@@ -342,6 +451,10 @@ export function hasLabResults(row: OilSampleRow): boolean {
   return row.resultStatus !== null && row.status === 'analysed';
 }
 
+export function isSampleApprovalLocked(row: OilSampleRow): boolean {
+  return isLabValuesLocked(row);
+}
+
 function normalizeRow(
   raw: Partial<OilSampleRow> & { labReferenceId?: string | null },
 ): OilSampleRow {
@@ -387,6 +500,16 @@ function normalizeRow(
     pdfUploadedAt: raw.pdfUploadedAt ?? pdfDefaults.pdfUploadedAt,
     pdfImportStatus: normalizePdfImportStatus(raw.pdfImportStatus),
     pdfReviewNotes: raw.pdfReviewNotes ?? pdfDefaults.pdfReviewNotes,
+    approvalStatus:
+      normalizeApprovalStatus(raw.approvalStatus) ??
+      (((raw.resultStatus !== null && raw.resultStatus !== undefined) &&
+        (raw.status ?? 'imported') === 'analysed')
+        ? 'pending'
+        : null),
+    labValuesLocked: raw.labValuesLocked === true,
+    approvedBy: raw.approvedBy ?? null,
+    approvedAt: raw.approvedAt ?? null,
+    approvalHistory: normalizeApprovalHistory(raw.approvalHistory),
     createdAt: raw.createdAt ?? isoNow(),
     updatedAt: raw.updatedAt ?? isoNow(),
   };
@@ -549,6 +672,11 @@ export class OilSampleLocalService {
       notes: input.notes?.trim() ?? '',
       ...emptyLabFields(),
       ...emptyPdfFields(),
+      approvalStatus: null,
+      labValuesLocked: false,
+      approvedBy: null,
+      approvedAt: null,
+      approvalHistory: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -623,6 +751,9 @@ export class OilSampleLocalService {
 
     const existing = this.findById(sampleInternalId);
     if (!existing) throw new Error('Sample not found.');
+    if (isLabValuesLocked(existing)) {
+      throw new Error('Laboratory values are locked and cannot be edited.');
+    }
 
     if (!input.resultStatus) throw new Error('Result status is required.');
 
@@ -646,6 +777,195 @@ export class OilSampleLocalService {
       sampleAnalysis: input.sampleAnalysis.trim(),
       alertType: input.alertType.trim(),
       labResultEnteredAt: now,
+      approvalStatus: 'pending',
+      labValuesLocked: false,
+      approvedBy: null,
+      approvedAt: null,
+    });
+  }
+
+  listPendingReviewQueue(): readonly OilSampleRow[] {
+    return [...this.list()]
+      .filter((s) => hasLabResults(s) && s.approvalStatus === 'pending')
+      .sort((a, b) => (b.labResultEnteredAt ?? '').localeCompare(a.labResultEnteredAt ?? ''));
+  }
+
+  listReadyForApprovalQueue(): readonly OilSampleRow[] {
+    return [...this.list()]
+      .filter((s) => hasLabResults(s) && s.approvalStatus === 'under-review')
+      .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+  }
+
+  openSampleForReview(sampleInternalId: string, actor: string): OilSampleRow {
+    if (!actor.trim()) throw new Error('Reviewer name is required.');
+
+    const existing = this.findById(sampleInternalId);
+    if (!existing) throw new Error('Sample not found.');
+    if (!hasLabResults(existing)) throw new Error('Sample has no lab results to review.');
+    assertApprovalTransition(existing.approvalStatus ?? 'pending', ['pending'], 'open for review');
+
+    const fromStatus = existing.approvalStatus ?? 'pending';
+    return this.repo.update(sampleInternalId, {
+      approvalStatus: 'under-review',
+      approvalHistory: appendApprovalHistory(existing, {
+        action: 'opened',
+        actor: actor.trim(),
+        fromStatus,
+        toStatus: 'under-review',
+      }),
+    });
+  }
+
+  editBeforeApproval(
+    sampleInternalId: string,
+    actor: string,
+    input: OilSampleReviewEditInput,
+  ): OilSampleRow {
+    if (!actor.trim()) throw new Error('Reviewer name is required.');
+
+    const existing = this.findById(sampleInternalId);
+    if (!existing) throw new Error('Sample not found.');
+    if (isLabValuesLocked(existing)) {
+      throw new Error('Laboratory values are locked and cannot be edited.');
+    }
+    assertApprovalTransition(existing.approvalStatus ?? 'pending', ['under-review'], 'edit');
+
+    const fromStatus = existing.approvalStatus ?? 'under-review';
+    const labResults = input.labResults;
+
+    return this.repo.update(sampleInternalId, {
+      approvalHistory: appendApprovalHistory(existing, {
+        action: 'edited',
+        actor: actor.trim(),
+        fromStatus,
+        toStatus: fromStatus,
+        notes: 'Engineer updated sample before approval.',
+      }),
+      ...(input.notes !== undefined ? { notes: input.notes.trim() } : {}),
+      ...(input.lubricant !== undefined ? { lubricant: input.lubricant.trim() } : {}),
+      ...(input.samplingLocation !== undefined
+        ? { samplingLocation: input.samplingLocation.trim() }
+        : {}),
+      ...(labResults
+        ? (() => {
+            validateNumericFields(labResults);
+            if (!labResults.resultStatus) throw new Error('Result status is required.');
+            return {
+              resultStatus: labResults.resultStatus,
+              contaminationRating: labResults.contaminationRating.trim(),
+              equipmentRating: labResults.equipmentRating.trim(),
+              lubricantRating: labResults.lubricantRating.trim(),
+              pqIndex: labResults.pqIndex,
+              viscosity100c: labResults.viscosity100c,
+              tan: labResults.tan,
+              oxidation: labResults.oxidation,
+              waterPercent: labResults.waterPercent,
+              particle4: labResults.particle4,
+              particle6: labResults.particle6,
+              particle14: labResults.particle14,
+              sampleAnalysis: labResults.sampleAnalysis.trim(),
+              alertType: labResults.alertType.trim(),
+              labResultEnteredAt: isoNow(),
+            };
+          })()
+        : {}),
+    });
+  }
+
+  approveSample(sampleInternalId: string, actor: string): OilSampleRow {
+    if (!actor.trim()) throw new Error('Reviewer name is required.');
+
+    const existing = this.findById(sampleInternalId);
+    if (!existing) throw new Error('Sample not found.');
+    if (!hasLabResults(existing)) throw new Error('Sample has no lab results to approve.');
+    assertApprovalTransition(existing.approvalStatus ?? 'pending', ['under-review'], 'approve');
+
+    const fromStatus = existing.approvalStatus ?? 'under-review';
+    const now = isoNow();
+    const approvedRow = this.repo.update(sampleInternalId, {
+      approvalStatus: 'approved',
+      labValuesLocked: true,
+      approvedBy: actor.trim(),
+      approvedAt: now,
+      approvalHistory: appendApprovalHistory(existing, {
+        action: 'approved',
+        actor: actor.trim(),
+        fromStatus,
+        toStatus: 'approved',
+      }),
+    });
+
+    return this.lockSample(sampleInternalId, actor.trim(), approvedRow);
+  }
+
+  rejectSample(sampleInternalId: string, reason: string, actor: string): OilSampleRow {
+    if (!actor.trim()) throw new Error('Reviewer name is required.');
+    const rejectReason = reason.trim();
+    if (!rejectReason) throw new Error('Reject reason is required.');
+
+    const existing = this.findById(sampleInternalId);
+    if (!existing) throw new Error('Sample not found.');
+    assertApprovalTransition(existing.approvalStatus ?? 'pending', ['under-review'], 'reject');
+
+    const fromStatus = existing.approvalStatus ?? 'under-review';
+    return this.repo.update(sampleInternalId, {
+      approvalStatus: 'pending',
+      labValuesLocked: false,
+      approvedBy: null,
+      approvedAt: null,
+      approvalHistory: appendApprovalHistory(existing, {
+        action: 'rejected',
+        actor: actor.trim(),
+        fromStatus,
+        toStatus: 'pending',
+        notes: rejectReason,
+      }),
+    });
+  }
+
+  returnForCorrection(sampleInternalId: string, reason: string, actor: string): OilSampleRow {
+    if (!actor.trim()) throw new Error('Reviewer name is required.');
+    const correctionReason = reason.trim();
+    if (!correctionReason) throw new Error('Correction reason is required.');
+
+    const existing = this.findById(sampleInternalId);
+    if (!existing) throw new Error('Sample not found.');
+    assertApprovalTransition(
+      existing.approvalStatus ?? 'pending',
+      ['under-review'],
+      'return for correction',
+    );
+
+    const fromStatus = existing.approvalStatus ?? 'under-review';
+    return this.repo.update(sampleInternalId, {
+      approvalStatus: 'pending',
+      labValuesLocked: false,
+      approvedBy: null,
+      approvedAt: null,
+      approvalHistory: appendApprovalHistory(existing, {
+        action: 'returned-for-correction',
+        actor: actor.trim(),
+        fromStatus,
+        toStatus: 'pending',
+        notes: correctionReason,
+      }),
+    });
+  }
+
+  private lockSample(
+    sampleInternalId: string,
+    actor: string,
+    approvedRow: OilSampleRow,
+  ): OilSampleRow {
+    return this.repo.update(sampleInternalId, {
+      approvalStatus: 'locked',
+      labValuesLocked: true,
+      approvalHistory: appendApprovalHistory(approvedRow, {
+        action: 'locked',
+        actor,
+        fromStatus: 'approved',
+        toStatus: 'locked',
+      }),
     });
   }
 
@@ -711,6 +1031,15 @@ export class OilSampleLocalService {
 
     const openRecommendations = samples.filter(isRecommendationOpen).length;
 
+    const pendingApproval = samples.filter(
+      (s) => hasLabResults(s) && (s.approvalStatus === 'pending' || s.approvalStatus === 'under-review'),
+    ).length;
+
+    const today = todayDateString();
+    const approvedToday = samples.filter(
+      (s) => s.approvedAt !== null && s.approvedAt.startsWith(today),
+    ).length;
+
     return {
       totalSamples: samples.length,
       pendingReview,
@@ -719,6 +1048,8 @@ export class OilSampleLocalService {
       critical,
       completedThisMonth,
       openRecommendations,
+      pendingApproval,
+      approvedToday,
     };
   }
 }

@@ -9,6 +9,7 @@ import {
   oilSampleService,
   hasLabResults,
   computeConditionAssessment,
+  isSampleApprovalLocked,
 } from '../../modules/oil-analysis/sample.service';
 import type {
   OilSampleRow,
@@ -84,6 +85,7 @@ const COPY = {
   sumContr:    { en: 'Contractor',               ar: 'المقاول' },
   sumLoc:      { en: 'Sampling Location',        ar: 'موقع أخذ العينة' },
   sumStatus:   { en: 'Current Status',           ar: 'الحالة الحالية' },
+  lockedMsg:   { en: 'Laboratory values are locked after approval and cannot be edited.', ar: 'قيم المختبر مقفلة بعد الموافقة ولا يمكن تعديلها.' },
   none:        { en: '—',                        ar: '—' },
 } as const;
 
@@ -187,6 +189,8 @@ export default function LabResults(): React.ReactElement {
     () => (selectedId ? oilSampleService.findById(selectedId) : null),
     [selectedId, revision],
   );
+
+  const isLocked = selected ? isSampleApprovalLocked(selected) : false;
 
   const previewCondition = useMemo(() => {
     if (!form.resultStatus && !form.contaminationRating.trim()
@@ -361,6 +365,9 @@ export default function LabResults(): React.ReactElement {
                 </p>
               )}
               {error && <p className="ur-form-error" role="alert">{error}</p>}
+              {isLocked && (
+                <p className="ur-form-error" role="status">{l(COPY.lockedMsg)}</p>
+              )}
 
               <div className="db-panel" style={{ marginBottom: '1rem' }}>
                 <div className="db-panel__head">
@@ -386,6 +393,7 @@ export default function LabResults(): React.ReactElement {
               </div>
 
               <form onSubmit={handleSubmit}>
+                <fieldset disabled={isLocked} style={{ border: 'none', margin: 0, padding: 0 }}>
                 <div className="ol-form-grid">
                   <div className="ur-form-field">
                     <label className="ur-form-label" htmlFor="lr-status">{l(COPY.fldStatus)}</label>
@@ -466,9 +474,10 @@ export default function LabResults(): React.ReactElement {
                 </div>
 
                 <div className="ur-dialog__footer">
-                  <button type="submit" className="ur-btn ur-btn--primary">{l(COPY.btnSave)}</button>
-                  <button type="button" className="ur-btn ur-btn--ghost" onClick={handleReset}>{l(COPY.btnReset)}</button>
+                  <button type="submit" className="ur-btn ur-btn--primary" disabled={isLocked}>{l(COPY.btnSave)}</button>
+                  <button type="button" className="ur-btn ur-btn--ghost" onClick={handleReset} disabled={isLocked}>{l(COPY.btnReset)}</button>
                 </div>
+                </fieldset>
               </form>
             </div>
           </div>

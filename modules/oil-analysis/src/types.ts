@@ -53,6 +53,37 @@ export type PdfImportStatus =
   | 'reviewed'
   | 'rejected';
 
+/**
+ * Engineer review and approval lifecycle for analysed samples.
+ *
+ * Transitions: pending → under-review → approved → locked.
+ * Reject / return-for-correction → pending.
+ */
+export type OilSampleApprovalStatus =
+  | 'pending'
+  | 'under-review'
+  | 'approved'
+  | 'locked';
+
+/** Audit action recorded in approval history. */
+export type OilSampleApprovalAction =
+  | 'opened'
+  | 'edited'
+  | 'approved'
+  | 'rejected'
+  | 'returned-for-correction'
+  | 'locked';
+
+/** Single entry in the engineer approval audit trail. */
+export interface OilSampleApprovalHistoryEntry {
+  readonly action: OilSampleApprovalAction;
+  readonly actor: string;
+  readonly at: IsoTimestamp;
+  readonly fromStatus: OilSampleApprovalStatus;
+  readonly toStatus: OilSampleApprovalStatus;
+  readonly notes?: string | undefined;
+}
+
 // ── Oil sample entity ───────────────────────────────────────────────────────────
 
 /**
@@ -74,6 +105,11 @@ export interface OilSample {
   readonly pdfUploadedAt?: IsoTimestamp | undefined;
   readonly pdfImportStatus?: PdfImportStatus | undefined;
   readonly pdfReviewNotes?: string | undefined;
+  readonly approvalStatus?: OilSampleApprovalStatus | undefined;
+  readonly labValuesLocked?: boolean | undefined;
+  readonly approvedBy?: string | undefined;
+  readonly approvedAt?: IsoTimestamp | undefined;
+  readonly approvalHistory?: readonly OilSampleApprovalHistoryEntry[] | undefined;
   readonly createdAt: IsoTimestamp;
   readonly updatedAt: IsoTimestamp;
 }

@@ -17,6 +17,7 @@ import SampleRegistry from './oil-analysis/SampleRegistry';
 import SampleIntake from './oil-analysis/SampleIntake';
 import LabResults from './oil-analysis/LabResults';
 import PdfImport from './oil-analysis/PdfImport';
+import EngineerReview from './oil-analysis/EngineerReview';
 
 // ── Locale helpers ─────────────────────────────────────────────────────────────
 
@@ -56,6 +57,8 @@ const COPY = {
   kpiLpMap:     { en: 'Missing LP reference',                                      ar: 'مرجع نقطة مفقود'                          },
   kpiPending:   { en: 'Awaiting review',                                           ar: 'بانتظار المراجعة'                         },
   kpiPdfPending:{ en: 'PDF imports awaiting review',                               ar: 'استيرادات PDF بانتظار المراجعة'           },
+  kpiPendingApproval: { en: 'Awaiting engineer sign-off',                        ar: 'بانتظار اعتماد المهندس'                   },
+  kpiApprovedToday:   { en: 'Signed off today',                                  ar: 'اعتُمدت اليوم'                            },
   kpiTotal:     { en: 'All registered samples',                                    ar: 'جميع العينات المسجلة'                     },
   alertCritical:{ en: 'critical sample(s) require immediate action.',              ar: 'عينة/عينات حرجة تتطلب إجراءً فورياً.'     },
   alertCaution: { en: 'sample(s) with open recommendations.',                        ar: 'عينة/عينات بتوصيات مفتوحة.'               },
@@ -68,6 +71,8 @@ const COPY = {
   labResultsDesc:   { en: 'Review, enter, and confirm laboratory analysis results.', ar: 'مراجعة وإدخال وتأكيد نتائج التحليل المختبري.' },
   pdfImportTitle:   { en: 'PDF Import',      ar: 'استيراد PDF'       },
   pdfImportDesc:    { en: 'Attach lab report PDF metadata and review imports.', ar: 'إرفاق بيانات تقرير المختبر PDF ومراجعة الاستيرادات.' },
+  reviewTitle:      { en: 'Engineer Review', ar: 'مراجعة المهندس'    },
+  reviewDesc:       { en: 'Review analysed samples and approve laboratory results.', ar: 'مراجعة العينات المحللة والموافقة على نتائج المختبر.' },
   trendsTitle:      { en: 'Trends',          ar: 'الاتجاهات'         },
   trendsDesc:       { en: 'Track parameter trends and condition changes over sample history.', ar: 'تتبع اتجاهات المعاملات وتغيرات الحالة عبر سجل العينات.' },
   reportsTitle:     { en: 'Reports',         ar: 'التقارير'          },
@@ -160,6 +165,18 @@ function OilAnalysisDashboard(): React.ReactElement {
       value:   { en: String(kpis.pendingReview), ar: String(kpis.pendingReview) },
       subtext: COPY.kpiPending,
       variant: kpis.pendingReview > 0 ? 'maintenance' : 'operational',
+    },
+    {
+      label:   { en: 'Pending Approval',        ar: 'بانتظار الموافقة'         },
+      value:   { en: String(kpis.pendingApproval), ar: String(kpis.pendingApproval) },
+      subtext: COPY.kpiPendingApproval,
+      variant: kpis.pendingApproval > 0 ? 'maintenance' : 'operational',
+    },
+    {
+      label:   { en: 'Approved Today',          ar: 'اعتُمدت اليوم'            },
+      value:   { en: String(kpis.approvedToday), ar: String(kpis.approvedToday) },
+      subtext: COPY.kpiApprovedToday,
+      variant: kpis.approvedToday > 0 ? 'operational' : 'operational',
     },
     {
       label:   { en: 'PDF Pending Review',      ar: 'PDF بانتظار المراجعة'     },
@@ -305,6 +322,7 @@ export default function OilAnalysisPage(): React.ReactElement {
       <Route path="intake" element={<SampleIntake />} />
       <Route path="lab-results" element={<LabResults />} />
       <Route path="pdf-import" element={<PdfImport />} />
+      <Route path="review" element={<EngineerReview />} />
       <Route
         path="trends"
         element={<OilAnalysisSubPage initials="TR" title={COPY.trendsTitle} desc={COPY.trendsDesc} />}

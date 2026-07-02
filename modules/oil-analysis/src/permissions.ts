@@ -19,6 +19,9 @@ export const OIL_ANALYSIS_PERMISSIONS = {
   /** Enter or confirm lab analysis results. */
   ENTER_RESULTS: 'oil-analysis:sample:enter-results',
 
+  /** Review, approve, or reject analysed sample results. */
+  APPROVE_SAMPLE: 'oil-analysis:sample:approve',
+
   /** View and generate oil analysis reports. */
   VIEW_REPORTS: 'oil-analysis:reports:view',
 

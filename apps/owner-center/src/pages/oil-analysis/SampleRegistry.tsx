@@ -11,8 +11,9 @@ import {
   oilSampleService,
   computeSampleCondition,
   hasLabResults,
+  isSampleApprovalLocked,
 } from '../../modules/oil-analysis/sample.service';
-import type { OilSampleRow, OilSampleRowStatus, OilLabResultStatus, PdfImportStatus } from '../../modules/oil-analysis/sample.service';
+import type { OilSampleRow, OilSampleRowStatus, OilLabResultStatus, PdfImportStatus, OilSampleApprovalStatus, OilSampleApprovalHistoryEntry } from '../../modules/oil-analysis/sample.service';
 
 interface L10n<T> { en: T; ar: T; }
 
@@ -101,7 +102,47 @@ const COPY = {
   dpPdfLink:   { en: 'PDF Link',            ar: 'رابط PDF' },
   dpPdfNotes:  { en: 'PDF Review Notes',    ar: 'ملاحظات مراجعة PDF' },
   dpOpenPdf:   { en: 'Open PDF',            ar: 'فتح PDF' },
+  dpApproval:  { en: 'Approval Status',     ar: 'حالة الموافقة' },
+  dpApprovedBy:{ en: 'Approved By',         ar: 'وُوفق بواسطة' },
+  dpApprovedAt:{ en: 'Approved At',         ar: 'تاريخ الموافقة' },
+  dpLocked:    { en: 'Lab Values Locked',   ar: 'قيم المختبر مقفلة' },
+  dpHistSec:   { en: 'Approval History',    ar: 'سجل الموافقة' },
+  dpHistEmpty: { en: 'No approval events recorded.', ar: 'لم يُسجَّل أي حدث موافقة.' },
 } as const;
+
+const APPROVAL_STATUS_LABELS: Record<OilSampleApprovalStatus, L10n<string>> = {
+  pending:        { en: 'Pending',       ar: 'معلّق' },
+  'under-review': { en: 'Under Review',  ar: 'قيد المراجعة' },
+  approved:       { en: 'Approved',      ar: 'موافق عليه' },
+  locked:         { en: 'Locked',        ar: 'مقفل' },
+};
+
+const HISTORY_ACTION_LABELS: Record<OilSampleApprovalHistoryEntry['action'], L10n<string>> = {
+  opened:                   { en: 'Opened for review',       ar: 'فُتحت للمراجعة' },
+  edited:                   { en: 'Edited before approval',  ar: 'عُدِّلت قبل الموافقة' },
+  approved:                 { en: 'Approved',                ar: 'وُوفق عليها' },
+  rejected:                 { en: 'Rejected',                ar: 'رُفضت' },
+  'returned-for-correction': { en: 'Returned for correction', ar: 'أُعيدت للتصحيح' },
+  locked:                   { en: 'Locked',                  ar: 'قُفلت' },
+};
+
+function formatDateTime(iso: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function approvalStatusChip(status: OilSampleApprovalStatus): ChipStatus {
+  switch (status) {
+    case 'locked':
+    case 'approved': return 'operational';
+    case 'under-review': return 'maintenance';
+    case 'pending': return 'warning';
+    default: return 'draft';
+  }
+}
 
 const PDF_STATUS_LABELS: Record<PdfImportStatus, L10n<string>> = {
   none:            { en: 'None',            ar: 'لا يوجد' },
@@ -371,6 +412,59 @@ function SampleDetailPanel({ row, locale, onClose }: DetailPanelProps): React.Re
             </div>
           </>
         )}
+        {row.approvalStatus && (
+          <>
+            <div className="oc-detail-panel__field">
+              <dt>{l(COPY.dpApproval)}</dt>
+              <dd>
+                <StatusChip
+                  status={approvalStatusChip(row.approvalStatus)}
+                  label={l(APPROVAL_STATUS_LABELS[row.approvalStatus])}
+                />
+              </dd>
+            </div>
+            {row.approvedBy && (
+              <div className="oc-detail-panel__field">
+                <dt>{l(COPY.dpApprovedBy)}</dt>
+                <dd>{row.approvedBy}</dd>
+              </div>
+            )}
+            {row.approvedAt && (
+              <div className="oc-detail-panel__field">
+                <dt>{l(COPY.dpApprovedAt)}</dt>
+                <dd>{formatDateTime(row.approvedAt)}</dd>
+              </div>
+            )}
+            {isSampleApprovalLocked(row) && (
+              <div className="oc-detail-panel__field">
+                <dt>{l(COPY.dpLocked)}</dt>
+                <dd><StatusChip status="critical" label={l(COPY.dpLocked)} /></dd>
+              </div>
+            )}
+          </>
+        )}
+        <div className="oc-detail-panel__history">
+          <h3 className="oc-detail-panel__history-title">{l(COPY.dpHistSec)}</h3>
+          {row.approvalHistory.length === 0 ? (
+            <p className="oc-detail-panel__history-empty">{l(COPY.dpHistEmpty)}</p>
+          ) : (
+            <ul className="oc-detail-panel__history-list">
+              {[...row.approvalHistory].reverse().map((entry, idx) => (
+                <li key={`${entry.at}-${idx}`} className="oc-detail-panel__history-item">
+                  <span className="oc-detail-panel__history-action">
+                    {l(HISTORY_ACTION_LABELS[entry.action])}
+                  </span>
+                  <span className="oc-detail-panel__history-meta">
+                    {entry.actor} · {formatDateTime(entry.at)}
+                  </span>
+                  {entry.notes && (
+                    <span className="oc-detail-panel__history-notes">{entry.notes}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </dl>
     </aside>
   );
