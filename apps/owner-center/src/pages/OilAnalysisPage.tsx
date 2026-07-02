@@ -16,6 +16,7 @@ import type { OilSampleRow } from '../modules/oil-analysis/sample.service';
 import SampleRegistry from './oil-analysis/SampleRegistry';
 import SampleIntake from './oil-analysis/SampleIntake';
 import LabResults from './oil-analysis/LabResults';
+import PdfImport from './oil-analysis/PdfImport';
 
 // ── Locale helpers ─────────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ const COPY = {
   kpiCompleted: { en: 'Confirmed this month',                                      ar: 'مؤكدة هذا الشهر'                          },
   kpiLpMap:     { en: 'Missing LP reference',                                      ar: 'مرجع نقطة مفقود'                          },
   kpiPending:   { en: 'Awaiting review',                                           ar: 'بانتظار المراجعة'                         },
+  kpiPdfPending:{ en: 'PDF imports awaiting review',                               ar: 'استيرادات PDF بانتظار المراجعة'           },
   kpiTotal:     { en: 'All registered samples',                                    ar: 'جميع العينات المسجلة'                     },
   alertCritical:{ en: 'critical sample(s) require immediate action.',              ar: 'عينة/عينات حرجة تتطلب إجراءً فورياً.'     },
   alertCaution: { en: 'sample(s) with open recommendations.',                        ar: 'عينة/عينات بتوصيات مفتوحة.'               },
@@ -64,6 +66,8 @@ const COPY = {
   intakeDesc:       { en: 'Register new field samples and prepare them for laboratory submission.', ar: 'تسجيل عينات ميدانية جديدة وتجهيزها للإرسال إلى المختبر.' },
   labResultsTitle:  { en: 'Lab Results',     ar: 'نتائج المختبر'     },
   labResultsDesc:   { en: 'Review, enter, and confirm laboratory analysis results.', ar: 'مراجعة وإدخال وتأكيد نتائج التحليل المختبري.' },
+  pdfImportTitle:   { en: 'PDF Import',      ar: 'استيراد PDF'       },
+  pdfImportDesc:    { en: 'Attach lab report PDF metadata and review imports.', ar: 'إرفاق بيانات تقرير المختبر PDF ومراجعة الاستيرادات.' },
   trendsTitle:      { en: 'Trends',          ar: 'الاتجاهات'         },
   trendsDesc:       { en: 'Track parameter trends and condition changes over sample history.', ar: 'تتبع اتجاهات المعاملات وتغيرات الحالة عبر سجل العينات.' },
   reportsTitle:     { en: 'Reports',         ar: 'التقارير'          },
@@ -140,7 +144,7 @@ function OilAnalysisDashboard(): React.ReactElement {
   const alertSamples = samples.filter(
     (s) => {
       const cond = computeSampleCondition(s);
-      return cond === 'alert' || cond === 'caution';
+      return cond === 'critical' || cond === 'caution' || cond === 'monitor';
     },
   );
 
@@ -156,6 +160,12 @@ function OilAnalysisDashboard(): React.ReactElement {
       value:   { en: String(kpis.pendingReview), ar: String(kpis.pendingReview) },
       subtext: COPY.kpiPending,
       variant: kpis.pendingReview > 0 ? 'maintenance' : 'operational',
+    },
+    {
+      label:   { en: 'PDF Pending Review',      ar: 'PDF بانتظار المراجعة'     },
+      value:   { en: String(kpis.pdfPendingReview), ar: String(kpis.pdfPendingReview) },
+      subtext: COPY.kpiPdfPending,
+      variant: kpis.pdfPendingReview > 0 ? 'warning' : 'operational',
     },
     {
       label:   { en: 'Needs LP Mapping',        ar: 'تحتاج ربط نقطة التشحيم'   },
@@ -294,6 +304,7 @@ export default function OilAnalysisPage(): React.ReactElement {
       <Route path="samples" element={<SampleRegistry />} />
       <Route path="intake" element={<SampleIntake />} />
       <Route path="lab-results" element={<LabResults />} />
+      <Route path="pdf-import" element={<PdfImport />} />
       <Route
         path="trends"
         element={<OilAnalysisSubPage initials="TR" title={COPY.trendsTitle} desc={COPY.trendsDesc} />}

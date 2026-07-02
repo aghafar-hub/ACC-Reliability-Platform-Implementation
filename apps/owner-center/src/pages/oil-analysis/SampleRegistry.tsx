@@ -12,7 +12,7 @@ import {
   computeSampleCondition,
   hasLabResults,
 } from '../../modules/oil-analysis/sample.service';
-import type { OilSampleRow, OilSampleRowStatus, OilLabResultStatus } from '../../modules/oil-analysis/sample.service';
+import type { OilSampleRow, OilSampleRowStatus, OilLabResultStatus, PdfImportStatus } from '../../modules/oil-analysis/sample.service';
 
 interface L10n<T> { en: T; ar: T; }
 
@@ -73,8 +73,9 @@ const COPY = {
   dpNone:      { en: '—',                   ar: '—' },
   condPending: { en: 'Pending',             ar: 'معلّق' },
   condNormal:  { en: 'Normal',              ar: 'طبيعي' },
+  condMonitor: { en: 'Monitor',             ar: 'مراقبة' },
   condCaution: { en: 'Caution',             ar: 'تحذير' },
-  condAlert:   { en: 'Alert',               ar: 'تنبيه' },
+  condCritical:{ en: 'Critical',            ar: 'حرج' },
   dpResult:    { en: 'Result Status',       ar: 'حالة النتيجة' },
   dpLabSec:    { en: 'Lab Results',         ar: 'نتائج المختبر' },
   dpContam:    { en: 'Contamination Rating', ar: 'تصنيف التلوث' },
@@ -94,7 +95,31 @@ const COPY = {
   rsMonitor:   { en: 'Monitor',             ar: 'مراقبة' },
   rsCaution:   { en: 'Caution',             ar: 'تحذير' },
   rsCritical:  { en: 'Critical',            ar: 'حرج' },
+  dpPdfSec:    { en: 'PDF Import',          ar: 'استيراد PDF' },
+  dpPdfStatus: { en: 'PDF Status',          ar: 'حالة PDF' },
+  dpPdfFile:   { en: 'PDF File',            ar: 'ملف PDF' },
+  dpPdfLink:   { en: 'PDF Link',            ar: 'رابط PDF' },
+  dpPdfNotes:  { en: 'PDF Review Notes',    ar: 'ملاحظات مراجعة PDF' },
+  dpOpenPdf:   { en: 'Open PDF',            ar: 'فتح PDF' },
 } as const;
+
+const PDF_STATUS_LABELS: Record<PdfImportStatus, L10n<string>> = {
+  none:            { en: 'None',            ar: 'لا يوجد' },
+  uploaded:        { en: 'Uploaded',        ar: 'مرفوع' },
+  'pending-review':  { en: 'Pending Review',  ar: 'بانتظار المراجعة' },
+  reviewed:        { en: 'Reviewed',        ar: 'تمت المراجعة' },
+  rejected:        { en: 'Rejected',        ar: 'مرفوض' },
+};
+
+function pdfStatusChip(status: PdfImportStatus): ChipStatus {
+  switch (status) {
+    case 'rejected':       return 'critical';
+    case 'pending-review': return 'warning';
+    case 'reviewed':       return 'operational';
+    case 'uploaded':       return 'maintenance';
+    default:               return 'draft';
+  }
+}
 
 const RESULT_STATUS_LABELS: Record<OilLabResultStatus, L10n<string>> = {
   normal:   COPY.rsNormal,
@@ -150,19 +175,21 @@ function statusChip(status: OilSampleRowStatus): { chip: ChipStatus; label: L10n
 
 function conditionLabel(cond: ReturnType<typeof computeSampleCondition>): L10n<string> {
   switch (cond) {
-    case 'normal':  return COPY.condNormal;
-    case 'caution': return COPY.condCaution;
-    case 'alert':   return COPY.condAlert;
-    default:        return COPY.condPending;
+    case 'normal':   return COPY.condNormal;
+    case 'monitor':  return COPY.condMonitor;
+    case 'caution':  return COPY.condCaution;
+    case 'critical': return COPY.condCritical;
+    default:         return COPY.condPending;
   }
 }
 
 function conditionChip(cond: ReturnType<typeof computeSampleCondition>): ChipStatus {
   switch (cond) {
-    case 'alert':   return 'critical';
-    case 'caution': return 'warning';
-    case 'normal':  return 'operational';
-    default:        return 'draft';
+    case 'critical': return 'critical';
+    case 'caution':  return 'warning';
+    case 'monitor':  return 'maintenance';
+    case 'normal':   return 'operational';
+    default:         return 'draft';
   }
 }
 
@@ -245,6 +272,45 @@ function SampleDetailPanel({ row, locale, onClose }: DetailPanelProps): React.Re
           <dt>{l(COPY.dpNotes)}</dt>
           <dd>{row.notes || l(COPY.dpNone)}</dd>
         </div>
+        {row.pdfImportStatus !== 'none' && (
+          <>
+            <div className="oc-detail-panel__field">
+              <dt>{l(COPY.dpPdfSec)}</dt>
+              <dd />
+            </div>
+            <div className="oc-detail-panel__field">
+              <dt>{l(COPY.dpPdfStatus)}</dt>
+              <dd>
+                <StatusChip
+                  status={pdfStatusChip(row.pdfImportStatus)}
+                  label={l(PDF_STATUS_LABELS[row.pdfImportStatus])}
+                />
+              </dd>
+            </div>
+            {row.pdfFileName && (
+              <div className="oc-detail-panel__field">
+                <dt>{l(COPY.dpPdfFile)}</dt>
+                <dd>{row.pdfFileName}</dd>
+              </div>
+            )}
+            {row.pdfFileUrl && (
+              <div className="oc-detail-panel__field">
+                <dt>{l(COPY.dpPdfLink)}</dt>
+                <dd>
+                  <a href={row.pdfFileUrl} target="_blank" rel="noopener noreferrer">
+                    {l(COPY.dpOpenPdf)}
+                  </a>
+                </dd>
+              </div>
+            )}
+            {row.pdfReviewNotes && (
+              <div className="oc-detail-panel__field">
+                <dt>{l(COPY.dpPdfNotes)}</dt>
+                <dd>{row.pdfReviewNotes}</dd>
+              </div>
+            )}
+          </>
+        )}
         {hasLabResults(row) && (
           <>
             <div className="oc-detail-panel__field">
@@ -410,8 +476,9 @@ export default function SampleRegistry(): React.ReactElement {
             <option value="">{l(COPY.filterCond)}</option>
             <option value="pending">{l(COPY.condPending)}</option>
             <option value="normal">{l(COPY.condNormal)}</option>
+            <option value="monitor">{l(COPY.condMonitor)}</option>
             <option value="caution">{l(COPY.condCaution)}</option>
-            <option value="alert">{l(COPY.condAlert)}</option>
+            <option value="critical">{l(COPY.condCritical)}</option>
           </select>
         </div>
         <Link to="/oil-analysis/intake" className="ur-btn ur-btn--primary oc-toolbar__record-btn">

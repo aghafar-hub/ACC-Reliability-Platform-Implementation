@@ -142,6 +142,7 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
       { path: '/oil-analysis/samples',       icon: 'clipboard',    label: { en: 'Samples',     ar: 'العينات'         } },
       { path: '/oil-analysis/intake',        icon: 'package',      label: { en: 'Intake',      ar: 'الاستقبال'       } },
       { path: '/oil-analysis/lab-results',   icon: 'activity',     label: { en: 'Lab Results', ar: 'نتائج المختبر'   } },
+      { path: '/oil-analysis/pdf-import',    icon: 'file-text',    label: { en: 'PDF Import',  ar: 'استيراد PDF'     } },
       { path: '/oil-analysis/trends',        icon: 'trending-up',  label: { en: 'Trends',      ar: 'الاتجاهات'       } },
       { path: '/oil-analysis/reports',       icon: 'file-text',    label: { en: 'Reports',     ar: 'التقارير'        } },
       { path: '/oil-analysis/settings',      icon: 'sliders',      label: { en: 'Settings',    ar: 'الإعدادات'       } },

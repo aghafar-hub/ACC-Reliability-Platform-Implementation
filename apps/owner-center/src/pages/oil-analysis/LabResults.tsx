@@ -8,11 +8,13 @@ import type { ChipStatus } from '../../components/StatusChip';
 import {
   oilSampleService,
   hasLabResults,
+  computeConditionAssessment,
 } from '../../modules/oil-analysis/sample.service';
 import type {
   OilSampleRow,
   OilLabResultStatus,
   OilLabResultInput,
+  OilConditionLevel,
 } from '../../modules/oil-analysis/sample.service';
 
 interface L10n<T> { en: T; ar: T; }
@@ -47,6 +49,8 @@ const COPY = {
   secSelect:   { en: 'Select Sample',            ar: 'اختر العينة' },
   secSummary:  { en: 'Sample Summary',         ar: 'ملخص العينة' },
   secResults:  { en: 'Analysis Results',       ar: 'نتائج التحليل' },
+  secPreview:  { en: 'Condition Assessment Preview', ar: 'معاينة تقييم الحالة' },
+  previewNone: { en: 'Enter result status or ratings to preview overall condition.', ar: 'أدخل حالة النتيجة أو التصنيفات لمعاينة الحالة الإجمالية.' },
   selPh:       { en: 'Choose a sample…',         ar: 'اختر عينة…' },
   noSamples:   { en: 'No samples available. Register a sample via Intake first.', ar: 'لا توجد عينات. سجّل عينة عبر الاستقبال أولاً.' },
   btnSave:     { en: 'Save Results',             ar: 'حفظ النتائج' },
@@ -92,6 +96,22 @@ const RESULT_STATUS_LABELS: Record<OilLabResultStatus, L10n<string>> = {
 
 function resultStatusChip(status: OilLabResultStatus): ChipStatus {
   switch (status) {
+    case 'critical': return 'critical';
+    case 'caution':  return 'warning';
+    case 'monitor':  return 'maintenance';
+    default:         return 'operational';
+  }
+}
+
+const CONDITION_LABELS: Record<OilConditionLevel, L10n<string>> = {
+  normal:   COPY.stNormal,
+  monitor:  COPY.stMonitor,
+  caution:  COPY.stCaution,
+  critical: COPY.stCritical,
+};
+
+function conditionLevelChip(level: OilConditionLevel): ChipStatus {
+  switch (level) {
     case 'critical': return 'critical';
     case 'caution':  return 'warning';
     case 'monitor':  return 'maintenance';
@@ -167,6 +187,19 @@ export default function LabResults(): React.ReactElement {
     () => (selectedId ? oilSampleService.findById(selectedId) : null),
     [selectedId, revision],
   );
+
+  const previewCondition = useMemo(() => {
+    if (!form.resultStatus && !form.contaminationRating.trim()
+      && !form.equipmentRating.trim() && !form.lubricantRating.trim()) {
+      return null;
+    }
+    return computeConditionAssessment({
+      resultStatus: form.resultStatus ? form.resultStatus as OilLabResultStatus : null,
+      contaminationRating: form.contaminationRating,
+      equipmentRating: form.equipmentRating,
+      lubricantRating: form.lubricantRating,
+    });
+  }, [form.resultStatus, form.contaminationRating, form.equipmentRating, form.lubricantRating]);
 
   function handleSelectSample(id: string): void {
     setSelectedId(id);
@@ -328,6 +361,29 @@ export default function LabResults(): React.ReactElement {
                 </p>
               )}
               {error && <p className="ur-form-error" role="alert">{error}</p>}
+
+              <div className="db-panel" style={{ marginBottom: '1rem' }}>
+                <div className="db-panel__head">
+                  <span className="db-panel__title">{l(COPY.secPreview)}</span>
+                  {previewCondition && (
+                    <StatusChip
+                      status={conditionLevelChip(previewCondition)}
+                      label={l(CONDITION_LABELS[previewCondition])}
+                    />
+                  )}
+                </div>
+                <div className="db-panel__body">
+                  {previewCondition ? (
+                    <p className="ur-form-hint">
+                      {l(CONDITION_LABELS[previewCondition])}
+                      {' — '}
+                      {l(COPY.secPreview)}
+                    </p>
+                  ) : (
+                    <p className="db-panel__empty">{l(COPY.previewNone)}</p>
+                  )}
+                </div>
+              </div>
 
               <form onSubmit={handleSubmit}>
                 <div className="ol-form-grid">

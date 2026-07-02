@@ -4,6 +4,8 @@
 // Sprint 01 — module scaffold.
 // Sprint 02 — sample registry, intake, validation, KPIs.
 // Sprint 03 — lab results manual entry.
+// Sprint 04 — PDF import shell + import review flow (metadata only).
+// Sprint 05 — condition assessment rules for manual lab results.
 //
 // React components MUST NOT access localStorage directly; they call the service.
 
@@ -11,6 +13,14 @@
 
 /** Lab result classification after manual entry. */
 export type OilLabResultStatus = 'normal' | 'monitor' | 'caution' | 'critical';
+
+/** PDF import lifecycle status (metadata shell — no parsing). */
+export type PdfImportStatus =
+  | 'none'
+  | 'uploaded'
+  | 'pending-review'
+  | 'reviewed'
+  | 'rejected';
 
 /** Row used by Oil Analysis UI; flat projection of a sample record. */
 export interface OilSampleRow {
@@ -45,6 +55,11 @@ export interface OilSampleRow {
   readonly sampleAnalysis: string;
   readonly alertType: string;
   readonly labResultEnteredAt: string | null;
+  readonly pdfFileName: string | null;
+  readonly pdfFileUrl: string | null;
+  readonly pdfUploadedAt: string | null;
+  readonly pdfImportStatus: PdfImportStatus;
+  readonly pdfReviewNotes: string;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -60,12 +75,24 @@ export type OilSampleRowStatus =
   | 'alert'
   | 'cancelled';
 
-export type SampleCondition = 'pending' | 'normal' | 'caution' | 'alert';
+export type SampleCondition = 'pending' | OilConditionLevel;
+
+/** Calculated overall condition from lab result fields. */
+export type OilConditionLevel = 'normal' | 'monitor' | 'caution' | 'critical';
+
+/** Input for condition assessment (persisted row or lab form preview). */
+export interface OilConditionAssessmentInput {
+  readonly resultStatus: OilLabResultStatus | null;
+  readonly contaminationRating: string;
+  readonly equipmentRating: string;
+  readonly lubricantRating: string;
+}
 
 /** Dashboard KPI snapshot computed from persisted samples. */
 export interface OilAnalysisDashboardKpis {
   readonly totalSamples: number;
   readonly pendingReview: number;
+  readonly pdfPendingReview: number;
   readonly needsLpMapping: number;
   readonly critical: number;
   readonly completedThisMonth: number;
@@ -91,6 +118,11 @@ export interface OilSampleCreateInput {
   readonly samplingLocation?: string;
   readonly status: 'imported' | 'pending-review';
   readonly notes?: string;
+}
+
+export interface OilPdfImportInput {
+  readonly pdfFileName?: string | null;
+  readonly pdfFileUrl: string;
 }
 
 export interface OilLabResultInput {
@@ -171,6 +203,42 @@ function normalizeResultStatus(raw: unknown): OilLabResultStatus | null {
   return null;
 }
 
+function emptyPdfFields(): Pick<
+  OilSampleRow,
+  'pdfFileName' | 'pdfFileUrl' | 'pdfUploadedAt' | 'pdfImportStatus' | 'pdfReviewNotes'
+> {
+  return {
+    pdfFileName: null,
+    pdfFileUrl: null,
+    pdfUploadedAt: null,
+    pdfImportStatus: 'none',
+    pdfReviewNotes: '',
+  };
+}
+
+function normalizePdfImportStatus(raw: unknown): PdfImportStatus {
+  if (
+    raw === 'uploaded' ||
+    raw === 'pending-review' ||
+    raw === 'reviewed' ||
+    raw === 'rejected'
+  ) {
+    return raw;
+  }
+  return 'none';
+}
+
+function isValidPdfUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function emptyLabFields(): Pick<
   OilSampleRow,
   | 'contaminationRating'
@@ -206,14 +274,67 @@ function emptyLabFields(): Pick<
   };
 }
 
-/** Derive display condition from status and result fields. */
+const CONDITION_SEVERITY: Record<OilConditionLevel, number> = {
+  normal: 0,
+  monitor: 1,
+  caution: 2,
+  critical: 3,
+};
+
+/** Parse a free-text rating field into a condition level. */
+export function parseRatingLevel(raw: string): OilConditionLevel | null {
+  const value = raw.trim().toLowerCase();
+  if (!value) return null;
+  if (value === 'critical' || value === 'alert') return 'critical';
+  if (value === 'caution' || value === 'warning') return 'caution';
+  if (value === 'monitor') return 'monitor';
+  if (value === 'normal') return 'normal';
+  return null;
+}
+
+/**
+ * Compute overall condition from result status and rating fields.
+ * Worst level wins: critical > caution > monitor > normal.
+ */
+export function computeConditionAssessment(
+  input: OilConditionAssessmentInput,
+): OilConditionLevel | null {
+  const levels: OilConditionLevel[] = [];
+
+  if (input.resultStatus) {
+    levels.push(input.resultStatus);
+  }
+
+  for (const field of [
+    input.contaminationRating,
+    input.equipmentRating,
+    input.lubricantRating,
+  ]) {
+    const parsed = parseRatingLevel(field);
+    if (parsed) levels.push(parsed);
+  }
+
+  if (levels.length === 0) return null;
+
+  return levels.reduce((worst, current) =>
+    CONDITION_SEVERITY[current] > CONDITION_SEVERITY[worst] ? current : worst,
+  );
+}
+
+/** Derive display condition from lab result fields and sample status. */
 export function computeSampleCondition(row: OilSampleRow): SampleCondition {
-  if (row.resultStatus === 'critical') return 'alert';
-  if (row.resultStatus === 'caution' || row.resultStatus === 'monitor') return 'caution';
-  if (row.resultStatus === 'normal' || row.status === 'analysed') return 'normal';
-  if (row.status === 'alert') return 'alert';
+  const assessed = computeConditionAssessment({
+    resultStatus: row.resultStatus,
+    contaminationRating: row.contaminationRating,
+    equipmentRating: row.equipmentRating,
+    lubricantRating: row.lubricantRating,
+  });
+
+  if (assessed) return assessed;
+
+  if (row.status === 'alert') return 'critical';
   if (row.status === 'caution') return 'caution';
-  if (row.status === 'normal') return 'normal';
+  if (row.status === 'normal' || row.status === 'analysed') return 'normal';
   return 'pending';
 }
 
@@ -230,6 +351,7 @@ function normalizeRow(
     '';
 
   const labDefaults = emptyLabFields();
+  const pdfDefaults = emptyPdfFields();
 
   return {
     id: raw.id ?? generateInternalId(),
@@ -260,6 +382,11 @@ function normalizeRow(
     sampleAnalysis: raw.sampleAnalysis ?? labDefaults.sampleAnalysis,
     alertType: raw.alertType ?? labDefaults.alertType,
     labResultEnteredAt: raw.labResultEnteredAt ?? labDefaults.labResultEnteredAt,
+    pdfFileName: raw.pdfFileName ?? pdfDefaults.pdfFileName,
+    pdfFileUrl: raw.pdfFileUrl ?? pdfDefaults.pdfFileUrl,
+    pdfUploadedAt: raw.pdfUploadedAt ?? pdfDefaults.pdfUploadedAt,
+    pdfImportStatus: normalizePdfImportStatus(raw.pdfImportStatus),
+    pdfReviewNotes: raw.pdfReviewNotes ?? pdfDefaults.pdfReviewNotes,
     createdAt: raw.createdAt ?? isoNow(),
     updatedAt: raw.updatedAt ?? isoNow(),
   };
@@ -270,15 +397,12 @@ function isActiveSample(row: OilSampleRow): boolean {
 }
 
 function isCriticalSample(row: OilSampleRow): boolean {
-  return row.resultStatus === 'critical' || row.status === 'alert';
+  return computeSampleCondition(row) === 'critical';
 }
 
 function isRecommendationOpen(row: OilSampleRow): boolean {
-  return (
-    row.resultStatus === 'caution' ||
-    row.resultStatus === 'monitor' ||
-    row.status === 'caution'
-  );
+  const cond = computeSampleCondition(row);
+  return cond === 'caution' || cond === 'monitor';
 }
 
 function validateNumericFields(input: OilLabResultInput): void {
@@ -424,11 +548,74 @@ export class OilSampleLocalService {
       resultStatus: null,
       notes: input.notes?.trim() ?? '',
       ...emptyLabFields(),
+      ...emptyPdfFields(),
       createdAt: now,
       updatedAt: now,
     };
 
     return this.repo.create(row);
+  }
+
+  listForPdfReview(): readonly OilSampleRow[] {
+    return [...this.list()]
+      .filter((s) => s.pdfImportStatus === 'pending-review')
+      .sort((a, b) => (b.pdfUploadedAt ?? '').localeCompare(a.pdfUploadedAt ?? ''));
+  }
+
+  attachPdfImport(sampleInternalId: string, input: OilPdfImportInput): OilSampleRow {
+    if (!sampleInternalId.trim()) throw new Error('Sample is required.');
+
+    const pdfFileUrl = input.pdfFileUrl.trim();
+    if (!pdfFileUrl) throw new Error('PDF URL is required.');
+    if (!isValidPdfUrl(pdfFileUrl)) throw new Error('PDF URL must be a valid http or https link.');
+
+    const existing = this.findById(sampleInternalId);
+    if (!existing) throw new Error('Sample not found.');
+
+    const pdfFileName = input.pdfFileName?.trim() ?? '';
+    const now = isoNow();
+
+    return this.repo.update(sampleInternalId, {
+      importSource: 'pdf-import',
+      pdfFileName: pdfFileName.length > 0 ? pdfFileName : null,
+      pdfFileUrl,
+      pdfUploadedAt: now,
+      pdfImportStatus: 'pending-review',
+      pdfReviewNotes: '',
+    });
+  }
+
+  reviewPdfImport(sampleInternalId: string, reviewNotes?: string): OilSampleRow {
+    if (!sampleInternalId.trim()) throw new Error('Sample is required.');
+
+    const existing = this.findById(sampleInternalId);
+    if (!existing) throw new Error('Sample not found.');
+    if (existing.pdfImportStatus !== 'pending-review') {
+      throw new Error('Sample PDF is not pending review.');
+    }
+
+    return this.repo.update(sampleInternalId, {
+      pdfImportStatus: 'reviewed',
+      pdfReviewNotes: reviewNotes?.trim() ?? '',
+    });
+  }
+
+  rejectPdfImport(sampleInternalId: string, reason: string): OilSampleRow {
+    if (!sampleInternalId.trim()) throw new Error('Sample is required.');
+
+    const rejectReason = reason.trim();
+    if (!rejectReason) throw new Error('Reject reason is required.');
+
+    const existing = this.findById(sampleInternalId);
+    if (!existing) throw new Error('Sample not found.');
+    if (existing.pdfImportStatus !== 'pending-review') {
+      throw new Error('Sample PDF is not pending review.');
+    }
+
+    return this.repo.update(sampleInternalId, {
+      pdfImportStatus: 'rejected',
+      pdfReviewNotes: rejectReason,
+    });
   }
 
   saveLabResults(sampleInternalId: string, input: OilLabResultInput): OilSampleRow {
@@ -478,6 +665,8 @@ export class OilSampleLocalService {
           row.contractorId,
           row.sampleAnalysis,
           row.alertType,
+          row.pdfFileName ?? '',
+          row.pdfReviewNotes,
         ].join(' ').toLowerCase();
         if (!haystack.includes(q)) return false;
       }
@@ -509,6 +698,10 @@ export class OilSampleLocalService {
       (s) => s.status === 'pending-review' || s.status === 'imported' || s.status === 'linked',
     ).length;
 
+    const pdfPendingReview = samples.filter(
+      (s) => s.pdfImportStatus === 'pending-review',
+    ).length;
+
     const needsLpMapping = samples.filter((s) => !s.lubricationPointId).length;
     const critical = samples.filter(isCriticalSample).length;
 
@@ -521,6 +714,7 @@ export class OilSampleLocalService {
     return {
       totalSamples: samples.length,
       pendingReview,
+      pdfPendingReview,
       needsLpMapping,
       critical,
       completedThisMonth,

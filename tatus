@@ -1,0 +1,15 @@
+warning: in the working copy of 'apps/owner-center/src/modules/oil-analysis/sample.service.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/owner-center/src/pages/OilAnalysisPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/owner-center/src/pages/oil-analysis/LabResults.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/owner-center/src/pages/oil-analysis/SampleRegistry.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/owner-center/src/registry/platform-manifests.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'modules/oil-analysis/src/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'modules/oil-analysis/src/types.ts', LF will be replaced by CRLF the next time Git touches it
+ .../src/modules/oil-analysis/sample.service.ts     | 220 [32m+++++++++++++++++++[m[31m--[m
+ apps/owner-center/src/pages/OilAnalysisPage.tsx    |  13 [32m+[m[31m-[m
+ .../src/pages/oil-analysis/LabResults.tsx          |  56 [32m++++++[m
+ .../src/pages/oil-analysis/SampleRegistry.tsx      |  89 [32m+++++++[m[31m--[m
+ .../src/registry/platform-manifests.ts             |   1 [32m+[m
+ modules/oil-analysis/src/index.ts                  |   1 [32m+[m
+ modules/oil-analysis/src/types.ts                  |  13 [32m++[m
+ 7 files changed, 368 insertions(+), 25 deletions(-)

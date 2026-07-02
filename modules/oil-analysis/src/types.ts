@@ -45,6 +45,14 @@ export type OilSampleImportSource = 'manual' | 'pdf-import' | 'lab-api';
 /** Result classification after lab analysis is confirmed. */
 export type OilSampleResultStatus = 'normal' | 'caution' | 'alert';
 
+/** PDF import lifecycle status (metadata shell — no parsing). */
+export type PdfImportStatus =
+  | 'none'
+  | 'uploaded'
+  | 'pending-review'
+  | 'reviewed'
+  | 'rejected';
+
 // ── Oil sample entity ───────────────────────────────────────────────────────────
 
 /**
@@ -61,6 +69,11 @@ export interface OilSample {
   readonly lubricationPointId?: string | undefined;
   readonly labReferenceId?: string | undefined;
   readonly resultStatus?: OilSampleResultStatus | undefined;
+  readonly pdfFileName?: string | undefined;
+  readonly pdfFileUrl?: string | undefined;
+  readonly pdfUploadedAt?: IsoTimestamp | undefined;
+  readonly pdfImportStatus?: PdfImportStatus | undefined;
+  readonly pdfReviewNotes?: string | undefined;
   readonly createdAt: IsoTimestamp;
   readonly updatedAt: IsoTimestamp;
 }

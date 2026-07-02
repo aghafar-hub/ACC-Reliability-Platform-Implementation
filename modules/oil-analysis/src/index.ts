@@ -8,6 +8,7 @@ export type {
   OilSampleStatus,
   OilSampleImportSource,
   OilSampleResultStatus,
+  PdfImportStatus,
   OilSample,
   OilSampleCreateRequest,
   OilSampleUpdateRequest,
