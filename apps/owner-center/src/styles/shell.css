@@ -5222,3 +5222,133 @@ button {
 .oa-settings-disabled p {
   margin: 0;
 }
+
+/* ── Oil Analysis — Equipment Picker & LP Mapping (Patch A-01) ───────────── */
+
+.oa-equip-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.oa-equip-picker__selected {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.oa-equip-picker__selected-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+}
+
+.oa-equip-picker__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.oa-equip-picker__empty {
+  padding: var(--space-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.oa-equip-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-sm);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+}
+
+.oa-equip-picker__option:last-child {
+  border-bottom: none;
+}
+
+.oa-equip-picker__option:hover {
+  background: var(--color-surface);
+}
+
+.oa-equip-picker__option-id {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+}
+
+.oa-equip-picker__option-meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.oa-lp-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.oa-lp-picker__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.oa-lp-picker__option:has(input:checked) {
+  border-color: var(--color-accent, #0071bc);
+  background: var(--color-surface);
+}
+
+.oa-lp-picker__option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-size-sm);
+}
+
+.oa-lp-picker__option-meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.oa-lp-picker__selected {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--chip-maintenance-bg);
+  font-size: var(--font-size-sm);
+}
+
+.oa-lp-picker__selected-title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-sm);
+}
+
+.ol-form-grid__full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 600px) {
+  .oa-equip-picker__selected-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -70,6 +70,9 @@ const COPY = {
   fldContam:   { en: 'Contamination Rating',     ar: 'تصنيف التلوث' },
   fldEquipR:   { en: 'Equipment Rating',         ar: 'تصنيف المعدة' },
   fldLubR:     { en: 'Lubricant Rating',         ar: 'تصنيف الزيت' },
+  fldIron:     { en: 'Iron (ppm)',               ar: 'الحديد (ppm)' },
+  fldCopper:   { en: 'Copper (ppm)',             ar: 'النحاس (ppm)' },
+  fldSilicon:  { en: 'Silicon (ppm)',            ar: 'السيليكون (ppm)' },
   fldPq:       { en: 'PQ Index',                 ar: 'مؤشر PQ' },
   fldVis:      { en: 'Viscosity @ 100°C',        ar: 'اللزوجة @ 100°م' },
   fldTan:      { en: 'TAN',                      ar: 'TAN' },
@@ -448,6 +451,24 @@ export default function LabResults(): React.ReactElement {
                     <label className="ur-form-label" htmlFor="lr-lub-r">{l(COPY.fldLubR)}</label>
                     <input id="lr-lub-r" className="ur-form-input" value={form.lubricantRating} onChange={(e) => updateField('lubricantRating', e.target.value)} />
                   </div>
+                  {isLabParameterVisible('iron') && (
+                  <div className="ur-form-field">
+                    <label className="ur-form-label" htmlFor="lr-iron">{l(COPY.fldIron)}</label>
+                    <input id="lr-iron" type="number" min="0" step="any" className="ur-form-input" value={form.ironPpm} onChange={(e) => updateField('ironPpm', e.target.value)} />
+                  </div>
+                  )}
+                  {isLabParameterVisible('copper') && (
+                  <div className="ur-form-field">
+                    <label className="ur-form-label" htmlFor="lr-copper">{l(COPY.fldCopper)}</label>
+                    <input id="lr-copper" type="number" min="0" step="any" className="ur-form-input" value={form.copperPpm} onChange={(e) => updateField('copperPpm', e.target.value)} />
+                  </div>
+                  )}
+                  {isLabParameterVisible('silicon') && (
+                  <div className="ur-form-field">
+                    <label className="ur-form-label" htmlFor="lr-silicon">{l(COPY.fldSilicon)}</label>
+                    <input id="lr-silicon" type="number" min="0" step="any" className="ur-form-input" value={form.siliconPpm} onChange={(e) => updateField('siliconPpm', e.target.value)} />
+                  </div>
+                  )}
                   {isLabParameterVisible('pqIndex') && (
                   <div className="ur-form-field">
                     <label className="ur-form-label" htmlFor="lr-pq">{l(COPY.fldPq)}</label>

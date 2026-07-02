@@ -20,6 +20,7 @@ import type {
   OilLabResultStatus,
   OilLabResultInput,
 } from '../../modules/oil-analysis/sample.service';
+import { isLabParameterVisible } from '../../modules/oil-analysis/settings-guards';
 
 interface L10n<T> { en: T; ar: T; }
 
@@ -98,6 +99,9 @@ const COPY = {
   fldLub:          { en: 'Lubricant',                    ar: 'زيت التشحيم' },
   fldLoc:          { en: 'Sampling Location',            ar: 'موقع أخذ العينة' },
   fldStatus:       { en: 'Result Status',                ar: 'حالة النتيجة' },
+  fldIron:         { en: 'Iron (ppm)',                   ar: 'الحديد (ppm)' },
+  fldCopper:       { en: 'Copper (ppm)',                 ar: 'النحاس (ppm)' },
+  fldSilicon:      { en: 'Silicon (ppm)',                ar: 'السيليكون (ppm)' },
   stNormal:        { en: 'Normal',                       ar: 'طبيعي' },
   stMonitor:       { en: 'Monitor',                      ar: 'مراقبة' },
   stCaution:       { en: 'Caution',                      ar: 'تحذير' },
@@ -503,6 +507,45 @@ function ReviewDetailPanel({
                 <option value="critical">{l(COPY.stCritical)}</option>
               </select>
             </div>
+            {isLabParameterVisible('iron') && (
+            <div className="ur-form-field">
+              <label className="ur-form-label">{l(COPY.fldIron)}</label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                className="ur-form-input"
+                value={form.ironPpm}
+                onChange={(e) => setForm((prev) => ({ ...prev, ironPpm: e.target.value }))}
+              />
+            </div>
+            )}
+            {isLabParameterVisible('copper') && (
+            <div className="ur-form-field">
+              <label className="ur-form-label">{l(COPY.fldCopper)}</label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                className="ur-form-input"
+                value={form.copperPpm}
+                onChange={(e) => setForm((prev) => ({ ...prev, copperPpm: e.target.value }))}
+              />
+            </div>
+            )}
+            {isLabParameterVisible('silicon') && (
+            <div className="ur-form-field">
+              <label className="ur-form-label">{l(COPY.fldSilicon)}</label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                className="ur-form-input"
+                value={form.siliconPpm}
+                onChange={(e) => setForm((prev) => ({ ...prev, siliconPpm: e.target.value }))}
+              />
+            </div>
+            )}
             <button type="button" className="ur-btn ur-btn--primary" onClick={handleSaveEdit}>
               {l(COPY.btnSaveEdit)}
             </button>

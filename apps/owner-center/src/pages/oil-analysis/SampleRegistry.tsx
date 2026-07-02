@@ -13,7 +13,8 @@ import {
   hasLabResults,
   isSampleApprovalLocked,
 } from '../../modules/oil-analysis/sample.service';
-import type { OilSampleRow, OilSampleRowStatus, OilLabResultStatus, PdfImportStatus, OilSampleApprovalStatus, OilSampleApprovalHistoryEntry } from '../../modules/oil-analysis/sample.service';
+import type { OilSampleRow, OilSampleRowStatus, OilLabResultStatus, PdfImportStatus, OilSampleApprovalStatus, OilSampleApprovalHistoryEntry, OilSampleLpMappingHistoryEntry } from '../../modules/oil-analysis/sample.service';
+import { isLabParameterVisible } from '../../modules/oil-analysis/settings-guards';
 
 interface L10n<T> { en: T; ar: T; }
 
@@ -82,6 +83,9 @@ const COPY = {
   dpContam:    { en: 'Contamination Rating', ar: 'تصنيف التلوث' },
   dpEquipR:    { en: 'Equipment Rating',    ar: 'تصنيف المعدة' },
   dpLubR:      { en: 'Lubricant Rating',    ar: 'تصنيف الزيت' },
+  dpIron:      { en: 'Iron (ppm)',          ar: 'الحديد (ppm)' },
+  dpCopper:    { en: 'Copper (ppm)',        ar: 'النحاس (ppm)' },
+  dpSilicon:   { en: 'Silicon (ppm)',       ar: 'السيليكون (ppm)' },
   dpPq:        { en: 'PQ Index',            ar: 'مؤشر PQ' },
   dpVis:       { en: 'Viscosity @ 100°C',   ar: 'اللزوجة @ 100°م' },
   dpTan:       { en: 'TAN',                 ar: 'TAN' },
@@ -107,7 +111,9 @@ const COPY = {
   dpApprovedAt:{ en: 'Approved At',         ar: 'تاريخ الموافقة' },
   dpLocked:    { en: 'Lab Values Locked',   ar: 'قيم المختبر مقفلة' },
   dpHistSec:   { en: 'Approval History',    ar: 'سجل الموافقة' },
+  dpLpHistSec: { en: 'LP Mapping History',  ar: 'سجل ربط نقطة التشحيم' },
   dpHistEmpty: { en: 'No approval events recorded.', ar: 'لم يُسجَّل أي حدث موافقة.' },
+  dpLpHistEmpty:{ en: 'No LP mapping events recorded.', ar: 'لم يُسجَّل أي حدث ربط نقطة.' },
 } as const;
 
 const APPROVAL_STATUS_LABELS: Record<OilSampleApprovalStatus, L10n<string>> = {
@@ -370,6 +376,24 @@ function SampleDetailPanel({ row, locale, onClose }: DetailPanelProps): React.Re
               <dt>{l(COPY.dpLubR)}</dt>
               <dd>{row.lubricantRating || l(COPY.dpNone)}</dd>
             </div>
+            {isLabParameterVisible('iron') && (
+            <div className="oc-detail-panel__field">
+              <dt>{l(COPY.dpIron)}</dt>
+              <dd>{formatNum(row.ironPpm)}</dd>
+            </div>
+            )}
+            {isLabParameterVisible('copper') && (
+            <div className="oc-detail-panel__field">
+              <dt>{l(COPY.dpCopper)}</dt>
+              <dd>{formatNum(row.copperPpm)}</dd>
+            </div>
+            )}
+            {isLabParameterVisible('silicon') && (
+            <div className="oc-detail-panel__field">
+              <dt>{l(COPY.dpSilicon)}</dt>
+              <dd>{formatNum(row.siliconPpm)}</dd>
+            </div>
+            )}
             <div className="oc-detail-panel__field">
               <dt>{l(COPY.dpPq)}</dt>
               <dd>{formatNum(row.pqIndex)}</dd>
@@ -443,6 +467,28 @@ function SampleDetailPanel({ row, locale, onClose }: DetailPanelProps): React.Re
             )}
           </>
         )}
+        <div className="oc-detail-panel__history">
+          <h3 className="oc-detail-panel__history-title">{l(COPY.dpLpHistSec)}</h3>
+          {row.lpMappingHistory.length === 0 ? (
+            <p className="oc-detail-panel__history-empty">{l(COPY.dpLpHistEmpty)}</p>
+          ) : (
+            <ul className="oc-detail-panel__history-list">
+              {[...row.lpMappingHistory].reverse().map((entry: OilSampleLpMappingHistoryEntry, idx) => (
+                <li key={`${entry.at}-${idx}`} className="oc-detail-panel__history-item">
+                  <span className="oc-detail-panel__history-action">
+                    {entry.lubricationPointId} — {entry.fromStatus} → {entry.toStatus}
+                  </span>
+                  <span className="oc-detail-panel__history-meta">
+                    {entry.actor} · {formatDateTime(entry.at)}
+                  </span>
+                  {entry.notes && (
+                    <span className="oc-detail-panel__history-notes">{entry.notes}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <div className="oc-detail-panel__history">
           <h3 className="oc-detail-panel__history-title">{l(COPY.dpHistSec)}</h3>
           {row.approvalHistory.length === 0 ? (

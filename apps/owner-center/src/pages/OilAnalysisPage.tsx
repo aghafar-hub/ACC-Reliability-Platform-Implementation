@@ -15,6 +15,7 @@ import {
 import type { OilSampleRow } from '../modules/oil-analysis/sample.service';
 import SampleRegistry from './oil-analysis/SampleRegistry';
 import SampleIntake from './oil-analysis/SampleIntake';
+import LpMapping from './oil-analysis/LpMapping';
 import LabResults from './oil-analysis/LabResults';
 import PdfImport from './oil-analysis/PdfImport';
 import EngineerReview from './oil-analysis/EngineerReview';
@@ -323,6 +324,7 @@ export default function OilAnalysisPage(): React.ReactElement {
 
       <Route path="samples" element={<SampleRegistry />} />
       <Route path="intake" element={<SampleIntake />} />
+      <Route path="lp-mapping" element={<LpMapping />} />
       <Route path="lab-results" element={<LabResults />} />
       <Route path="pdf-import" element={<PdfImport />} />
       <Route path="review" element={<EngineerReview />} />

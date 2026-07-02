@@ -1,5 +1,5 @@
 // apps/owner-center/src/pages/oil-analysis/SampleIntake.tsx
-// Oil Analysis — Sample Intake (Sprint 02).
+// Oil Analysis — Sample Intake (Sprint 02, Patch A-01 equipment picker).
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { StatusChip } from '../../components/StatusChip';
 import { oilSampleService } from '../../modules/oil-analysis/sample.service';
 import type { OilSampleCreateInput } from '../../modules/oil-analysis/sample.service';
+import EquipmentPicker from './EquipmentPicker';
 
 interface L10n<T> { en: T; ar: T; }
 
@@ -16,51 +17,45 @@ function t<T>(bundle: L10n<T>, locale: string): T {
 
 const COPY = {
   title:       { en: 'Sample Intake',           ar: 'استقبال العينات' },
-  desc:        { en: 'Register a new oil analysis sample manually. LP reference fields only — no duplicate lubrication point data.', ar: 'تسجيل عينة تحليل زيت جديدة يدوياً. حقول مرجعية لنقطة التشحيم فقط — بدون إدخال بيانات نقطة مكررة.' },
+  desc:        { en: 'Register a new oil analysis sample. LP mapping is confirmed by an engineer after intake.', ar: 'تسجيل عينة تحليل زيت جديدة. يؤكد المهندس ربط نقطة التشحيم بعد الاستقبال.' },
   liveData:    { en: 'Manual intake',           ar: 'استقبال يدوي' },
   secForm:     { en: 'Sample Details',          ar: 'تفاصيل العينة' },
-  fldEquip:    { en: 'Equipment ID *',          ar: 'معرّف المعدة *' },
-  fldLp:       { en: 'LP ID (optional)',        ar: 'رمز النقطة (اختياري)' },
   fldLab:      { en: 'Lab Sample ID / Oil Report ID *', ar: 'معرّف عينة المختبر / تقرير الزيت *' },
   fldDate:     { en: 'Sample Date *',           ar: 'تاريخ العينة *' },
   fldLub:      { en: 'Lubricant',               ar: 'زيت التشحيم' },
   fldContr:    { en: 'Contractor',              ar: 'المقاول' },
   fldArea:     { en: 'Area',                    ar: 'المنطقة' },
   fldLoc:      { en: 'Sampling Point / Location', ar: 'نقطة / موقع أخذ العينة' },
-  fldStatus:   { en: 'Status',                  ar: 'الحالة' },
   fldNotes:    { en: 'Notes',                   ar: 'ملاحظات' },
-  stImported:  { en: 'Imported',                ar: 'مستورد' },
-  stPending:   { en: 'Pending Review',          ar: 'بانتظار المراجعة' },
+  lpHint:      { en: 'After save, the sample will appear in LP Mapping for engineer confirmation.', ar: 'بعد الحفظ، ستظهر العينة في ربط نقطة التشحيم لتأكيد المهندس.' },
   btnSave:     { en: 'Save Sample',             ar: 'حفظ العينة' },
   btnReset:    { en: 'Reset',                   ar: 'إعادة تعيين' },
   btnRegistry: { en: 'View Registry',           ar: 'عرض السجل' },
+  btnLpMap:    { en: 'LP Mapping',              ar: 'ربط نقطة التشحيم' },
   success:     { en: 'Sample registered successfully.', ar: 'تم تسجيل العينة بنجاح.' },
   dupWarn:     { en: 'This Lab Sample ID already exists.', ar: 'معرّف عينة المختبر هذا موجود مسبقاً.' },
+  equipReq:    { en: 'Select equipment from Equipment Master.', ar: 'اختر المعدة من سجل المعدات.' },
 } as const;
 
 interface FormState {
   equipmentId: string;
-  lubricationPointId: string;
   labSampleId: string;
   sampledAt: string;
   lubricant: string;
   contractorId: string;
   area: string;
   samplingLocation: string;
-  status: 'imported' | 'pending-review';
   notes: string;
 }
 
 const EMPTY_FORM: FormState = {
   equipmentId: '',
-  lubricationPointId: '',
   labSampleId: '',
   sampledAt: '',
   lubricant: '',
   contractorId: '',
   area: '',
   samplingLocation: '',
-  status: 'imported',
   notes: '',
 };
 
@@ -94,6 +89,10 @@ export default function SampleIntake(): React.ReactElement {
 
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault();
+    if (!form.equipmentId.trim()) {
+      setError(l(COPY.equipReq));
+      return;
+    }
     if (dupWarning) {
       setError(l(COPY.dupWarn));
       return;
@@ -101,14 +100,12 @@ export default function SampleIntake(): React.ReactElement {
 
     const input: OilSampleCreateInput = {
       equipmentId: form.equipmentId,
-      lubricationPointId: form.lubricationPointId || null,
       labSampleId: form.labSampleId,
       sampledAt: form.sampledAt,
       lubricant: form.lubricant,
       contractorId: form.contractorId,
       area: form.area,
       samplingLocation: form.samplingLocation,
-      status: form.status,
       notes: form.notes,
     };
 
@@ -144,6 +141,8 @@ export default function SampleIntake(): React.ReactElement {
             {l(COPY.success)} <strong>{successId}</strong>
             {' · '}
             <Link to="/oil-analysis/samples">{l(COPY.btnRegistry)}</Link>
+            {' · '}
+            <Link to="/oil-analysis/lp-mapping">{l(COPY.btnLpMap)}</Link>
           </p>
         )}
 
@@ -155,27 +154,24 @@ export default function SampleIntake(): React.ReactElement {
           <p className="ur-form-error" role="alert">{l(COPY.dupWarn)}</p>
         )}
 
+        <p className="ur-form-hint">{l(COPY.lpHint)}</p>
+
         <form onSubmit={handleSubmit}>
           <div className="ol-form-grid">
-            <div className="ur-form-field">
-              <label className="ur-form-label" htmlFor="oa-equip">{l(COPY.fldEquip)}</label>
-              <input
-                id="oa-equip"
-                className="ur-form-input"
+            <div className="ur-form-field ol-form-grid__full">
+              <EquipmentPicker
                 value={form.equipmentId}
-                onChange={(e) => updateField('equipmentId', e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="ur-form-field">
-              <label className="ur-form-label" htmlFor="oa-lp">{l(COPY.fldLp)}</label>
-              <input
-                id="oa-lp"
-                className="ur-form-input"
-                value={form.lubricationPointId}
-                onChange={(e) => updateField('lubricationPointId', e.target.value)}
-                placeholder="LP-001"
+                onChange={(equipmentId, equipment) => {
+                  updateField('equipmentId', equipmentId);
+                  if (equipment) {
+                    setForm((prev) => ({
+                      ...prev,
+                      equipmentId,
+                      area: equipment.area,
+                      contractorId: equipment.contractorId,
+                    }));
+                  }
+                }}
               />
             </div>
 
@@ -242,19 +238,6 @@ export default function SampleIntake(): React.ReactElement {
                 onChange={(e) => updateField('samplingLocation', e.target.value)}
               />
             </div>
-
-            <div className="ur-form-field">
-              <label className="ur-form-label" htmlFor="oa-status">{l(COPY.fldStatus)}</label>
-              <select
-                id="oa-status"
-                className="ur-form-input"
-                value={form.status}
-                onChange={(e) => updateField('status', e.target.value as FormState['status'])}
-              >
-                <option value="imported">{l(COPY.stImported)}</option>
-                <option value="pending-review">{l(COPY.stPending)}</option>
-              </select>
-            </div>
           </div>
 
           <div className="ur-form-field">
@@ -269,7 +252,7 @@ export default function SampleIntake(): React.ReactElement {
           </div>
 
           <div className="ur-dialog__footer">
-            <button type="submit" className="ur-btn ur-btn--primary" disabled={dupWarning}>
+            <button type="submit" className="ur-btn ur-btn--primary" disabled={dupWarning || !form.equipmentId}>
               {l(COPY.btnSave)}
             </button>
             <button type="button" className="ur-btn ur-btn--ghost" onClick={handleReset}>

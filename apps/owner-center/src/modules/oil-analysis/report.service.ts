@@ -219,6 +219,7 @@ function listAbnormalFields(row: OilSampleRow): string[] {
 function pendingReason(row: OilSampleRow): string {
   const reasons: string[] = [];
   if (!row.lubricationPointId) reasons.push('missing-lp');
+  if (row.status === 'needs-lp-mapping') reasons.push('needs-lp-mapping');
   if (row.pdfImportStatus === 'pending-review') reasons.push('pdf-pending');
   if (row.status === 'imported' || row.status === 'linked' || row.status === 'pending-review') {
     reasons.push('intake');
@@ -230,6 +231,7 @@ function pendingReason(row: OilSampleRow): string {
 }
 
 function isPendingReviewRow(row: OilSampleRow): boolean {
+  if (row.status === 'needs-lp-mapping') return true;
   if (!row.lubricationPointId) return true;
   if (row.pdfImportStatus === 'pending-review') return true;
   if (row.status === 'imported' || row.status === 'linked' || row.status === 'pending-review') return true;

@@ -12,6 +12,8 @@
 // React components MUST NOT access localStorage directly; they call the service.
 
 import { oilAnalysisSettingsService } from './settings.service';
+import { isKnownEquipmentId } from './equipment-master.service';
+import { lubricationPointService } from '../oil-lubrication/lubrication-point.service';
 
 // ── View model ────────────────────────────────────────────────────────────────
 
@@ -49,6 +51,17 @@ export interface OilSampleApprovalHistoryEntry {
   readonly at: string;
   readonly fromStatus: OilSampleApprovalStatus;
   readonly toStatus: OilSampleApprovalStatus;
+  readonly notes?: string;
+}
+
+/** Engineer LP mapping confirmation audit entry. */
+export interface OilSampleLpMappingHistoryEntry {
+  readonly action: 'confirmed';
+  readonly actor: string;
+  readonly at: string;
+  readonly lubricationPointId: string;
+  readonly fromStatus: OilSampleRowStatus;
+  readonly toStatus: OilSampleRowStatus;
   readonly notes?: string;
 }
 
@@ -98,6 +111,7 @@ export interface OilSampleRow {
   readonly approvedBy: string | null;
   readonly approvedAt: string | null;
   readonly approvalHistory: readonly OilSampleApprovalHistoryEntry[];
+  readonly lpMappingHistory: readonly OilSampleLpMappingHistoryEntry[];
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -149,14 +163,12 @@ export interface OilSampleRegistryKpis {
 
 export interface OilSampleCreateInput {
   readonly equipmentId: string;
-  readonly lubricationPointId?: string | null;
   readonly labSampleId: string;
   readonly sampledAt: string;
   readonly lubricant?: string;
   readonly contractorId?: string;
   readonly area?: string;
   readonly samplingLocation?: string;
-  readonly status: 'imported' | 'pending-review';
   readonly notes?: string;
 }
 
@@ -287,6 +299,32 @@ function normalizeApprovalHistory(raw: unknown): readonly OilSampleApprovalHisto
       action: entry.action,
       actor: entry.actor,
       at: entry.at,
+      fromStatus: entry.fromStatus,
+      toStatus: entry.toStatus,
+      ...(entry.notes ? { notes: entry.notes } : {}),
+    }));
+}
+
+function normalizeLpMappingHistory(raw: unknown): readonly OilSampleLpMappingHistoryEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((entry): entry is OilSampleLpMappingHistoryEntry => {
+      if (!entry || typeof entry !== 'object') return false;
+      const e = entry as Partial<OilSampleLpMappingHistoryEntry>;
+      return (
+        e.action === 'confirmed' &&
+        typeof e.actor === 'string' &&
+        typeof e.at === 'string' &&
+        typeof e.lubricationPointId === 'string' &&
+        typeof e.fromStatus === 'string' &&
+        typeof e.toStatus === 'string'
+      );
+    })
+    .map((entry) => ({
+      action: entry.action,
+      actor: entry.actor,
+      at: entry.at,
+      lubricationPointId: entry.lubricationPointId,
       fromStatus: entry.fromStatus,
       toStatus: entry.toStatus,
       ...(entry.notes ? { notes: entry.notes } : {}),
@@ -531,6 +569,7 @@ function normalizeRow(
     approvedBy: raw.approvedBy ?? null,
     approvedAt: raw.approvedAt ?? null,
     approvalHistory: normalizeApprovalHistory(raw.approvalHistory),
+    lpMappingHistory: normalizeLpMappingHistory(raw.lpMappingHistory),
     createdAt: raw.createdAt ?? isoNow(),
     updatedAt: raw.updatedAt ?? isoNow(),
   };
@@ -663,6 +702,9 @@ export class OilSampleLocalService {
   create(input: OilSampleCreateInput): OilSampleRow {
     const equipmentId = input.equipmentId.trim();
     if (!equipmentId) throw new Error('Equipment ID is required.');
+    if (!isKnownEquipmentId(equipmentId)) {
+      throw new Error(`Equipment ID '${equipmentId}' is not registered in Equipment Master.`);
+    }
 
     const labSampleId = input.labSampleId.trim();
     if (!labSampleId) throw new Error('Lab Sample ID is required.');
@@ -675,13 +717,12 @@ export class OilSampleLocalService {
       throw new Error(`Lab Sample ID '${labSampleId}' already exists.`);
     }
 
-    const lpId = input.lubricationPointId?.trim() ?? '';
     const now = isoNow();
     const row: OilSampleRow = {
       id: generateInternalId(),
       sampleId: this.repo.nextSampleCode(),
       equipmentId,
-      lubricationPointId: lpId.length > 0 ? lpId : null,
+      lubricationPointId: null,
       labSampleId,
       sampledAt,
       lubricant: input.lubricant?.trim() ?? '',
@@ -689,7 +730,7 @@ export class OilSampleLocalService {
       area: input.area?.trim() ?? '',
       samplingLocation: input.samplingLocation?.trim() ?? '',
       importSource: 'manual',
-      status: input.status,
+      status: 'needs-lp-mapping',
       resultStatus: null,
       notes: input.notes?.trim() ?? '',
       ...emptyLabFields(),
@@ -699,11 +740,64 @@ export class OilSampleLocalService {
       approvedBy: null,
       approvedAt: null,
       approvalHistory: [],
+      lpMappingHistory: [],
       createdAt: now,
       updatedAt: now,
     };
 
     return this.repo.create(row);
+  }
+
+  listLpMappingQueue(): readonly OilSampleRow[] {
+    return [...this.list()]
+      .filter((s) => s.status === 'needs-lp-mapping' || (!s.lubricationPointId && s.status !== 'linked'))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  confirmLpMapping(
+    sampleInternalId: string,
+    lubricationPointId: string,
+    actor: string,
+    notes?: string,
+  ): OilSampleRow {
+    if (!actor.trim()) throw new Error('Engineer name is required.');
+
+    const lpId = lubricationPointId.trim();
+    if (!lpId) throw new Error('LP ID is required.');
+
+    const existing = this.findById(sampleInternalId);
+    if (!existing) throw new Error('Sample not found.');
+    if (existing.lubricationPointId) {
+      throw new Error('Sample already has a confirmed LP mapping.');
+    }
+    if (existing.status !== 'needs-lp-mapping' && existing.status !== 'imported' && existing.status !== 'pending-review') {
+      throw new Error(`Cannot confirm LP mapping while sample status is '${existing.status}'.`);
+    }
+
+    const lp = lubricationPointService.list().find(
+      (point) => point.lubricationPointId === lpId && point.isActive,
+    );
+    if (!lp) throw new Error(`LP ID '${lpId}' is not registered.`);
+    if (lp.equipmentId !== existing.equipmentId) {
+      throw new Error(`LP ID '${lpId}' does not belong to equipment '${existing.equipmentId}'.`);
+    }
+
+    const fromStatus = existing.status;
+    const historyEntry: OilSampleLpMappingHistoryEntry = {
+      action: 'confirmed',
+      actor: actor.trim(),
+      at: isoNow(),
+      lubricationPointId: lpId,
+      fromStatus,
+      toStatus: 'linked',
+      ...(notes?.trim() ? { notes: notes.trim() } : {}),
+    };
+
+    return this.repo.update(sampleInternalId, {
+      lubricationPointId: lpId,
+      status: 'linked',
+      lpMappingHistory: [...existing.lpMappingHistory, historyEntry],
+    });
   }
 
   listForPdfReview(): readonly OilSampleRow[] {
@@ -880,6 +974,9 @@ export class OilSampleLocalService {
               contaminationRating: labResults.contaminationRating.trim(),
               equipmentRating: labResults.equipmentRating.trim(),
               lubricantRating: labResults.lubricantRating.trim(),
+              ironPpm: labResults.ironPpm,
+              copperPpm: labResults.copperPpm,
+              siliconPpm: labResults.siliconPpm,
               pqIndex: labResults.pqIndex,
               viscosity100c: labResults.viscosity100c,
               tan: labResults.tan,
@@ -1028,7 +1125,11 @@ export class OilSampleLocalService {
     return {
       total: samples.length,
       pendingReview: samples.filter(
-        (s) => s.status === 'pending-review' || s.status === 'imported' || s.status === 'linked',
+        (s) =>
+          s.status === 'pending-review' ||
+          s.status === 'imported' ||
+          s.status === 'linked' ||
+          s.status === 'needs-lp-mapping',
       ).length,
       needsLpMapping: samples.filter((s) => !s.lubricationPointId).length,
       critical: samples.filter(isCriticalSample).length,
@@ -1040,7 +1141,11 @@ export class OilSampleLocalService {
     const ym = currentYearMonth();
 
     const pendingReview = samples.filter(
-      (s) => s.status === 'pending-review' || s.status === 'imported' || s.status === 'linked',
+      (s) =>
+        s.status === 'pending-review' ||
+        s.status === 'imported' ||
+        s.status === 'linked' ||
+        s.status === 'needs-lp-mapping',
     ).length;
 
     const pdfPendingReview = samples.filter(
