@@ -28,3 +28,19 @@ export {
 export type { OilAnalysisEntityType } from './entity-types';
 
 export { OIL_ANALYSIS_MANIFEST } from './manifest';
+
+export type {
+  OilAnalysisDefaultSampleStatus,
+  OilAnalysisReportLanguage,
+  OilAnalysisParameterId,
+  OilAnalysisConditionLevel,
+  OilAnalysisDateFormat,
+  OilAnalysisParameterThresholds,
+  OilAnalysisParameterSetting,
+  OilAnalysisConditionLevelRule,
+  OilAnalysisGeneralSettings,
+  OilAnalysisLaboratorySettings,
+  OilAnalysisConditionRules,
+  OilAnalysisSettingsAudit,
+  OilAnalysisModuleSettings,
+} from './settings-types';

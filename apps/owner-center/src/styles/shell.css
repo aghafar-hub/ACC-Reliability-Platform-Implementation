@@ -5073,3 +5073,139 @@ button {
   white-space: nowrap;
   font-size: var(--font-size-sm);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Oil Analysis — Module Settings (Sprint 09) — oa-settings-* classes
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.oa-settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.oa-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.oa-settings-success {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--chip-operational-bg);
+  color: var(--chip-operational-text);
+  font-size: var(--font-size-sm);
+}
+
+.oa-settings-hint {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.oa-settings-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.oa-settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.oa-settings-param-table .oa-settings-threshold {
+  width: 88px;
+  min-width: 72px;
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.oa-settings-condition-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-md);
+}
+
+.oa-settings-condition-card {
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.oa-settings-condition-card__title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.oa-settings-perm-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.oa-settings-perm-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+.oa-settings-perm-list__code {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.oa-settings-data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.oa-settings-file-input {
+  display: none;
+}
+
+.oa-settings-audit {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+}
+
+.oa-settings-audit__row {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) 1fr;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+
+.oa-settings-audit__row:last-child {
+  border-bottom: none;
+}
+
+.oa-settings-audit__row dt {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.oa-settings-audit__row dd {
+  margin: 0;
+}

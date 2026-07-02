@@ -7,8 +7,11 @@
 // Sprint 04 — PDF import shell + import review flow (metadata only).
 // Sprint 05 — condition assessment rules for manual lab results.
 // Sprint 06 — engineer review & approval workflow.
+// Sprint 09 — sample code prefix from module settings.
 //
 // React components MUST NOT access localStorage directly; they call the service.
+
+import { oilAnalysisSettingsService } from './settings.service';
 
 // ── View model ────────────────────────────────────────────────────────────────
 
@@ -619,7 +622,8 @@ class OilSampleLocalRepository {
 
   nextSampleCode(): string {
     const year = new Date().getFullYear();
-    const prefix = `OA-${year}-`;
+    const codePrefix = oilAnalysisSettingsService.getSampleNumberPrefix();
+    const prefix = `${codePrefix}-${year}-`;
     const maxSeq = this.list().reduce((max, row) => {
       if (!row.sampleId.startsWith(prefix)) return max;
       const seq = Number.parseInt(row.sampleId.slice(prefix.length), 10);

@@ -20,6 +20,7 @@ import PdfImport from './oil-analysis/PdfImport';
 import EngineerReview from './oil-analysis/EngineerReview';
 import Trends from './oil-analysis/Trends';
 import Reports from './oil-analysis/Reports';
+import ModuleSettings from './oil-analysis/ModuleSettings';
 
 // ── Locale helpers ─────────────────────────────────────────────────────────────
 
@@ -327,10 +328,7 @@ export default function OilAnalysisPage(): React.ReactElement {
       <Route path="review" element={<EngineerReview />} />
       <Route path="trends" element={<Trends />} />
       <Route path="reports" element={<Reports />} />
-      <Route
-        path="settings"
-        element={<OilAnalysisSubPage initials="ST" title={COPY.settingsTitle} desc={COPY.settingsDesc} />}
-      />
+      <Route path="settings" element={<ModuleSettings />} />
 
       <Route path="*" element={<Navigate to="/oil-analysis" replace />} />
     </Routes>
