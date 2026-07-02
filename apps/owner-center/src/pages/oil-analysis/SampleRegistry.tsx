@@ -130,6 +130,8 @@ const HISTORY_ACTION_LABELS: Record<OilSampleApprovalHistoryEntry['action'], L10
   rejected:                 { en: 'Rejected',                ar: 'رُفضت' },
   'returned-for-correction': { en: 'Returned for correction', ar: 'أُعيدت للتصحيح' },
   locked:                   { en: 'Locked',                  ar: 'قُفلت' },
+  'lab-results-entered':    { en: 'Lab results entered',     ar: 'أُدخلت نتائج المختبر' },
+  'auto-approved':          { en: 'Auto-approved',           ar: 'اعتُمدت تلقائياً' },
 };
 
 function formatDateTime(iso: string): string {

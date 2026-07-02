@@ -7,6 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import { StatusChip } from '../../components/StatusChip';
 import type { ChipStatus } from '../../components/StatusChip';
 import { SummaryCard } from '../../components/SummaryCard';
+import { OilAnalysisActionButton } from '../../components/oil-analysis/OilAnalysisActionButton';
+import { useOilAnalysisPermissions } from '../../hooks/useOilAnalysisPermissions';
 import { oilSampleService } from '../../modules/oil-analysis/sample.service';
 import type { OilSampleRow, OilSampleLpMappingHistoryEntry } from '../../modules/oil-analysis/sample.service';
 import { findEquipmentById } from '../../modules/oil-analysis/equipment-master.service';
@@ -126,6 +128,7 @@ interface DetailPanelProps {
 
 function DetailPanel({ row, locale, actor, onClose, onUpdated }: DetailPanelProps): React.ReactElement {
   const l = (b: L10n<string>) => t(b, locale);
+  const permissions = useOilAnalysisPermissions();
   const equipment = findEquipmentById(row.equipmentId);
   const availableLps = useMemo(() => listLpsForEquipment(row.equipmentId), [row.equipmentId]);
   const [selectedLpId, setSelectedLpId] = useState('');
@@ -259,14 +262,15 @@ function DetailPanel({ row, locale, actor, onClose, onUpdated }: DetailPanelProp
               />
             </div>
 
-            <button
+            <OilAnalysisActionButton
               type="button"
               className="ur-btn ur-btn--primary"
+              allowed={permissions.canConfirmLpMapping}
               disabled={!selectedLpId || availableLps.length === 0}
               onClick={handleConfirm}
             >
               {l(COPY.btnConfirm)}
-            </button>
+            </OilAnalysisActionButton>
           </div>
         </div>
       )}

@@ -5,6 +5,8 @@ import React, { useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { usePlatformSdk } from '../../context/SdkContext';
 import { StatusChip } from '../../components/StatusChip';
+import { OilAnalysisActionButton } from '../../components/oil-analysis/OilAnalysisActionButton';
+import { useOilAnalysisPermissions } from '../../hooks/useOilAnalysisPermissions';
 import type {
   OilAnalysisModuleSettings,
   OilAnalysisParameterSetting,
@@ -148,6 +150,7 @@ export default function ModuleSettings(): React.ReactElement {
   const { locale } = useLanguage();
   const l = (b: L10n<string>) => t(b, locale);
   const sdk = usePlatformSdk();
+  const permissions = useOilAnalysisPermissions();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [draft, setDraft] = useState<OilAnalysisModuleSettings>(() =>
@@ -260,9 +263,14 @@ export default function ModuleSettings(): React.ReactElement {
       {saved && !error && <p className="oa-settings-success" role="status">{l(COPY.btnSaved)}</p>}
 
       <div className="oa-settings-actions">
-        <button type="button" className="ur-btn ur-btn--primary" onClick={handleSave}>
+        <OilAnalysisActionButton
+          type="button"
+          className="ur-btn ur-btn--primary"
+          allowed={permissions.canManageSettings}
+          onClick={handleSave}
+        >
           {l(COPY.btnSave)}
-        </button>
+        </OilAnalysisActionButton>
       </div>
 
       {/* Section 1 — General Settings */}

@@ -7,6 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import { StatusChip } from '../../components/StatusChip';
 import type { ChipStatus } from '../../components/StatusChip';
 import { SummaryCard } from '../../components/SummaryCard';
+import { OilAnalysisActionButton } from '../../components/oil-analysis/OilAnalysisActionButton';
+import { useOilAnalysisPermissions } from '../../hooks/useOilAnalysisPermissions';
 import {
   oilSampleService,
   computeSampleCondition,
@@ -17,10 +19,10 @@ import type {
   OilSampleRow,
   OilSampleApprovalStatus,
   OilSampleApprovalHistoryEntry,
-  OilLabResultStatus,
   OilLabResultInput,
 } from '../../modules/oil-analysis/sample.service';
-import { isLabParameterVisible } from '../../modules/oil-analysis/settings-guards';
+import { isLabParameterVisible, isApprovalWorkflowEnabled, SETTINGS_GUARD_COPY } from '../../modules/oil-analysis/settings-guards';
+import { SettingsDisabledPanel } from './SettingsDisabledPanel';
 
 interface L10n<T> { en: T; ar: T; }
 
@@ -123,6 +125,8 @@ const HISTORY_ACTION_LABELS: Record<OilSampleApprovalHistoryEntry['action'], L10
   rejected:                { en: 'Rejected',                ar: 'رُفضت' },
   'returned-for-correction':{ en: 'Returned for correction', ar: 'أُعيدت للتصحيح' },
   locked:                  { en: 'Locked',                  ar: 'قُفلت' },
+  'lab-results-entered':   { en: 'Lab results entered',     ar: 'أُدخلت نتائج المختبر' },
+  'auto-approved':         { en: 'Auto-approved',           ar: 'اعتُمدت تلقائياً' },
 };
 
 function approvalStatusChip(status: OilSampleApprovalStatus | null): ChipStatus {
@@ -139,7 +143,6 @@ interface ReviewFormState {
   notes: string;
   lubricant: string;
   samplingLocation: string;
-  resultStatus: OilLabResultStatus | '';
   contaminationRating: string;
   equipmentRating: string;
   lubricantRating: string;
@@ -163,7 +166,6 @@ function formFromSample(row: OilSampleRow): ReviewFormState {
     notes: row.notes,
     lubricant: row.lubricant,
     samplingLocation: row.samplingLocation,
-    resultStatus: row.resultStatus ?? '',
     contaminationRating: row.contaminationRating,
     equipmentRating: row.equipmentRating,
     lubricantRating: row.lubricantRating,
@@ -277,6 +279,8 @@ interface ReviewDetailPanelProps {
   readonly row: OilSampleRow;
   readonly locale: string;
   readonly reviewerName: string;
+  readonly canReview: boolean;
+  readonly canApprove: boolean;
   readonly onClose: () => void;
   readonly onUpdated: () => void;
 }
@@ -285,6 +289,8 @@ function ReviewDetailPanel({
   row,
   locale,
   reviewerName,
+  canReview,
+  canApprove,
   onClose,
   onUpdated,
 }: ReviewDetailPanelProps): React.ReactElement {
@@ -313,12 +319,7 @@ function ReviewDetailPanel({
   }
 
   function handleSaveEdit(): void {
-    if (!form.resultStatus) {
-      setError('Result status is required.');
-      return;
-    }
     const labResults: OilLabResultInput = {
-      resultStatus: form.resultStatus,
       contaminationRating: form.contaminationRating,
       equipmentRating: form.equipmentRating,
       lubricantRating: form.lubricantRating,
@@ -456,9 +457,14 @@ function ReviewDetailPanel({
 
       {canOpen && (
         <div className="oc-detail-panel__actions">
-          <button type="button" className="ur-btn ur-btn--primary" onClick={handleOpen}>
+          <OilAnalysisActionButton
+            type="button"
+            className="ur-btn ur-btn--primary"
+            allowed={canReview}
+            onClick={handleOpen}
+          >
             {l(COPY.btnOpen)}
-          </button>
+          </OilAnalysisActionButton>
         </div>
       )}
 
@@ -492,20 +498,6 @@ function ReviewDetailPanel({
                 value={form.samplingLocation}
                 onChange={(e) => setForm((prev) => ({ ...prev, samplingLocation: e.target.value }))}
               />
-            </div>
-            <div className="ur-form-field">
-              <label className="ur-form-label">{l(COPY.fldStatus)}</label>
-              <select
-                className="ur-form-input"
-                value={form.resultStatus}
-                onChange={(e) => setForm((prev) => ({ ...prev, resultStatus: e.target.value as OilLabResultStatus | '' }))}
-              >
-                <option value="">{l(COPY.none)}</option>
-                <option value="normal">{l(COPY.stNormal)}</option>
-                <option value="monitor">{l(COPY.stMonitor)}</option>
-                <option value="caution">{l(COPY.stCaution)}</option>
-                <option value="critical">{l(COPY.stCritical)}</option>
-              </select>
             </div>
             {isLabParameterVisible('iron') && (
             <div className="ur-form-field">
@@ -546,9 +538,14 @@ function ReviewDetailPanel({
               />
             </div>
             )}
-            <button type="button" className="ur-btn ur-btn--primary" onClick={handleSaveEdit}>
+            <OilAnalysisActionButton
+              type="button"
+              className="ur-btn ur-btn--primary"
+              allowed={canReview}
+              onClick={handleSaveEdit}
+            >
               {l(COPY.btnSaveEdit)}
-            </button>
+            </OilAnalysisActionButton>
           </div>
         </div>
       )}
@@ -556,27 +553,30 @@ function ReviewDetailPanel({
       {canDecide && !dialog && (
         <div className="oc-approval-actions">
           <div className="oc-approval-actions__btns">
-            <button
+            <OilAnalysisActionButton
               type="button"
               className="ur-btn ur-btn--sm oc-approval-actions__approve-btn"
+              allowed={canApprove}
               onClick={handleApprove}
             >
               {l(COPY.btnApprove)}
-            </button>
-            <button
+            </OilAnalysisActionButton>
+            <OilAnalysisActionButton
               type="button"
               className="ur-btn ur-btn--ghost ur-btn--sm oc-approval-actions__reject-btn"
+              allowed={canApprove}
               onClick={() => setDialog('reject')}
             >
               {l(COPY.btnReject)}
-            </button>
-            <button
+            </OilAnalysisActionButton>
+            <OilAnalysisActionButton
               type="button"
               className="ur-btn ur-btn--ghost ur-btn--sm"
+              allowed={canApprove}
               onClick={() => setDialog('return')}
             >
               {l(COPY.btnReturn)}
-            </button>
+            </OilAnalysisActionButton>
           </div>
         </div>
       )}
@@ -627,6 +627,7 @@ function ReviewDetailPanel({
 export default function EngineerReview(): React.ReactElement {
   const { locale } = useLanguage();
   const { user } = useAuth();
+  const permissions = useOilAnalysisPermissions();
   const l = (b: L10n<string>) => t(b, locale);
 
   const reviewerName = user?.displayName ?? user?.email ?? 'Unknown Reviewer';
@@ -652,6 +653,17 @@ export default function EngineerReview(): React.ReactElement {
       const refreshed = oilSampleService.findById(selectedId);
       if (!refreshed) setSelectedId(null);
     }
+  }
+
+  if (!isApprovalWorkflowEnabled()) {
+    return (
+      <SettingsDisabledPanel
+        title={COPY.title}
+        desc={COPY.desc}
+        message={SETTINGS_GUARD_COPY.approvalWorkflowDisabled}
+        badge={COPY.liveData}
+      />
+    );
   }
 
   return (
@@ -718,6 +730,8 @@ export default function EngineerReview(): React.ReactElement {
             row={selected}
             locale={locale}
             reviewerName={reviewerName}
+            canReview={permissions.canEngineerReview}
+            canApprove={permissions.canApproveResults}
             onClose={() => setSelectedId(null)}
             onUpdated={handleUpdated}
           />

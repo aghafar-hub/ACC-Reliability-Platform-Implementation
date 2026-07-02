@@ -5,6 +5,8 @@ import React, { useMemo, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusChip } from '../../components/StatusChip';
 import { SummaryCard } from '../../components/SummaryCard';
+import { OilAnalysisActionButton } from '../../components/oil-analysis/OilAnalysisActionButton';
+import { useOilAnalysisPermissions } from '../../hooks/useOilAnalysisPermissions';
 import {
   generateOilReport,
   listReportAreas,
@@ -418,6 +420,7 @@ function hasReportData(output: OilReportOutput): boolean {
 export default function Reports(): React.ReactElement {
   const { locale } = useLanguage();
   const l = (b: L10n<string>) => t(b, locale);
+  const permissions = useOilAnalysisPermissions();
 
   const areas = useMemo(() => listReportAreas(), []);
   const contractors = useMemo(() => listReportContractors(), []);
@@ -529,22 +532,24 @@ export default function Reports(): React.ReactElement {
         </div>
 
         <div className="oa-report-actions">
-          <button
+          <OilAnalysisActionButton
             type="button"
             className="ur-btn ur-btn--ghost ur-btn--sm"
+            allowed={permissions.canExportReports}
             disabled={!hasData || !csvExportEnabled}
             onClick={() => exportReportCsv(output)}
           >
             {l(COPY.btnCsv)}
-          </button>
-          <button
+          </OilAnalysisActionButton>
+          <OilAnalysisActionButton
             type="button"
             className="ur-btn ur-btn--ghost ur-btn--sm"
+            allowed={permissions.canExportReports}
             disabled={!hasData || !jsonExportEnabled}
             onClick={() => exportReportJson(output)}
           >
             {l(COPY.btnJson)}
-          </button>
+          </OilAnalysisActionButton>
         </div>
       </div>
 

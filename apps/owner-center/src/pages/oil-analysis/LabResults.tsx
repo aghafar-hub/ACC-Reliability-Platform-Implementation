@@ -3,8 +3,11 @@
 
 import React, { useMemo, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
 import { StatusChip } from '../../components/StatusChip';
 import type { ChipStatus } from '../../components/StatusChip';
+import { OilAnalysisActionButton } from '../../components/oil-analysis/OilAnalysisActionButton';
+import { useOilAnalysisPermissions } from '../../hooks/useOilAnalysisPermissions';
 import {
   oilSampleService,
   hasLabResults,
@@ -13,8 +16,8 @@ import {
 } from '../../modules/oil-analysis/sample.service';
 import type {
   OilSampleRow,
-  OilLabResultStatus,
   OilLabResultInput,
+  OilLabResultStatus,
   OilConditionLevel,
 } from '../../modules/oil-analysis/sample.service';
 import {
@@ -55,14 +58,14 @@ const COPY = {
   secSelect:   { en: 'Select Sample',            ar: 'اختر العينة' },
   secSummary:  { en: 'Sample Summary',         ar: 'ملخص العينة' },
   secResults:  { en: 'Analysis Results',       ar: 'نتائج التحليل' },
-  secPreview:  { en: 'Condition Assessment Preview', ar: 'معاينة تقييم الحالة' },
-  previewNone: { en: 'Enter result status or ratings to preview overall condition.', ar: 'أدخل حالة النتيجة أو التصنيفات لمعاينة الحالة الإجمالية.' },
+  secPreview:  { en: 'Condition Assessment (automatic)', ar: 'تقييم الحالة (تلقائي)' },
+  previewNone: { en: 'Enter enabled lab parameter values to preview evaluated condition.', ar: 'أدخل قيم المعاملات المفعّلة لمعاينة الحالة المُقيَّمة.' },
+  computedStatus:{ en: 'Evaluated condition',          ar: 'الحالة المُقيَّمة' },
   selPh:       { en: 'Choose a sample…',         ar: 'اختر عينة…' },
   noSamples:   { en: 'No samples available. Register a sample via Intake first.', ar: 'لا توجد عينات. سجّل عينة عبر الاستقبال أولاً.' },
   btnSave:     { en: 'Save Results',             ar: 'حفظ النتائج' },
   btnReset:    { en: 'Reset Form',               ar: 'إعادة تعيين' },
-  success:     { en: 'Lab results saved. Sample marked as analysed.', ar: 'تم حفظ نتائج المختبر. تم وضع علامة على العينة كمحللة.' },
-  fldStatus:   { en: 'Result Status *',          ar: 'حالة النتيجة *' },
+  success:     { en: 'Lab results saved. Condition evaluated automatically.', ar: 'تم حفظ نتائج المختبر. تم تقييم الحالة تلقائياً.' },
   stNormal:    { en: 'Normal',                   ar: 'طبيعي' },
   stMonitor:   { en: 'Monitor',                  ar: 'مراقبة' },
   stCaution:   { en: 'Caution',                  ar: 'تحذير' },
@@ -131,7 +134,6 @@ function conditionLevelChip(level: OilConditionLevel): ChipStatus {
 }
 
 interface LabFormState {
-  resultStatus: OilLabResultStatus | '';
   contaminationRating: string;
   equipmentRating: string;
   lubricantRating: string;
@@ -151,7 +153,6 @@ interface LabFormState {
 }
 
 const EMPTY_FORM: LabFormState = {
-  resultStatus: '',
   contaminationRating: '',
   equipmentRating: '',
   lubricantRating: '',
@@ -172,7 +173,6 @@ const EMPTY_FORM: LabFormState = {
 
 function formFromSample(row: OilSampleRow): LabFormState {
   return {
-    resultStatus: row.resultStatus ?? '',
     contaminationRating: row.contaminationRating,
     equipmentRating: row.equipmentRating,
     lubricantRating: row.lubricantRating,
@@ -195,6 +195,8 @@ function formFromSample(row: OilSampleRow): LabFormState {
 export default function LabResults(): React.ReactElement {
   const { locale } = useLanguage();
   const l = (b: L10n<string>) => t(b, locale);
+  const { user } = useAuth();
+  const permissions = useOilAnalysisPermissions();
 
   const samples = oilSampleService.listForLabEntry();
   const [selectedId, setSelectedId] = useState('');
@@ -210,20 +212,27 @@ export default function LabResults(): React.ReactElement {
 
   const isLocked = selected ? isSampleApprovalLocked(selected) : false;
   const manualEntryEnabled = isManualEntryEnabled();
-  const entryBlocked = !manualEntryEnabled || isLocked;
+  const entryBlocked = !manualEntryEnabled || isLocked || !permissions.canEnterLabResults;
 
   const previewCondition = useMemo(() => {
-    if (!form.resultStatus && !form.contaminationRating.trim()
-      && !form.equipmentRating.trim() && !form.lubricantRating.trim()) {
-      return null;
-    }
     return computeConditionAssessment({
-      resultStatus: form.resultStatus ? form.resultStatus as OilLabResultStatus : null,
+      resultStatus: null,
       contaminationRating: form.contaminationRating,
       equipmentRating: form.equipmentRating,
       lubricantRating: form.lubricantRating,
+      ironPpm: parseOptionalNumber(form.ironPpm),
+      copperPpm: parseOptionalNumber(form.copperPpm),
+      siliconPpm: parseOptionalNumber(form.siliconPpm),
+      pqIndex: parseOptionalNumber(form.pqIndex),
+      viscosity100c: parseOptionalNumber(form.viscosity100c),
+      tan: parseOptionalNumber(form.tan),
+      oxidation: parseOptionalNumber(form.oxidation),
+      waterPercent: parseOptionalNumber(form.waterPercent),
+      particle4: parseOptionalNumber(form.particle4),
+      particle6: parseOptionalNumber(form.particle6),
+      particle14: parseOptionalNumber(form.particle14),
     });
-  }, [form.resultStatus, form.contaminationRating, form.equipmentRating, form.lubricantRating]);
+  }, [form]);
 
   function handleSelectSample(id: string): void {
     setSelectedId(id);
@@ -254,7 +263,6 @@ export default function LabResults(): React.ReactElement {
     }
 
     const input: OilLabResultInput = {
-      resultStatus: form.resultStatus as OilLabResultStatus,
       contaminationRating: form.contaminationRating,
       equipmentRating: form.equipmentRating,
       lubricantRating: form.lubricantRating,
@@ -274,7 +282,8 @@ export default function LabResults(): React.ReactElement {
     };
 
     try {
-      oilSampleService.saveLabResults(selectedId, input);
+      const actor = user?.displayName?.trim() || user?.email?.trim() || 'Lab Technician';
+      oilSampleService.saveLabResults(selectedId, input, actor);
       setSuccess(true);
       setRevision((n) => n + 1);
       setForm(formFromSample(oilSampleService.findById(selectedId)!));
@@ -423,20 +432,17 @@ export default function LabResults(): React.ReactElement {
                 <fieldset disabled={entryBlocked} style={{ border: 'none', margin: 0, padding: 0 }}>
                 <div className="ol-form-grid">
                   <div className="ur-form-field">
-                    <label className="ur-form-label" htmlFor="lr-status">{l(COPY.fldStatus)}</label>
-                    <select
-                      id="lr-status"
-                      className="ur-form-input"
-                      value={form.resultStatus}
-                      onChange={(e) => updateField('resultStatus', e.target.value as LabFormState['resultStatus'])}
-                      required
-                    >
-                      <option value="">{l(COPY.selPh)}</option>
-                      <option value="normal">{l(COPY.stNormal)}</option>
-                      <option value="monitor">{l(COPY.stMonitor)}</option>
-                      <option value="caution">{l(COPY.stCaution)}</option>
-                      <option value="critical">{l(COPY.stCritical)}</option>
-                    </select>
+                    <label className="ur-form-label">{l(COPY.computedStatus)}</label>
+                    <div className="ur-form-input" style={{ display: 'flex', alignItems: 'center', minHeight: '2.5rem' }}>
+                      {previewCondition ? (
+                        <StatusChip
+                          status={conditionLevelChip(previewCondition)}
+                          label={l(CONDITION_LABELS[previewCondition])}
+                        />
+                      ) : (
+                        <span className="ur-form-hint">{l(COPY.previewNone)}</span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="ur-form-field">
@@ -533,7 +539,14 @@ export default function LabResults(): React.ReactElement {
                 </div>
 
                 <div className="ur-dialog__footer">
-                  <button type="submit" className="ur-btn ur-btn--primary" disabled={entryBlocked}>{l(COPY.btnSave)}</button>
+                  <OilAnalysisActionButton
+                    type="submit"
+                    className="ur-btn ur-btn--primary"
+                    allowed={permissions.canEnterLabResults}
+                    disabled={entryBlocked}
+                  >
+                    {l(COPY.btnSave)}
+                  </OilAnalysisActionButton>
                   <button type="button" className="ur-btn ur-btn--ghost" onClick={handleReset} disabled={entryBlocked}>{l(COPY.btnReset)}</button>
                 </div>
                 </fieldset>

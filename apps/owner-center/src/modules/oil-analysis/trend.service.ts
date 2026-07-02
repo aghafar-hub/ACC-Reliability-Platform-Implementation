@@ -14,6 +14,7 @@ import {
 } from '../trend-engine';
 import { oilSampleService, computeSampleCondition, hasLabResults } from './sample.service';
 import type { OilSampleRow } from './sample.service';
+import { isSampleResultFinalized } from './approval-workflow';
 import { oilChangeService } from '../oil-lubrication/oil-change.service';
 import type { OcRecord } from '../oil-lubrication/oil-change.service';
 
@@ -58,11 +59,11 @@ export function getOilTrendParameter(id: OilTrendParameterId): OilTrendParameter
 
 // ── Eligibility ───────────────────────────────────────────────────────────────
 
-/** Only approved or locked laboratory results are trendable. */
+/** Only finalized laboratory results are trendable. */
 export function isTrendEligibleSample(row: OilSampleRow): boolean {
   if (!hasLabResults(row)) return false;
   if (row.status === 'cancelled') return false;
-  return row.approvalStatus === 'approved' || row.approvalStatus === 'locked';
+  return isSampleResultFinalized(row);
 }
 
 function extractNumericValue(row: OilSampleRow, field: keyof OilSampleRow): number | null {

@@ -5,6 +5,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import { StatusChip } from '../../components/StatusChip';
+import { OilAnalysisActionButton } from '../../components/oil-analysis/OilAnalysisActionButton';
+import { useOilAnalysisPermissions } from '../../hooks/useOilAnalysisPermissions';
 import { oilSampleService } from '../../modules/oil-analysis/sample.service';
 import type { OilSampleCreateInput } from '../../modules/oil-analysis/sample.service';
 import EquipmentPicker from './EquipmentPicker';
@@ -63,6 +65,7 @@ export default function SampleIntake(): React.ReactElement {
   const { locale } = useLanguage();
   const l = (b: L10n<string>) => t(b, locale);
   const navigate = useNavigate();
+  const permissions = useOilAnalysisPermissions();
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
@@ -252,9 +255,14 @@ export default function SampleIntake(): React.ReactElement {
           </div>
 
           <div className="ur-dialog__footer">
-            <button type="submit" className="ur-btn ur-btn--primary" disabled={dupWarning || !form.equipmentId}>
+            <OilAnalysisActionButton
+              type="submit"
+              className="ur-btn ur-btn--primary"
+              allowed={permissions.canCreateSample}
+              disabled={dupWarning || !form.equipmentId}
+            >
               {l(COPY.btnSave)}
-            </button>
+            </OilAnalysisActionButton>
             <button type="button" className="ur-btn ur-btn--ghost" onClick={handleReset}>
               {l(COPY.btnReset)}
             </button>

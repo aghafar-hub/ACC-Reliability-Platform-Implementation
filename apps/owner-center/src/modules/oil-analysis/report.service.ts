@@ -14,6 +14,9 @@ import {
 import type { OilSampleRow, SampleCondition } from './sample.service';
 import { analyzeOilParameterTrend, isTrendEligibleSample } from './trend.service';
 import type { TrendDirection } from '../trend-engine';
+import { isSampleResultFinalized, isApprovalWorkflowEnabled } from './approval-workflow';
+import { evaluateParameterCondition } from './threshold-engine';
+import type { OilAnalysisParameterId } from './settings-types';
 
 // ── Report types ──────────────────────────────────────────────────────────────
 
@@ -145,13 +148,9 @@ export interface OilReportOutput {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function isApprovedOrLocked(row: OilSampleRow): boolean {
-  return row.approvalStatus === 'approved' || row.approvalStatus === 'locked';
-}
-
 function isEngineeringEligible(row: OilSampleRow): boolean {
   if (!hasLabResults(row)) return false;
-  return isApprovedOrLocked(row);
+  return isSampleResultFinalized(row);
 }
 
 function matchesDateRange(row: OilSampleRow, filters: OilReportFilters): boolean {
@@ -197,7 +196,35 @@ function groupBy(
 function listAbnormalFields(row: OilSampleRow): string[] {
   const fields: string[] = [];
 
-  if (row.resultStatus === 'critical' || row.resultStatus === 'caution' || row.resultStatus === 'monitor') {
+  const paramChecks: readonly { id: OilAnalysisParameterId; value: number | null }[] = [
+    { id: 'iron', value: row.ironPpm },
+    { id: 'copper', value: row.copperPpm },
+    { id: 'silicon', value: row.siliconPpm },
+    { id: 'water', value: row.waterPercent },
+    { id: 'pqIndex', value: row.pqIndex },
+    { id: 'viscosity', value: row.viscosity100c },
+    { id: 'tan', value: row.tan },
+    { id: 'oxidation', value: row.oxidation },
+    {
+      id: 'particleCount',
+      value: [row.particle4, row.particle6, row.particle14]
+        .filter((v): v is number => v !== null && Number.isFinite(v))
+        .reduce((max, v) => Math.max(max, v), Number.NEGATIVE_INFINITY) === Number.NEGATIVE_INFINITY
+        ? null
+        : Math.max(
+            ...( [row.particle4, row.particle6, row.particle14].filter(
+              (v): v is number => v !== null && Number.isFinite(v),
+            ) ),
+          ),
+    },
+  ];
+
+  for (const { id, value } of paramChecks) {
+    const level = evaluateParameterCondition(id, value);
+    if (level && level !== 'normal') fields.push(`${id}:${level}`);
+  }
+
+  if (row.resultStatus && row.resultStatus !== 'normal') {
     fields.push(`resultStatus:${row.resultStatus}`);
   }
   if (row.alertType.trim()) fields.push(`alert:${row.alertType.trim()}`);
@@ -226,7 +253,9 @@ function pendingReason(row: OilSampleRow): string {
   }
   if (hasLabResults(row) && row.approvalStatus === 'pending') reasons.push('pending-approval');
   if (row.approvalStatus === 'under-review') reasons.push('under-review');
-  if (hasLabResults(row) && !row.approvalStatus) reasons.push('awaiting-review');
+  if (hasLabResults(row) && isApprovalWorkflowEnabled() && !row.approvalStatus) {
+    reasons.push('awaiting-review');
+  }
   return reasons.join(', ') || row.status;
 }
 
@@ -235,7 +264,8 @@ function isPendingReviewRow(row: OilSampleRow): boolean {
   if (!row.lubricationPointId) return true;
   if (row.pdfImportStatus === 'pending-review') return true;
   if (row.status === 'imported' || row.status === 'linked' || row.status === 'pending-review') return true;
-  if (hasLabResults(row) && (row.approvalStatus === 'pending' || row.approvalStatus === 'under-review')) {
+  if (hasLabResults(row) && isApprovalWorkflowEnabled()
+    && (row.approvalStatus === 'pending' || row.approvalStatus === 'under-review')) {
     return true;
   }
   return false;

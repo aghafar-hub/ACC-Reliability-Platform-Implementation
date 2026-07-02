@@ -13,6 +13,7 @@ import {
   computeSampleCondition,
 } from '../modules/oil-analysis/sample.service';
 import type { OilSampleRow } from '../modules/oil-analysis/sample.service';
+import { isApprovalWorkflowEnabled } from '../modules/oil-analysis/settings-guards';
 import SampleRegistry from './oil-analysis/SampleRegistry';
 import SampleIntake from './oil-analysis/SampleIntake';
 import LpMapping from './oil-analysis/LpMapping';
@@ -170,17 +171,17 @@ function OilAnalysisDashboard(): React.ReactElement {
       subtext: COPY.kpiPending,
       variant: kpis.pendingReview > 0 ? 'maintenance' : 'operational',
     },
-    {
+    ...(isApprovalWorkflowEnabled() ? [{
       label:   { en: 'Pending Approval',        ar: 'بانتظار الموافقة'         },
       value:   { en: String(kpis.pendingApproval), ar: String(kpis.pendingApproval) },
       subtext: COPY.kpiPendingApproval,
-      variant: kpis.pendingApproval > 0 ? 'maintenance' : 'operational',
-    },
+      variant: (kpis.pendingApproval > 0 ? 'maintenance' : 'operational') as KpiVariant,
+    }] : []),
     {
       label:   { en: 'Approved Today',          ar: 'اعتُمدت اليوم'            },
       value:   { en: String(kpis.approvedToday), ar: String(kpis.approvedToday) },
       subtext: COPY.kpiApprovedToday,
-      variant: kpis.approvedToday > 0 ? 'operational' : 'operational',
+      variant: 'operational',
     },
     {
       label:   { en: 'PDF Pending Review',      ar: 'PDF بانتظار المراجعة'     },

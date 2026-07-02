@@ -3,6 +3,7 @@
 
 import { oilAnalysisSettingsService } from './settings.service';
 import type { OilAnalysisParameterId } from './settings-types';
+import { isApprovalWorkflowEnabled } from './approval-workflow';
 import { OIL_TREND_PARAMETERS } from './trend.service';
 import type { OilTrendParameterDef } from './trend.service';
 import type { ModuleSubNavItem } from '../../types/module-registry-types';
@@ -20,6 +21,10 @@ export const SETTINGS_GUARD_COPY = {
     en: 'Trend analysis is disabled by module settings',
     ar: 'تحليل الاتجاهات معطّل بإعدادات الوحدة',
   },
+  approvalWorkflowDisabled: {
+    en: 'Engineer approval workflow is disabled by module settings',
+    ar: 'سير موافقة المهندس معطّل بإعدادات الوحدة',
+  },
 } as const;
 
 export function isManualEntryEnabled(): boolean {
@@ -33,6 +38,8 @@ export function isPdfImportEnabled(): boolean {
 export function isTrendEngineEnabled(): boolean {
   return oilAnalysisSettingsService.getSettings().general.enableTrendEngine;
 }
+
+export { isApprovalWorkflowEnabled } from './approval-workflow';
 
 export function isCsvExportEnabled(): boolean {
   return oilAnalysisSettingsService.getSettings().general.enableCsvExport;
@@ -58,6 +65,7 @@ export function filterOilAnalysisSubNav(
   return items.filter((item) => {
     if (item.path === '/oil-analysis/pdf-import') return isPdfImportEnabled();
     if (item.path === '/oil-analysis/trends') return isTrendEngineEnabled();
+    if (item.path === '/oil-analysis/review') return isApprovalWorkflowEnabled();
     return true;
   });
 }
