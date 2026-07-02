@@ -5024,3 +5024,52 @@ button {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Oil Analysis — Reports (Sprint 08) — oa-report-* classes
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.oa-report-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.oa-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: flex-end;
+}
+
+.oa-trend-field--search {
+  flex: 1 1 200px;
+  min-width: 200px;
+}
+
+.oa-report-breakdowns {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-md);
+}
+
+.oa-report-breakdown__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  margin: 0 0 var(--space-sm);
+  color: var(--color-text-muted);
+}
+
+.oa-report-table-wrap {
+  overflow-x: auto;
+}
+
+.oa-report-table--wide {
+  min-width: 960px;
+}
+
+.oa-report-table th,
+.oa-report-table td {
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
