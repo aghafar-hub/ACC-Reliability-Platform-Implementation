@@ -481,6 +481,80 @@ export {
   CONTRACTOR_DEACTIVATED_VERSION,
 } from './contracts/platform-events';
 
+// ── Equipment Master — Types ──────────────────────────────────────────────────
+export type {
+  EquipmentStatus as MasterEquipmentStatus,
+  EquipmentRecord,
+  CreateEquipmentRequest,
+  UpdateEquipmentRequest,
+  EquipmentListQuery,
+  EquipmentListResult,
+  IEquipmentRepository,
+  IEquipmentService,
+} from './equipment/equipment-types';
+
+export { EQUIPMENT_STATUSES } from './equipment/equipment-types';
+
+// ── Equipment Master — Repository ─────────────────────────────────────────────
+export { InMemoryEquipmentRepository } from './equipment/equipment-repository';
+
+// ── Equipment Master — Service ──────────────────────────────────────────────────
+export { EquipmentService } from './equipment/equipment-service';
+
+// ── Equipment Master — Event Tokens ───────────────────────────────────────────
+export { EQUIPMENT_UPDATED_TOKEN } from './equipment/equipment-event-tokens';
+
+// ── Equipment Master — Platform Events ────────────────────────────────────────
+export type {
+  EquipmentUpdatedPayload,
+  EquipmentUpdatedEvent,
+} from './contracts/platform-events';
+
+export { EQUIPMENT_UPDATED_VERSION } from './contracts/platform-events';
+
+// ── Lubrication Point Master — Types ──────────────────────────────────────────
+export type {
+  LpStatus,
+  LubricationPointRecordId,
+  LubricationPointRecord,
+  CreateLubricationPointRequest,
+  UpdateLubricationPointRequest,
+  LubricationPointListQuery,
+  LubricationPointListResult,
+  ILubricationPointRepository,
+  ILubricationPointService,
+} from './lubrication-point/lubrication-point-types';
+
+export {
+  LP_STATUSES,
+  generateLubricationPointRecordId,
+} from './lubrication-point/lubrication-point-types';
+
+// ── Lubrication Point Master — Repository ─────────────────────────────────────
+export { InMemoryLubricationPointRepository } from './lubrication-point/lubrication-point-repository';
+
+// ── Lubrication Point Master — Service ────────────────────────────────────────
+export { LubricationPointService } from './lubrication-point/lubrication-point-service';
+
+// ── Lubrication Point Master — Event Tokens ───────────────────────────────────
+export {
+  LP_UPDATED_TOKEN,
+  LP_DEACTIVATED_TOKEN,
+} from './lubrication-point/lubrication-point-event-tokens';
+
+// ── Lubrication Point Master — Platform Events ────────────────────────────────
+export type {
+  LpUpdatedPayload,
+  LpUpdatedEvent,
+  LpDeactivatedPayload,
+  LpDeactivatedEvent,
+} from './contracts/platform-events';
+
+export {
+  LP_UPDATED_VERSION,
+  LP_DEACTIVATED_VERSION,
+} from './contracts/platform-events';
+
 // ── Module Registry — Types ───────────────────────────────────────────────────
 export type {
   ModuleStatus,
@@ -833,4 +907,10 @@ export {
   WorkflowDefinitionDuplicateError,
   WorkflowLifecycleError,
   WorkflowInstanceLifecycleError,
+  EquipmentError,
+  EquipmentNotFoundError,
+  EquipmentDuplicateError,
+  LubricationPointError,
+  LubricationPointNotFoundError,
+  LubricationPointDuplicateError,
 } from './errors';

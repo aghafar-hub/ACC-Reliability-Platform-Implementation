@@ -6,7 +6,7 @@ import { ModuleRegistry } from './module-registry';
 import { createPlatformContext } from './platform-context';
 import { PlatformError } from './errors';
 import { ConfigManager } from './config/config-manager';
-import { NullEventBus } from './events/null-event-bus';
+import { LocalEventBus } from './events/local-event-bus';
 import { LifecycleManager } from './lifecycle/lifecycle-manager';
 
 import type { PlatformContext } from './platform-context';
@@ -60,7 +60,7 @@ export async function bootstrapPlatform(): Promise<BootstrapResult> {
     serviceRegistry.register('platform.logger',         'Platform Logger',                  logger);
     serviceRegistry.register('platform.config',         'Platform Config',                  config);
     serviceRegistry.register('platform.configManager',  'Platform Config Manager',          configManager);
-    serviceRegistry.register('platform.eventBus',       'Platform Event Bus (Null Phase 1)', new NullEventBus());
+    serviceRegistry.register('platform.eventBus',       'Platform Event Bus (Local)',       new LocalEventBus());
 
     const lifecycleManager = new LifecycleManager({
       logger,

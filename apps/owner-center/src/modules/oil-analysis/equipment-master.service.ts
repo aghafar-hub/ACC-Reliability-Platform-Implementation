@@ -1,7 +1,8 @@
 // apps/owner-center/src/modules/oil-analysis/equipment-master.service.ts
-// Equipment Master read facade for Oil Analysis — sourced from Oil Lubrication tasks.
+// Equipment Master read facade — backed by Platform Equipment Master (sdk.equipment).
 
-import { oilChangeService } from '../oil-lubrication/oil-change.service';
+import { createEquipmentId } from '@acc-reliability/sdk';
+import { getPlatformSdk } from '../platform/platform-master-access';
 
 /** Equipment master row projected for Oil Analysis pickers. */
 export interface EquipmentMasterRow {
@@ -11,43 +12,38 @@ export interface EquipmentMasterRow {
   readonly contractorId: string;
 }
 
-function buildEquipmentIndex(): Map<string, EquipmentMasterRow> {
-  const index = new Map<string, EquipmentMasterRow>();
-  for (const task of oilChangeService.listTasks()) {
-    const equipmentId = task.equipmentId.trim();
-    if (!equipmentId || index.has(equipmentId)) continue;
-    index.set(equipmentId, {
-      equipmentId,
-      equipmentName: task.equipmentName,
-      area: task.area,
-      contractorId: task.contractorId,
-    });
-  }
-  return index;
+function toRow(record: {
+  equipmentId: string;
+  name: string;
+  area: string;
+  contractorId: string;
+}): EquipmentMasterRow {
+  return {
+    equipmentId: record.equipmentId,
+    equipmentName: record.name,
+    area: record.area,
+    contractorId: record.contractorId,
+  };
 }
 
 export function listEquipmentMaster(): readonly EquipmentMasterRow[] {
-  return [...buildEquipmentIndex().values()].sort((a, b) =>
-    a.equipmentId.localeCompare(b.equipmentId),
-  );
+  const result = getPlatformSdk().equipment.list({ status: 'active' });
+  return result.equipment.map(toRow);
 }
 
 export function findEquipmentById(equipmentId: string): EquipmentMasterRow | null {
   const id = equipmentId.trim();
   if (!id) return null;
-  return buildEquipmentIndex().get(id) ?? null;
+  const record = getPlatformSdk().equipment.findById(createEquipmentId(id));
+  return record === null ? null : toRow(record);
 }
 
 export function searchEquipment(query: string): readonly EquipmentMasterRow[] {
-  const q = query.trim().toLowerCase();
-  const all = listEquipmentMaster();
-  if (!q) return all;
-  return all.filter((row) =>
-    [row.equipmentId, row.equipmentName, row.area, row.contractorId]
-      .join(' ')
-      .toLowerCase()
-      .includes(q),
+  const q = query.trim();
+  const result = getPlatformSdk().equipment.list(
+    q ? { searchText: q, status: 'active' } : { status: 'active' },
   );
+  return result.equipment.map(toRow);
 }
 
 export function isKnownEquipmentId(equipmentId: string): boolean {

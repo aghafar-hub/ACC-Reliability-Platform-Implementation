@@ -69,6 +69,7 @@ export type {
 
 // ── Event Bus ─────────────────────────────────────────────────────────────────
 export { EventToken } from './events/event-token';
+export { LocalEventBus } from './events/local-event-bus';
 export { NullEventBus } from './events/null-event-bus';
 export type {
   IEventBus,

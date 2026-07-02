@@ -292,6 +292,78 @@ export interface EquipmentStatusChangedEvent extends PlatformEvent<EquipmentStat
   readonly type: 'EquipmentStatusChanged';
 }
 
+// ── Master Data Events ────────────────────────────────────────────────────────
+
+/** Version of the {@link EquipmentUpdatedEvent} contract. */
+export const EQUIPMENT_UPDATED_VERSION: ContractVersion = '1.0';
+
+/** Data payload for the {@link EquipmentUpdatedEvent}. */
+export interface EquipmentUpdatedPayload {
+  readonly equipmentId: EquipmentId;
+  readonly name: string;
+  readonly area: string;
+  readonly contractorId: ContractorId;
+  readonly status: 'active' | 'inactive';
+  readonly changedFields: readonly string[];
+  readonly updatedBy: UserId;
+  readonly updatedAt: string;
+}
+
+/**
+ * Published when platform equipment master data is created or updated.
+ *
+ * Source: `platform.equipment`
+ * Consumers: oil-lubrication, oil-analysis, future modules
+ */
+export interface EquipmentUpdatedEvent extends PlatformEvent<EquipmentUpdatedPayload> {
+  readonly type: 'EquipmentUpdated';
+}
+
+/** Version of the {@link LpUpdatedEvent} contract. */
+export const LP_UPDATED_VERSION: ContractVersion = '1.0';
+
+/** Data payload for the {@link LpUpdatedEvent}. */
+export interface LpUpdatedPayload {
+  readonly id: string;
+  readonly lpId: string;
+  readonly equipmentId: EquipmentId;
+  readonly changedFields: readonly string[];
+  readonly updatedBy: UserId;
+  readonly updatedAt: string;
+}
+
+/**
+ * Published when platform lubrication point master data is created or updated.
+ *
+ * Source: `platform.lubrication-points`
+ * Consumers: oil-lubrication, oil-analysis, future modules
+ */
+export interface LpUpdatedEvent extends PlatformEvent<LpUpdatedPayload> {
+  readonly type: 'LpUpdated';
+}
+
+/** Version of the {@link LpDeactivatedEvent} contract. */
+export const LP_DEACTIVATED_VERSION: ContractVersion = '1.0';
+
+/** Data payload for the {@link LpDeactivatedEvent}. */
+export interface LpDeactivatedPayload {
+  readonly id: string;
+  readonly lpId: string;
+  readonly equipmentId: EquipmentId;
+  readonly deactivatedBy: UserId;
+  readonly deactivatedAt: string;
+}
+
+/**
+ * Published when a lubrication point is deactivated in the platform master registry.
+ *
+ * Source: `platform.lubrication-points`
+ * Consumers: oil-lubrication, oil-analysis, future modules
+ */
+export interface LpDeactivatedEvent extends PlatformEvent<LpDeactivatedPayload> {
+  readonly type: 'LpDeactivated';
+}
+
 // ── Route Events ──────────────────────────────────────────────────────────────
 
 /** Version of the {@link RouteAssignedEvent} contract. */
@@ -1484,6 +1556,9 @@ export type AnyPlatformEvent =
   | ActionCreatedEvent
   | ActionCompletedEvent
   | EquipmentStatusChangedEvent
+  | EquipmentUpdatedEvent
+  | LpUpdatedEvent
+  | LpDeactivatedEvent
   | RouteAssignedEvent
   | RouteCompletedEvent
   | HealthStatusChangedEvent

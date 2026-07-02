@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { bootstrapPlatformSdk, type IPlatformSdk } from '@acc-reliability/sdk';
+import { setPlatformSdk } from '../modules/platform/platform-master-access';
 
 // ── Internal state ────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ export function SdkProvider({ children }: { children: React.ReactNode }): React.
 
     bootstrapPlatformSdk()
       .then(({ sdk }) => {
+        setPlatformSdk(sdk);
         setState({ status: 'ready', sdk });
       })
       .catch((err: unknown) => {

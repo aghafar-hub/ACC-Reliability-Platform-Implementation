@@ -21,6 +21,8 @@ import type { IModuleClient } from '../clients/module-client';
 import type { INotificationManagementClient } from '../clients/notification-management-client';
 import type { IReportingClient } from '../clients/reporting-client';
 import type { IWorkflowsClient } from '../clients/workflows-client';
+import type { IEquipmentClient } from '../clients/equipment-client';
+import type { ILubricationPointClient } from '../clients/lubrication-point-client';
 import type { SdkContext } from '../sdk-context';
 import type { IPlatformSdk } from '../platform-sdk';
 
@@ -47,6 +49,8 @@ export interface PlatformSdkParams {
   readonly notificationManagement: INotificationManagementClient;
   readonly reporting: IReportingClient;
   readonly workflows: IWorkflowsClient;
+  readonly equipment: IEquipmentClient;
+  readonly lubricationPoints: ILubricationPointClient;
   readonly context: SdkContext;
 }
 
@@ -80,6 +84,8 @@ export class PlatformSdk implements IPlatformSdk {
   readonly notificationManagement: INotificationManagementClient;
   readonly reporting: IReportingClient;
   readonly workflows: IWorkflowsClient;
+  readonly equipment: IEquipmentClient;
+  readonly lubricationPoints: ILubricationPointClient;
   readonly context: SdkContext;
 
   constructor(params: PlatformSdkParams) {
@@ -99,6 +105,8 @@ export class PlatformSdk implements IPlatformSdk {
     this.notificationManagement = params.notificationManagement;
     this.reporting               = params.reporting;
     this.workflows               = params.workflows;
+    this.equipment               = params.equipment;
+    this.lubricationPoints       = params.lubricationPoints;
     this.context               = params.context;
 
     Object.freeze(this);

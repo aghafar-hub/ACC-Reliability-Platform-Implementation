@@ -712,6 +712,82 @@ export class ContractorLifecycleError extends ContractorError {
   }
 }
 
+// ── Equipment Master errors ───────────────────────────────────────────────────
+
+export class EquipmentError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'EQUIPMENT_ERROR',
+    context?: Record<string, unknown>,
+  ) {
+    super(message, code, context);
+    this.name = 'EquipmentError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export class EquipmentNotFoundError extends EquipmentError {
+  readonly equipmentId: string;
+
+  constructor(equipmentId: string) {
+    super(`Equipment '${equipmentId}' was not found`, 'EQUIPMENT_NOT_FOUND', { equipmentId });
+    this.name = 'EquipmentNotFoundError';
+    this.equipmentId = equipmentId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export class EquipmentDuplicateError extends EquipmentError {
+  readonly equipmentId: string;
+
+  constructor(equipmentId: string) {
+    super(`Equipment '${equipmentId}' already exists`, 'EQUIPMENT_DUPLICATE', { equipmentId });
+    this.name = 'EquipmentDuplicateError';
+    this.equipmentId = equipmentId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+// ── Lubrication Point Master errors ───────────────────────────────────────────
+
+export class LubricationPointError extends PlatformError {
+  constructor(
+    message: string,
+    code: string = 'LUBRICATION_POINT_ERROR',
+    context?: Record<string, unknown>,
+  ) {
+    super(message, code, context);
+    this.name = 'LubricationPointError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export class LubricationPointNotFoundError extends LubricationPointError {
+  readonly lubricationPointId: string;
+
+  constructor(lubricationPointId: string) {
+    super(
+      `Lubrication point '${lubricationPointId}' was not found`,
+      'LUBRICATION_POINT_NOT_FOUND',
+      { lubricationPointId },
+    );
+    this.name = 'LubricationPointNotFoundError';
+    this.lubricationPointId = lubricationPointId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export class LubricationPointDuplicateError extends LubricationPointError {
+  readonly lpId: string;
+
+  constructor(lpId: string) {
+    super(`LP ID '${lpId}' already exists`, 'LUBRICATION_POINT_DUPLICATE', { lpId });
+    this.name = 'LubricationPointDuplicateError';
+    this.lpId = lpId;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 // ── Module Registry errors ────────────────────────────────────────────────────
 
 /**

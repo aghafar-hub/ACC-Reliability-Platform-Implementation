@@ -45,6 +45,10 @@ import {
   PermissionService,
   AuthService,
   InMemoryAuthRepository,
+  EquipmentService,
+  InMemoryEquipmentRepository,
+  LubricationPointService,
+  InMemoryLubricationPointRepository,
   createUserId,
   createContractorId,
   createSessionId,
@@ -63,6 +67,8 @@ import type {
   IWorkflowService,
   IPermissionService,
   IAuthService,
+  IEquipmentService,
+  ILubricationPointService,
   HealthStatus,
   CreateNotificationRuleRequest,
   CreateReportRequest,
@@ -85,6 +91,8 @@ import { SessionStorageAuthRepository } from './impl/session-storage-auth-reposi
 import { LocalStorageModuleRepository } from './impl/local-storage-module-repository';
 import { LocalStorageUserRepository } from './impl/local-storage-user-repository';
 import { LocalStorageContractorRepository } from './impl/local-storage-contractor-repository';
+import { LocalStorageEquipmentRepository } from './impl/local-storage-equipment-repository';
+import { LocalStorageLubricationPointRepository } from './impl/local-storage-lubrication-point-repository';
 import { LocalStorageNotificationManagementRepository } from './impl/local-storage-notification-management-repository';
 import { LocalStorageReportingRepository } from './impl/local-storage-reporting-repository';
 import { LocalStorageWorkflowRepository } from './impl/local-storage-workflow-repository';
@@ -100,10 +108,13 @@ import { MetricsClientImpl } from './impl/metrics-client-impl';
 import { ConfigClientImpl } from './impl/config-client-impl';
 import { UserClientImpl } from './impl/user-client-impl';
 import { ContractorClientImpl } from './impl/contractor-client-impl';
+import { EquipmentClientImpl } from './impl/equipment-client-impl';
+import { LubricationPointClientImpl } from './impl/lubrication-point-client-impl';
 import { ModuleClientImpl } from './impl/module-client-impl';
 import { NotificationManagementClientImpl } from './impl/notification-management-client-impl';
 import { ReportingClientImpl } from './impl/reporting-client-impl';
 import { WorkflowsClientImpl } from './impl/workflows-client-impl';
+import { seedEquipmentMaster, seedLubricationPointMaster } from './master-data-seed';
 
 // ── DI tokens ─────────────────────────────────────────────────────────────────
 
@@ -122,6 +133,8 @@ export const SDK_TOKENS = {
   reporting:   new Token<IReportingService>('platform.reporting'),
   workflows:   new Token<IWorkflowService>('platform.workflows'),
   permissions:   new Token<IPermissionService>('platform.permissions'),
+  equipment:     new Token<IEquipmentService>('platform.equipment'),
+  lubricationPoints: new Token<ILubricationPointService>('platform.lubrication-points'),
 } as const;
 
 // ── Required service ids ──────────────────────────────────────────────────────
@@ -144,6 +157,8 @@ const REQUIRED_SERVICE_IDS: readonly string[] = [
   'platform.reporting',
   'platform.workflows',
   'platform.permissions',
+  'platform.equipment',
+  'platform.lubrication-points',
 ];
 
 // ── Bootstrap result ──────────────────────────────────────────────────────────
@@ -241,6 +256,24 @@ export async function bootstrapPlatformSdk(): Promise<SdkBootstrapResult> {
   // localStorage. Existing records loaded from storage are left unchanged.
   seedContractors(contractorService);
 
+  // Equipment Master Service
+  const equipmentRepository = (typeof window !== 'undefined')
+    ? new LocalStorageEquipmentRepository()
+    : new InMemoryEquipmentRepository();
+  const equipmentService = new EquipmentService(equipmentRepository, auditService, eventBus);
+  seedEquipmentMaster(equipmentService);
+
+  // Lubrication Point Master Service
+  const lubricationPointRepository = (typeof window !== 'undefined')
+    ? new LocalStorageLubricationPointRepository()
+    : new InMemoryLubricationPointRepository();
+  const lubricationPointService = new LubricationPointService(
+    lubricationPointRepository,
+    auditService,
+    eventBus,
+  );
+  seedLubricationPointMaster(lubricationPointService);
+
   // Module Registry Service
   // LocalStorageModuleRepository is used in browser environments so lifecycle
   // changes (disable, maintenance, retire) survive page refresh.
@@ -324,6 +357,8 @@ export async function bootstrapPlatformSdk(): Promise<SdkBootstrapResult> {
   container.registerSingleton(SDK_TOKENS.reporting,   reportingService);
   container.registerSingleton(SDK_TOKENS.workflows,   workflowService);
   container.registerSingleton(SDK_TOKENS.permissions,   permissionService);
+  container.registerSingleton(SDK_TOKENS.equipment,     equipmentService);
+  container.registerSingleton(SDK_TOKENS.lubricationPoints, lubricationPointService);
 
   // Register in ServiceRegistry (lifecycle tracking + status visibility)
   registry.register('platform.auth',          'Authentication Service',       authService);
@@ -339,12 +374,15 @@ export async function bootstrapPlatformSdk(): Promise<SdkBootstrapResult> {
   registry.register('platform.reporting',   'Reporting Service',              reportingService);
   registry.register('platform.workflows',   'Workflow & Approval Service',    workflowService);
   registry.register('platform.permissions',   'Permission Service',           permissionService);
+  registry.register('platform.equipment',     'Equipment Master Service',     equipmentService);
+  registry.register('platform.lubrication-points', 'Lubrication Point Master Service', lubricationPointService);
 
   // Transition all platform services to 'running'
   for (const id of [
     'platform.auth', 'platform.health', 'platform.metrics', 'platform.notifications',
     'platform.actions', 'platform.audit', 'platform.identity',
     'platform.contractors', 'platform.modules', 'platform.notification-management', 'platform.reporting', 'platform.workflows', 'platform.permissions',
+    'platform.equipment', 'platform.lubrication-points',
   ] as const) {
     registry.setStatus(id, 'running');
   }
@@ -377,6 +415,8 @@ export async function bootstrapPlatformSdk(): Promise<SdkBootstrapResult> {
     notificationManagement: new NotificationManagementClientImpl(notificationManagementService, sdkContext),
     reporting:     new ReportingClientImpl(reportingService, sdkContext),
     workflows:     new WorkflowsClientImpl(workflowService, sdkContext),
+    equipment:     new EquipmentClientImpl(equipmentService, sdkContext),
+    lubricationPoints: new LubricationPointClientImpl(lubricationPointService, sdkContext),
     context:       sdkContext,
   });
 

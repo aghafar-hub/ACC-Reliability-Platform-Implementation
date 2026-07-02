@@ -53,7 +53,7 @@ export type {
   UserRole,
 } from '@acc-reliability/services';
 
-export { createContractorId, createUserId } from '@acc-reliability/services';
+export { createContractorId, createUserId, createEquipmentId } from '@acc-reliability/services';
 
 // ── Permissions client ────────────────────────────────────────────────────────
 export type { IPermissionsClient } from './clients/permissions-client';
@@ -371,4 +371,48 @@ export {
   WorkflowDefinitionDuplicateError,
   WorkflowLifecycleError,
   WorkflowInstanceLifecycleError,
+} from '@acc-reliability/services';
+
+// ── Equipment Master client ───────────────────────────────────────────────────
+export type { IEquipmentClient } from './clients/equipment-client';
+
+export type {
+  EquipmentRecord,
+  MasterEquipmentStatus,
+  CreateEquipmentRequest,
+  UpdateEquipmentRequest,
+  EquipmentListQuery,
+  EquipmentListResult,
+} from '@acc-reliability/services';
+
+export { EQUIPMENT_STATUSES } from '@acc-reliability/services';
+
+export {
+  EquipmentError,
+  EquipmentNotFoundError,
+  EquipmentDuplicateError,
+} from '@acc-reliability/services';
+
+// ── Lubrication Point Master client ─────────────────────────────────────────
+export type { ILubricationPointClient } from './clients/lubrication-point-client';
+
+export type {
+  LubricationPointRecord,
+  LubricationPointRecordId,
+  LpStatus,
+  CreateLubricationPointRequest,
+  UpdateLubricationPointRequest,
+  LubricationPointListQuery,
+  LubricationPointListResult,
+} from '@acc-reliability/services';
+
+export {
+  LP_STATUSES,
+  generateLubricationPointRecordId,
+} from '@acc-reliability/services';
+
+export {
+  LubricationPointError,
+  LubricationPointNotFoundError,
+  LubricationPointDuplicateError,
 } from '@acc-reliability/services';

@@ -22,6 +22,8 @@ import type { IModuleClient } from './clients/module-client';
 import type { INotificationManagementClient } from './clients/notification-management-client';
 import type { IReportingClient } from './clients/reporting-client';
 import type { IWorkflowsClient } from './clients/workflows-client';
+import type { IEquipmentClient } from './clients/equipment-client';
+import type { ILubricationPointClient } from './clients/lubrication-point-client';
 import type { SdkContext } from './sdk-context';
 
 /**
@@ -141,6 +143,18 @@ export interface IPlatformSdk {
    * and basic instance lifecycle.
    */
   readonly workflows: IWorkflowsClient;
+
+  /**
+   * Equipment Master client — unified platform equipment registry.
+   * Shared by oil-lubrication, oil-analysis, and future modules.
+   */
+  readonly equipment: IEquipmentClient;
+
+  /**
+   * Lubrication Point Master client — unified platform LP registry.
+   * Shared by oil-lubrication, oil-analysis, and future modules.
+   */
+  readonly lubricationPoints: ILubricationPointClient;
 
   /**
    * Runtime context for the current session — current user, contractor scope,
