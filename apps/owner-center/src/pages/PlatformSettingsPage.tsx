@@ -15,7 +15,9 @@ import { usePlatformSdk } from '../context/SdkContext';
 import { SummaryCard } from '../components/SummaryCard';
 import { StatusChip } from '../components/StatusChip';
 import { BackToSettingsLink } from '../components/BackToSettingsLink';
+import { MasterDataProviderIndicator } from '../components/MasterDataProviderIndicator';
 import type { ConfigEntry, ConfigSummary } from '@acc-reliability/sdk';
+import { useMasterDataProviderMode } from '../context/SdkContext';
 
 // ── Locale helpers ────────────────────────────────────────────────────────────
 
@@ -62,6 +64,7 @@ const COPY = {
 
   noEntries:       { en: 'No configuration entries match the current filters.', ar: 'لا توجد إدخالات تكوين تطابق عوامل التصفية الحالية.' },
   readOnlyNote:    { en: 'Configuration is read-only. Changes require environment variables or an approved config provider.', ar: 'التكوين للقراءة فقط. تتطلب التغييرات متغيرات البيئة أو موفر تكوين معتمد.' },
+  debugHeading:    { en: 'Developer Diagnostics',       ar: 'تشخيصات المطور' },
 } as const;
 
 // ── Helper utilities ──────────────────────────────────────────────────────────
@@ -86,6 +89,7 @@ function loadConfigData(
 export default function PlatformSettingsPage(): React.ReactElement {
   const { locale } = useLanguage();
   const sdk = usePlatformSdk();
+  const masterDataProvider = useMasterDataProviderMode();
 
   const [data, setData] = useState(() =>
     loadConfigData(
@@ -166,6 +170,15 @@ export default function PlatformSettingsPage(): React.ReactElement {
       </div>
 
       <p className="ur-page__desc">{t(COPY.readOnlyNote, locale)}</p>
+
+      <section className="master-data-indicator__settings-panel" aria-label={t(COPY.debugHeading, locale)}>
+        <h2 className="master-data-indicator__settings-heading">{t(COPY.debugHeading, locale)}</h2>
+        <MasterDataProviderIndicator
+          mode={masterDataProvider}
+          locale={locale}
+          variant="settings"
+        />
+      </section>
 
       {opError && <p className="ur-inline-error">{opError}</p>}
 

@@ -22,6 +22,8 @@ import { UserMenu } from '../components/UserMenu';
 import { NotificationBell } from '../components/NotificationBell';
 import { SearchButton } from '../components/SearchButton';
 import { CommandPalette } from '../components/CommandPalette';
+import { MasterDataProviderIndicator } from '../components/MasterDataProviderIndicator';
+import { useMasterDataProviderMode } from '../context/SdkContext';
 import type { LocaleCode, ThemeId } from '../types/app-types';
 import type { GuideTourId } from '../types/tour-types';
 import type { ModuleId } from '@acc-reliability/sdk';
@@ -304,6 +306,8 @@ export function AppLayout(): React.ReactElement {
   const { theme, setTheme } = useTheme();
   const { locale, setLocale } = useLanguage();
   const palette = useCommandPalette();
+  const masterDataProvider = useMasterDataProviderMode();
+  const showMasterDataIndicator = import.meta.env.DEV;
 
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
 
@@ -318,6 +322,9 @@ export function AppLayout(): React.ReactElement {
         <BrandBlock />
         <div className="app-header__spacer" />
         <div className="app-header__actions">
+          {showMasterDataIndicator && (
+            <MasterDataProviderIndicator mode={masterDataProvider} locale={locale} />
+          )}
           <SearchButton locale={locale} onOpen={palette.open} />
           <NotificationBell locale={locale} />
           <div className="app-header__sep" aria-hidden="true" />

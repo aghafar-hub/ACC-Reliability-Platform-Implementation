@@ -46,9 +46,7 @@ import {
   AuthService,
   InMemoryAuthRepository,
   EquipmentService,
-  InMemoryEquipmentRepository,
   LubricationPointService,
-  InMemoryLubricationPointRepository,
   createUserId,
   createContractorId,
   createSessionId,
@@ -91,8 +89,18 @@ import { SessionStorageAuthRepository } from './impl/session-storage-auth-reposi
 import { LocalStorageModuleRepository } from './impl/local-storage-module-repository';
 import { LocalStorageUserRepository } from './impl/local-storage-user-repository';
 import { LocalStorageContractorRepository } from './impl/local-storage-contractor-repository';
-import { LocalStorageEquipmentRepository } from './impl/local-storage-equipment-repository';
-import { LocalStorageLubricationPointRepository } from './impl/local-storage-lubrication-point-repository';
+
+import {
+  createEquipmentRepositoryProvider,
+  createLubricationPointRepositoryProvider,
+} from './providers/resolve-master-data-repository-providers';
+import {
+  DEFAULT_MASTER_DATA_REPOSITORY_PROVIDER,
+  type MasterDataRepositoryProviderKind,
+} from './providers/master-data-repository-provider-kind';
+import type { MasterDataRepositoryProviderContext } from './providers/master-data-repository-provider-context';
+import { resolveAppsScriptBootstrap } from './apps-script/resolve-apps-script-bootstrap';
+import type { SdkBootstrapOptions } from './sdk-bootstrap-options';
 import { LocalStorageNotificationManagementRepository } from './impl/local-storage-notification-management-repository';
 import { LocalStorageReportingRepository } from './impl/local-storage-reporting-repository';
 import { LocalStorageWorkflowRepository } from './impl/local-storage-workflow-repository';
@@ -197,8 +205,14 @@ export interface SdkBootstrapResult {
  * @throws {PlatformError} if kernel bootstrap fails or required services are
  *   missing after registration.
  */
-export async function bootstrapPlatformSdk(): Promise<SdkBootstrapResult> {
+export async function bootstrapPlatformSdk(
+  options?: SdkBootstrapOptions,
+): Promise<SdkBootstrapResult> {
   const startedAt = Date.now();
+  const equipmentProviderKind =
+    options?.repositoryProviders?.equipment ?? DEFAULT_MASTER_DATA_REPOSITORY_PROVIDER;
+  const lubricationPointProviderKind =
+    options?.repositoryProviders?.lubricationPoints ?? DEFAULT_MASTER_DATA_REPOSITORY_PROVIDER;
 
   // ── Step 1: Boot kernel ──────────────────────────────────────────────────
   const { context: kernelContext } = await kernelBootstrap();
@@ -207,7 +221,23 @@ export async function bootstrapPlatformSdk(): Promise<SdkBootstrapResult> {
   const configManager = kernelContext.services.getRequired<IConfigManager>('platform.configManager');
   const registry = kernelContext.services;
 
-  logger.info('Platform SDK: registering platform services…');
+  const appsScriptBootstrap = resolveAppsScriptBootstrap(
+    options,
+    configManager,
+    equipmentProviderKind,
+    lubricationPointProviderKind,
+  );
+
+  const repositoryProviderContext: MasterDataRepositoryProviderContext = {
+    apiMode: appsScriptBootstrap.apiMode,
+    appsScriptClient: appsScriptBootstrap.client,
+  };
+
+  logger.info('Platform SDK: registering platform services…', {
+    apiMode: appsScriptBootstrap.apiMode,
+    equipmentProvider: equipmentProviderKind,
+    lubricationPointProvider: lubricationPointProviderKind,
+  });
 
   // ── Step 2: Build DI container ───────────────────────────────────────────
   const container = new Container(logger);
@@ -256,17 +286,19 @@ export async function bootstrapPlatformSdk(): Promise<SdkBootstrapResult> {
   // localStorage. Existing records loaded from storage are left unchanged.
   seedContractors(contractorService);
 
-  // Equipment Master Service
-  const equipmentRepository = (typeof window !== 'undefined')
-    ? new LocalStorageEquipmentRepository()
-    : new InMemoryEquipmentRepository();
+  // Equipment Master Service — repository backend selected via provider (default: localStorage).
+  const equipmentRepository = createEquipmentRepositoryProvider(
+    equipmentProviderKind,
+    repositoryProviderContext,
+  ).createRepository();
   const equipmentService = new EquipmentService(equipmentRepository, auditService, eventBus);
   seedEquipmentMaster(equipmentService);
 
-  // Lubrication Point Master Service
-  const lubricationPointRepository = (typeof window !== 'undefined')
-    ? new LocalStorageLubricationPointRepository()
-    : new InMemoryLubricationPointRepository();
+  // Lubrication Point Master Service — repository backend selected via provider (default: localStorage).
+  const lubricationPointRepository = createLubricationPointRepositoryProvider(
+    lubricationPointProviderKind,
+    repositoryProviderContext,
+  ).createRepository();
   const lubricationPointService = new LubricationPointService(
     lubricationPointRepository,
     auditService,

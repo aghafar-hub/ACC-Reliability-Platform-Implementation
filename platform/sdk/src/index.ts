@@ -26,7 +26,57 @@ export type {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 export { bootstrapPlatformSdk } from './bootstrap';
 export type { SdkBootstrapResult } from './bootstrap';
+export type { SdkBootstrapOptions } from './sdk-bootstrap-options';
 export { SDK_TOKENS } from './bootstrap';
+
+export type { SdkApiMode } from './apps-script/apps-script-api-mode';
+export { DEFAULT_SDK_API_MODE } from './apps-script/apps-script-api-mode';
+export type { AppsScriptApiConfig } from './apps-script/apps-script-api-config';
+export type { IAppsScriptApiClient, AppsScriptApiRequestOptions } from './apps-script/apps-script-api-client';
+export { createAppsScriptApiClient } from './apps-script/impl/apps-script-api-client-impl';
+export type { AppsScriptEndpoint } from './apps-script/contracts/apps-script-endpoints';
+export { APPS_SCRIPT_ENDPOINTS } from './apps-script/contracts/apps-script-endpoints';
+export {
+  APPS_SCRIPT_ERROR_CODES,
+  APPS_SCRIPT_BACKEND_ERROR_CODES,
+  AppsScriptNotConfiguredError,
+  AppsScriptNotImplementedError,
+  AppsScriptApiError,
+  AppsScriptMissingActionError,
+  AppsScriptUnknownActionError,
+  AppsScriptInvalidResponseError,
+  AppsScriptRecordNotFoundError,
+  AppsScriptTimeoutError,
+  AppsScriptResponseParseError,
+} from './apps-script/apps-script-api-errors';
+export type { AppsScriptResponseEnvelope, AppsScriptErrorDetail } from './apps-script/apps-script-response-envelope';
+export type {
+  AppsScriptEquipmentDto,
+  EquipmentListEndpointRequest,
+  EquipmentListEndpointResponse,
+  EquipmentGetEndpointRequest,
+  EquipmentGetEndpointResponse,
+} from './apps-script/contracts/equipment-endpoint-contracts';
+export type {
+  AppsScriptLubricationPointDto,
+  LpListEndpointRequest,
+  LpListEndpointResponse,
+  LpGetEndpointRequest,
+  LpGetEndpointResponse,
+  LpUpsertEndpointRequest,
+  LpUpsertEndpointResponse,
+  LpDeactivateEndpointRequest,
+  LpDeactivateEndpointResponse,
+} from './apps-script/contracts/lubrication-point-endpoint-contracts';
+
+export type { MasterDataRepositoryProviderKind } from './providers/master-data-repository-provider-kind';
+export { DEFAULT_MASTER_DATA_REPOSITORY_PROVIDER } from './providers/master-data-repository-provider-kind';
+export type { IEquipmentRepositoryProvider } from './providers/equipment-repository-provider';
+export type { ILubricationPointRepositoryProvider } from './providers/lubrication-point-repository-provider';
+export {
+  createEquipmentRepositoryProvider,
+  createLubricationPointRepositoryProvider,
+} from './providers/resolve-master-data-repository-providers';
 
 // ── Main facade ───────────────────────────────────────────────────────────────
 export type { IPlatformSdk } from './platform-sdk';

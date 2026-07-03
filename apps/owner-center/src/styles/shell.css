@@ -5352,3 +5352,69 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* Master-data provider developer indicator */
+.master-data-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.master-data-indicator--apps-script {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  color: var(--color-text);
+}
+
+.master-data-indicator__label {
+  font-weight: 600;
+}
+
+.master-data-indicator__value {
+  font-weight: 700;
+}
+
+.master-data-indicator__settings-panel {
+  margin: var(--space-md) 0;
+  padding: var(--space-md) var(--space-lg);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.master-data-indicator__settings-heading {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.master-data-indicator--settings {
+  display: block;
+}
+
+.master-data-indicator__settings-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.master-data-indicator__settings-value {
+  margin-top: 0.25rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.master-data-indicator__settings-note {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
