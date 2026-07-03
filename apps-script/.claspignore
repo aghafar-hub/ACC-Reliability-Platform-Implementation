@@ -1,0 +1,11 @@
+# Local clasp config (never push)
+.clasp.json
+.clasp.json.example
+
+# Documentation — not deployable Apps Script source
+**/*.md
+DEPLOYMENT_SYNC.md
+SETUP.md
+
+# Obsolete duplicate initializer — canonical file is database/initializeAccDatabase.gs
+db-initializer.gs

@@ -1,4 +1,21 @@
 {
   "scriptId": "YOUR_APPS_SCRIPT_PROJECT_ID",
-  "rootDir": "."
+  "rootDir": ".",
+  "scriptExtensions": [".js", ".gs"],
+  "htmlExtensions": [".html"],
+  "jsonExtensions": [".json"],
+  "filePushOrder": [
+    "workbook-config.gs",
+    "config.gs",
+    "errors.gs",
+    "response.gs",
+    "request.gs",
+    "sheets.gs",
+    "equipment-handlers.gs",
+    "lp-handlers.gs",
+    "router.gs",
+    "Code.gs",
+    "database/initializeAccDatabase.gs",
+    "migration/previewMasterDataMigration.gs"
+  ]
 }

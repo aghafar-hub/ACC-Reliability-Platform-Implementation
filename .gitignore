@@ -10,3 +10,4 @@ coverage/
 *.tsbuildinfo
 .turbo/
 docs/foundation/
+apps-script/.clasp.json

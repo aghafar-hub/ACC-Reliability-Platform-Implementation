@@ -6,23 +6,21 @@
  * Version: 1.0.0
  *
  * Purpose:
- *   Creates, formats, and validates all 51 sheets across the
+ *   Creates, formats, and validates all 60 sheets across the
  *   4 production workbooks of the ACC Reliability Platform.
  *
  * Design:
- *   - No secrets or real IDs stored here.
- *   - Replace WORKBOOK_IDS placeholders before running.
+ *   - Production IDs live in Script Properties (see workbook-config.gs).
+ *   - WORKBOOK_IDS below are fallback-only placeholders for bootstrap.
  *   - Safe to re-run: existing sheets are NOT overwritten.
- *   - Run individual init functions per workbook if needed.
+ *   - Deploy via clasp push from apps-script/ (see DEPLOYMENT_SYNC.md).
  *
  * Usage:
- *   1. Create 4 blank Google Sheets files.
- *   2. Copy each file's URL ID into WORKBOOK_IDS below.
- *   3. Open any of the 4 files → Extensions → Apps Script.
- *   4. Paste this script into Code.gs.
- *   5. Run verifyConfig() first — confirm all IDs are set.
- *   6. Run initializeAccDatabase().
- *   7. Check Execution Log for results.
+ *   1. Set Script Properties (SETTINGS_CONFIG_SPREADSHEET_ID, etc.).
+ *   2. Run showConfiguredWorkbookIds() and verifyActiveWorkbookNames().
+ *   3. Run verifyConfig() — confirm all IDs resolve.
+ *   4. Run initializeAccDatabase() or a single-workbook init function.
+ *   5. Check Execution Log for results.
  *
  * Column color coding applied by this script:
  *   Yellow (#FFF8E1) = Required — must fill
@@ -32,11 +30,11 @@
  * ============================================================
  */
 
-// ─── CONFIGURATION ────────────────────────────────────────────────────────────
-// Replace each value with the Google Sheets file ID from its URL.
-// URL format: https://docs.google.com/spreadsheets/d/FILE_ID/edit
+// ─── CONFIGURATION (FALLBACK ONLY) ───────────────────────────────────────────
+// Prefer Script Properties (workbook-config.gs). Use these placeholders only
+// when properties are not set. URL: https://docs.google.com/spreadsheets/d/FILE_ID/edit
 
-var WORKBOOK_IDS = {
+const WORKBOOK_IDS = {
   SETTINGS:     "REPLACE_WITH_SETTINGS_FILE_ID",
   MASTER_DATA:  "REPLACE_WITH_MASTER_DATA_FILE_ID",
   OIL_LUB:      "REPLACE_WITH_OIL_LUB_FILE_ID",
@@ -91,6 +89,10 @@ var LIST = {
   AGG_PERIOD:      ["DAILY","WEEKLY","MONTHLY"],
   ACCESS_LEVEL:    ["FULL","READ_ONLY","NO_ACCESS"],
   SPECIALTY:       ["OIL_LAB","VIBRATION","GENERAL","ELECTRICAL"],
+  AREA_STATUS:     ["ACTIVE","INACTIVE"],
+  MAPPING_STATUS:  ["ACTIVE","INACTIVE"],
+  ENTITY_STATUS:   ["ACTIVE","INACTIVE"],
+  CONTRACTOR_TYPE: ["MAINTENANCE","OIL_LAB","ANALYSIS","GENERAL","ELECTRICAL"],
   SAMPLE_SOURCE:   ["IN_SERVICE","DRAIN","FILTER"],
   AXIS:            ["H","V","A"],
   COND_AFTER:      ["GOOD","FRESH"],
@@ -102,7 +104,7 @@ var LIST = {
 
 /**
  * Run this function to initialise all 4 workbooks.
- * Pre-requisite: WORKBOOK_IDS must all be replaced.
+ * Pre-requisite: Script Properties or WORKBOOK_IDS fallback must all resolve.
  */
 function initializeAccDatabase() {
   var results = [];
@@ -149,7 +151,10 @@ function runWorkbook_(name, fn) {
 // Run any of these to initialise a single workbook.
 
 function initSettingsOnly()   { initSettingsWorkbook(); }
-function initMasterDataOnly() { initMasterDataWorkbook(); }
+function initMasterDataOnly() {
+  logWorkbookGuard_('initMasterDataOnly', 'MASTER_DATA');
+  initMasterDataWorkbook();
+}
 function initOilLubOnly()     { initOilLubWorkbook(); }
 function initOilAnalysisOnly(){ initOilAnalysisWorkbook(); }
 
@@ -158,16 +163,17 @@ function initOilAnalysisOnly(){ initOilAnalysisWorkbook(); }
  */
 function verifyConfig() {
   var missing = [];
-  for (var key in WORKBOOK_IDS) {
-    if (!WORKBOOK_IDS[key] || WORKBOOK_IDS[key].indexOf("REPLACE_") === 0) {
-      missing.push(key);
+  var keys = ["SETTINGS", "MASTER_DATA", "OIL_LUB", "OIL_ANALYSIS"];
+  for (var i = 0; i < keys.length; i++) {
+    if (!getResolvedWorkbookId_(keys[i])) {
+      missing.push(keys[i]);
     }
   }
 
   var msg = missing.length === 0
     ? "All 4 workbook IDs are configured.\nReady to run initializeAccDatabase()."
     : "Missing IDs:\n" + missing.join(", ") +
-      "\n\nUpdate WORKBOOK_IDS at the top of this script, then run again.";
+      "\n\nSet Script Properties (see workbook-config.gs) or WORKBOOK_IDS fallback, then run again.";
 
   try {
     SpreadsheetApp.getUi().alert("Configuration Check\n\n" + msg);
@@ -181,7 +187,7 @@ function verifyConfig() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function initSettingsWorkbook() {
-  var ss = openWorkbook_(WORKBOOK_IDS.SETTINGS);
+  var ss = openWorkbook_(getResolvedWorkbookId_("SETTINGS"));
   var hdr = COLOR.SETTINGS;
 
   /* W1-S01 App_Settings (9 cols) */
@@ -466,60 +472,50 @@ function initSettingsWorkbook() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WORKBOOK 2: ACC_PLATFORM_MASTER_DATA (13 sheets, 121 columns)
+// WORKBOOK 2: ACC_PLATFORM_MASTER_DATA (22 sheets, 194 columns)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function initMasterDataWorkbook() {
-  var ss = openWorkbook_(WORKBOOK_IDS.MASTER_DATA);
+  var ss = openWorkbook_(getResolvedWorkbookId_("MASTER_DATA"));
   var hdr = COLOR.MASTER_DATA;
 
-  /* W2-S01 Equipment_Master (15 cols) */
+  /* W2-S01 Equipment_Master (10 cols) — frozen master fields */
   buildSheet_(ss, "Equipment_Master", hdr, [
-    col_("A","equipment_id",      "PK","EQP-XXXX — never change after creation"),
-    col_("B","equipment_tag",     "R", "Plant asset tag (e.g. P-101) — unique"),
-    col_("C","equipment_name",    "R", "Descriptive name"),
-    col_("D","equipment_type_id", "FK","→ Equipment_Types.type_id"),
-    col_("E","area_id",           "FK","→ Areas.area_id"),
-    col_("F","criticality",       "R", "A=most critical, C=least",  LIST.CRITICALITY),
-    col_("G","is_active",         "R", "FALSE = decommissioned",     LIST.BOOLEAN),
-    col_("H","description",       "O", "Free-text notes"),
-    col_("I","manufacturer",      "O", "OEM company name"),
-    col_("J","model",             "O", "Model number"),
-    col_("K","serial_number",     "O", "Manufacturer serial"),
-    col_("L","install_date",      "O", "YYYY-MM-DD"),
-    col_("M","created_at",        "S", "ISO timestamp"),
-    col_("N","updated_at",        "S", "ISO timestamp"),
-    col_("O","created_by",        "S", "Creator email")
+    col_("A","equipment_id",         "PK","EQP-XXXX — never change after creation"),
+    col_("B","equipment_tag",        "R", "Plant asset tag — unique (legacy Equipment_ID)"),
+    col_("C","equipment_name",       "R", "Descriptive name"),
+    col_("D","area_id",              "FK","→ Areas.area_id — required"),
+    col_("E","equipment_type_id",    "FK","→ Equipment_Types.type_id"),
+    col_("F","parent_equipment_id",  "FK","→ Equipment_Master — parent assembly"),
+    col_("G","criticality",          "R", "A=most critical, C=least",  LIST.CRITICALITY),
+    col_("H","status",               "R", "ACTIVE or INACTIVE",          LIST.ENTITY_STATUS),
+    col_("I","created_at",           "S", "ISO timestamp"),
+    col_("J","updated_at",           "S", "ISO timestamp")
   ], [
-    ["EQP-0001","P-101","Feed Water Pump","ET-001","AREA-001","A","TRUE",
-     "Primary feed water pump","Sulzer","CPE-100","SN-SAMPLE-001","2020-01-15",ts_(),ts_(),"admin@example.com"],
-    ["EQP-0002","C-201","Air Compressor Unit 1","ET-002","AREA-002","A","TRUE",
-     "Main process air compressor","Atlas Copco","GA75","SN-SAMPLE-002","2019-06-01",ts_(),ts_(),"admin@example.com"]
+    ["EQP-0001","P-101","Feed Water Pump","AREA-001","ET-001","","A","ACTIVE",ts_(),ts_()],
+    ["EQP-0002","C-201","Air Compressor Unit 1","AREA-002","ET-002","","A","ACTIVE",ts_(),ts_()]
   ]);
 
-  /* W2-S02 LP_Master (16 cols) */
+  /* W2-S02 LP_Master (13 cols) — frozen master fields */
   buildSheet_(ss, "LP_Master", hdr, [
     col_("A","lp_id",                 "PK","LP-XXXX — never change"),
-    col_("B","lp_code",               "R", "Human code (e.g. LP-P101-GB) — unique"),
+    col_("B","equipment_id",          "FK","→ Equipment_Master — required"),
     col_("C","lp_name",               "R", "Descriptive name"),
-    col_("D","equipment_id",          "FK","→ Equipment_Master"),
-    col_("E","lube_point_type",       "R", "Type of lubrication point", LIST.LUBE_PT_TYPE),
-    col_("F","oil_type_id",           "FK","→ Oil_Types"),
-    col_("G","oil_brand_id",          "FK","→ Oil_Brands"),
-    col_("H","oil_capacity_liters",   "R", "Total oil volume in system (L)"),
-    col_("I","change_interval_days",  "R", "Days between oil changes"),
-    col_("J","sampling_interval_days","R", "Days between oil samples"),
-    col_("K","last_change_date",      "A", "App updates — do not edit manually"),
-    col_("L","last_sample_date",      "A", "App updates — do not edit manually"),
-    col_("M","is_active",             "R", "FALSE = decommissioned", LIST.BOOLEAN),
-    col_("N","created_at",            "S", "ISO timestamp"),
-    col_("O","updated_at",            "S", "ISO timestamp"),
-    col_("P","created_by",            "S", "Creator email")
+    col_("D","lube_point_type",       "R", "Type of lubrication point", LIST.LUBE_PT_TYPE),
+    col_("E","oil_type_id",           "FK","→ Oil_Types"),
+    col_("F","oil_brand_id",          "FK","→ Oil_Brands"),
+    col_("G","oil_capacity_liters",   "R", "Total oil volume in system (L)"),
+    col_("H","change_interval_days",  "R", "Days between oil changes"),
+    col_("I","sampling_required",     "R", "TRUE if periodic sampling applies", LIST.BOOLEAN),
+    col_("J","sampling_interval_days","O", "Days between oil samples"),
+    col_("K","status",                "R", "ACTIVE or INACTIVE", LIST.ENTITY_STATUS),
+    col_("L","created_at",            "S", "ISO timestamp"),
+    col_("M","updated_at",            "S", "ISO timestamp")
   ], [
-    ["LP-0001","LP-P101-GB","P-101 Gearbox","EQP-0001","GEARBOX","OT-001","OB-001",
-     5,90,45,"","","TRUE",ts_(),ts_(),"admin@example.com"],
-    ["LP-0002","LP-C201-BEARING-DE","C-201 Drive End Bearing","EQP-0002","BEARING",
-     "OT-002","OB-002",1.5,180,60,"","","TRUE",ts_(),ts_(),"admin@example.com"]
+    ["LP-0001","EQP-0001","P-101 Gearbox","GEARBOX","OT-001","OB-001",
+     5,90,"TRUE",45,"ACTIVE",ts_(),ts_()],
+    ["LP-0002","EQP-0002","C-201 Drive End Bearing","BEARING",
+     "OT-002","OB-002",1.5,180,"TRUE",60,"ACTIVE",ts_(),ts_()]
   ]);
 
   /* W2-S03 VB_Master (12 cols) */
@@ -540,33 +536,40 @@ function initMasterDataWorkbook() {
     ["VB-0001","VB-P101-DE","P-101 Drive End","EQP-0001","SKF CMSS 100","H",4.5,7.1,30,"TRUE",ts_(),ts_()]
   ]);
 
-  /* W2-S04 Areas (7 cols) */
+  /* W2-S04 Areas (9 cols) */
   buildSheet_(ss, "Areas", hdr, [
-    col_("A","area_id",              "PK","AREA-XXX"),
-    col_("B","area_code",            "R", "Short UPPERCASE code — unique"),
-    col_("C","area_name",            "R", "Full area name"),
-    col_("D","plant_section",        "O", "Plant section or unit"),
-    col_("E","responsible_supervisor","O","Supervisor email"),
-    col_("F","is_active",            "R", "TRUE/FALSE",                 LIST.BOOLEAN),
-    col_("G","created_at",           "S", "ISO timestamp")
+    col_("A","area_id",                  "PK","AREA-XXX"),
+    col_("B","area_code",                "R", "Short UPPERCASE code — unique"),
+    col_("C","area_name",                "R", "Full area name"),
+    col_("D","main_area",                "O", "Production unit / plant section"),
+    col_("E","line",                     "O", "Production line identifier"),
+    col_("F","responsible_contractor_id","R", "→ Contractors — one per area", null),
+    col_("G","status",                   "R", "ACTIVE or INACTIVE",          LIST.AREA_STATUS),
+    col_("H","created_at",               "S", "ISO timestamp"),
+    col_("I","updated_at",               "S", "ISO timestamp")
   ], [
-    ["AREA-001","UTIL","Utilities Area",  "Utility Plant",    "supervisor@example.com","TRUE",ts_()],
-    ["AREA-002","PROC","Process Area",    "Production Unit 1","supervisor@example.com","TRUE",ts_()],
-    ["AREA-003","STOR","Storage Area",    "Tank Farm",        "supervisor@example.com","TRUE",ts_()]
+    ["AREA-001","111","Area 111",        "Kiln",     "Line1","CTR-001","ACTIVE",ts_(),ts_()],
+    ["AREA-002","312","Area 312",        "Raw Mill", "Line2","CTR-001","ACTIVE",ts_(),ts_()],
+    ["AREA-003","ASEC-01","ASEC Section","ASEC Plant","Line1","CTR-002","ACTIVE",ts_(),ts_()]
   ]);
 
-  /* W2-S05 Contractors (8 cols) */
+  /* W2-S05 Contractors (11 cols) */
   buildSheet_(ss, "Contractors", hdr, [
-    col_("A","contractor_id",  "PK","CTR-XXX"),
-    col_("B","contractor_name","R", "Company name"),
-    col_("C","contact_person", "O", "Primary contact name"),
-    col_("D","email",          "O", "Contact email"),
-    col_("E","phone",          "O", "Contact phone"),
-    col_("F","specialty",      "O", "Contractor type",   LIST.SPECIALTY),
-    col_("G","is_active",      "R", "TRUE/FALSE",        LIST.BOOLEAN),
-    col_("H","created_at",     "S", "ISO timestamp")
+    col_("A","contractor_id",   "PK","CTR-XXX"),
+    col_("B","contractor_code", "R", "Short UPPERCASE code — unique"),
+    col_("C","contractor_name", "R", "Company name"),
+    col_("D","contractor_type", "R", "Contractor category",   LIST.CONTRACTOR_TYPE),
+    col_("E","contact_person",  "O", "Primary contact name"),
+    col_("F","email",           "O", "Contact email"),
+    col_("G","phone",           "O", "Contact phone"),
+    col_("H","scope",           "O", "Service scope description"),
+    col_("I","status",          "R", "ACTIVE or INACTIVE",    LIST.ENTITY_STATUS),
+    col_("J","created_at",      "S", "ISO timestamp"),
+    col_("K","updated_at",      "S", "ISO timestamp")
   ], [
-    ["CTR-001","Sample Oil Analysis Lab","Lab Manager","lab@example.com","+966-11-555-0001","OIL_LAB","TRUE",ts_()]
+    ["CTR-001","RHI","Reliance Heavy Industries (RHI)","MAINTENANCE","Operations Manager","ops@rhi.example.com","+20-2-555-0001","Plant maintenance contractor","ACTIVE",ts_(),ts_()],
+    ["CTR-002","ASEC","ASEC","MAINTENANCE","Site Manager","ops@asec.example.com","+20-2-555-0002","ASEC plant operations","ACTIVE",ts_(),ts_()],
+    ["CTR-003","LAB-01","Sample Oil Analysis Lab","OIL_LAB","Lab Manager","lab@example.com","+966-11-555-0001","Oil analysis laboratory","ACTIVE",ts_(),ts_()]
   ]);
 
   /* W2-S06 Equipment_Types (7 cols) */
@@ -619,6 +622,28 @@ function initMasterDataWorkbook() {
     ["OB-003","Mobil SHC Gear 320",   "Mobil","SHC Gear",    "TRUE",ts_()],
     ["OB-004","Castrol Tribol 1100",  "Castrol","Tribol",    "TRUE",ts_()],
     ["OB-005","Total Nevastane SH 46","Total","Nevastane SH","TRUE",ts_()]
+  ]);
+
+  /* W2-S08b Oil_Products (15 cols) */
+  buildSheet_(ss, "Oil_Products", hdr, [
+    col_("A","oil_product_id",  "PK","OP-XXX"),
+    col_("B","oil_type_id",     "FK","→ Oil_Types — required"),
+    col_("C","oil_brand_id",    "FK","→ Oil_Brands — required"),
+    col_("D","product_name",    "R", "Commercial product name"),
+    col_("E","iso_vg",          "O", "ISO viscosity grade (e.g. VG46)"),
+    col_("F","application",     "O", "Intended application"),
+    col_("G","oem_approval",    "O", "OEM approval reference"),
+    col_("H","density",         "O", "Density kg/L at 15°C"),
+    col_("I","viscosity",       "O", "Nominal viscosity description"),
+    col_("J","flash_point",     "O", "Flash point °C"),
+    col_("K","msds_url",        "O", "MSDS document URL"),
+    col_("L","safety_notes",    "O", "Handling / storage notes"),
+    col_("M","status",          "R", "ACTIVE or INACTIVE", LIST.ENTITY_STATUS),
+    col_("N","created_at",      "S", "ISO timestamp"),
+    col_("O","updated_at",      "S", "ISO timestamp")
+  ], [
+    ["OP-001","OT-001","OB-001","Shell Omala S2 G 320","VG320","Gearboxes","","","","","","","ACTIVE",ts_(),ts_()],
+    ["OP-002","OT-002","OB-002","Shell Tellus S2 MX 46","VG46","Hydraulic systems","","","","","","","ACTIVE",ts_(),ts_()]
   ]);
 
   /* W2-S09 Route_Templates (9 cols) */
@@ -710,6 +735,135 @@ function initMasterDataWorkbook() {
     [3,"C","Standard", "عادي","#2E7D32","MEDIUM",  "TRUE"]
   ]);
 
+  /* W2-S14 Equipment_Line_Assignments (10 cols) */
+  buildSheet_(ss, "Equipment_Line_Assignments", hdr, [
+    col_("A","assignment_id",   "PK","ELA-XXXX"),
+    col_("B","line",            "R", "Production line identifier"),
+    col_("C","area",            "O", "Area name or code from source"),
+    col_("D","equipment_code",  "R", "Legacy equipment tag"),
+    col_("E","source_workbook", "R", "Origin workbook name"),
+    col_("F","source_sheet",    "R", "Origin sheet tab"),
+    col_("G","source_row",      "R", "Origin row number"),
+    col_("H","status",          "R", "ACTIVE or INACTIVE", LIST.ENTITY_STATUS),
+    col_("I","created_at",      "S", "ISO timestamp"),
+    col_("J","updated_at",      "S", "ISO timestamp")
+  ], [
+    ["ELA-0001","Line1","111","P-101","Equipment Register","EQ Rigester",2,"ACTIVE",ts_(),ts_()],
+    ["ELA-0002","Line2","312","C-201","Equipment Register","EQ Rigester",3,"ACTIVE",ts_(),ts_()]
+  ]);
+
+  /* W2-S15 Legacy_Area_Mapping (12 cols) — data-driven area translation */
+  buildSheet_(ss, "Legacy_Area_Mapping", hdr, [
+    col_("A","mapping_id",                "PK","MAP-AREA-XXXX"),
+    col_("B","legacy_value",              "R", "Legacy area code or name as it appears in source"),
+    col_("C","legacy_workbook",           "O", "Source workbook label (blank = any)"),
+    col_("D","legacy_sheet",              "O", "Source sheet tab (blank = any)"),
+    col_("E","new_area_id",               "FK","→ Areas.area_id — required when ACTIVE"),
+    col_("F","new_area_code",             "O", "Denormalized target area_code for review"),
+    col_("G","new_area_name",             "O", "Denormalized target area_name for review"),
+    col_("H","responsible_contractor_id", "FK","→ Contractors — optional override"),
+    col_("I","status",                    "R", "ACTIVE or INACTIVE", LIST.MAPPING_STATUS),
+    col_("J","notes",                     "O", "Platform Owner notes"),
+    col_("K","created_at",                "S", "ISO timestamp"),
+    col_("L","updated_at",                "S", "ISO timestamp")
+  ], [
+    ["MAP-AREA-001","111",               "ACC_Oil_Users_Config","Areas","AREA-001","111","Area 111",        "CTR-001","ACTIVE","Location code → Kiln area",ts_(),ts_()],
+    ["MAP-AREA-002","Area 111",          "ACC_Oil_Users_Config","Areas","AREA-001","111","Area 111",        "CTR-001","ACTIVE","Area name variant",          ts_(),ts_()],
+    ["MAP-AREA-003","312",               "ACC_Oil_Users_Config","Areas","AREA-002","312","Area 312",        "CTR-001","ACTIVE","Location code → Raw Mill",   ts_(),ts_()],
+    ["MAP-AREA-004","Area 312",          "ACC_Oil_Users_Config","Areas","AREA-002","312","Area 312",        "CTR-001","ACTIVE","Area name variant",          ts_(),ts_()],
+    ["MAP-AREA-005","Area 123",          "ACC_Oil_Users_Config","Areas","AREA-002","312","Area 312",        "CTR-001","ACTIVE","Legacy name → Raw Mill area",ts_(),ts_()],
+    ["MAP-AREA-006","ASEC-01",            "ACC_Oil_Users_Config","Areas","AREA-003","ASEC-01","ASEC Section","CTR-002","ACTIVE","ASEC plant section",         ts_(),ts_()]
+  ]);
+
+  /* W2-S16 Legacy_Oil_Type_Mapping (7 cols) */
+  buildSheet_(ss, "Legacy_Oil_Type_Mapping", hdr, [
+    col_("A","mapping_id",   "PK","MAP-OIL-XXXX"),
+    col_("B","legacy_value", "R", "Legacy lubricant type name from source"),
+    col_("C","new_value",    "FK","→ Oil_Types.oil_type_id"),
+    col_("D","status",       "R", "ACTIVE or INACTIVE", LIST.MAPPING_STATUS),
+    col_("E","notes",        "O", "Platform Owner notes"),
+    col_("F","created_at",   "S", "ISO timestamp"),
+    col_("G","updated_at",   "S", "ISO timestamp")
+  ], [
+    ["MAP-OIL-001","VG 320",          "OT-001","ACTIVE","ISO VG 320 gear oil",  ts_(),ts_()],
+    ["MAP-OIL-002","ISO VG 46",       "OT-002","ACTIVE","Hydraulic oil VG 46",  ts_(),ts_()],
+    ["MAP-OIL-003","Shell Omala S2",  "OT-001","ACTIVE","Brand-prefixed legacy name",ts_(),ts_()]
+  ]);
+
+  /* W2-S17 Legacy_Oil_Brand_Mapping (7 cols) */
+  buildSheet_(ss, "Legacy_Oil_Brand_Mapping", hdr, [
+    col_("A","mapping_id",   "PK","MAP-OBR-XXXX"),
+    col_("B","legacy_value", "R", "Legacy brand name from source"),
+    col_("C","new_value",    "FK","→ Oil_Brands.brand_id"),
+    col_("D","status",       "R", "ACTIVE or INACTIVE", LIST.MAPPING_STATUS),
+    col_("E","notes",        "O", "Platform Owner notes"),
+    col_("F","created_at",   "S", "ISO timestamp"),
+    col_("G","updated_at",   "S", "ISO timestamp")
+  ], [
+    ["MAP-OBR-001","Shell",  "OB-001","ACTIVE","Shell product line", ts_(),ts_()],
+    ["MAP-OBR-002","Mobil",  "OB-003","ACTIVE","Mobil product line", ts_(),ts_()],
+    ["MAP-OBR-003","Castrol","OB-004","ACTIVE","Castrol product line",ts_(),ts_()]
+  ]);
+
+  /* W2-S18 Legacy_Equipment_Type_Mapping (7 cols) */
+  buildSheet_(ss, "Legacy_Equipment_Type_Mapping", hdr, [
+    col_("A","mapping_id",   "PK","MAP-EQT-XXXX"),
+    col_("B","legacy_value", "R", "Legacy equipment type label"),
+    col_("C","new_value",    "FK","→ Equipment_Types.type_id"),
+    col_("D","status",       "R", "ACTIVE or INACTIVE", LIST.MAPPING_STATUS),
+    col_("E","notes",        "O", "Platform Owner notes"),
+    col_("F","created_at",   "S", "ISO timestamp"),
+    col_("G","updated_at",   "S", "ISO timestamp")
+  ], [
+    ["MAP-EQT-001","Pump",       "ET-001","ACTIVE","Centrifugal pump",     ts_(),ts_()],
+    ["MAP-EQT-002","Compressor", "ET-002","ACTIVE","Reciprocating compressor",ts_(),ts_()],
+    ["MAP-EQT-003","Gearbox",    "ET-003","ACTIVE","Gearbox / reducer",    ts_(),ts_()]
+  ]);
+
+  /* W2-S19 Legacy_Contractor_Mapping (7 cols) */
+  buildSheet_(ss, "Legacy_Contractor_Mapping", hdr, [
+    col_("A","mapping_id",   "PK","MAP-CTR-XXXX"),
+    col_("B","legacy_value", "R", "Legacy contractor name or code"),
+    col_("C","new_value",    "FK","→ Contractors.contractor_id"),
+    col_("D","status",       "R", "ACTIVE or INACTIVE", LIST.MAPPING_STATUS),
+    col_("E","notes",        "O", "Platform Owner notes"),
+    col_("F","created_at",   "S", "ISO timestamp"),
+    col_("G","updated_at",   "S", "ISO timestamp")
+  ], [
+    ["MAP-CTR-001","RHI",  "CTR-001","ACTIVE","Reliance Heavy Industries",ts_(),ts_()],
+    ["MAP-CTR-002","ASEC", "CTR-002","ACTIVE","ASEC plant contractor",      ts_(),ts_()]
+  ]);
+
+  /* W2-S20 Legacy_Status_Mapping (7 cols) */
+  buildSheet_(ss, "Legacy_Status_Mapping", hdr, [
+    col_("A","mapping_id",   "PK","MAP-STS-XXXX"),
+    col_("B","legacy_value", "R", "Legacy status label"),
+    col_("C","new_value",    "R", "Target status_code (Status_Dictionary)"),
+    col_("D","status",       "R", "ACTIVE or INACTIVE", LIST.MAPPING_STATUS),
+    col_("E","notes",        "O", "Platform Owner notes"),
+    col_("F","created_at",   "S", "ISO timestamp"),
+    col_("G","updated_at",   "S", "ISO timestamp")
+  ], [
+    ["MAP-STS-001","Scheduled",  "SCHEDULED", "ACTIVE","Oil change scheduled",  ts_(),ts_()],
+    ["MAP-STS-002","Done",       "COMPLETED", "ACTIVE","Legacy completed label",ts_(),ts_()],
+    ["MAP-STS-003","In Progress","IN_PROGRESS","ACTIVE","Legacy in-progress label",ts_(),ts_()]
+  ]);
+
+  /* W2-S21 Legacy_Line_Mapping (7 cols) */
+  buildSheet_(ss, "Legacy_Line_Mapping", hdr, [
+    col_("A","mapping_id",   "PK","MAP-LIN-XXXX"),
+    col_("B","legacy_value", "R", "Legacy production line label"),
+    col_("C","new_value",    "R", "Target line identifier"),
+    col_("D","status",       "R", "ACTIVE or INACTIVE", LIST.MAPPING_STATUS),
+    col_("E","notes",        "O", "Platform Owner notes"),
+    col_("F","created_at",   "S", "ISO timestamp"),
+    col_("G","updated_at",   "S", "ISO timestamp")
+  ], [
+    ["MAP-LIN-001","Line 1",     "Line1","ACTIVE","Normalized line identifier",ts_(),ts_()],
+    ["MAP-LIN-002","Kiln Line",  "Line1","ACTIVE","Kiln production line",      ts_(),ts_()],
+    ["MAP-LIN-003","Raw Mill L2","Line2","ACTIVE","Raw mill line 2",           ts_(),ts_()]
+  ]);
+
   removeDefaultSheet_(ss);
   log_("Master Data: " + ss.getSheets().length + " sheets");
 }
@@ -719,7 +873,7 @@ function initMasterDataWorkbook() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function initOilLubWorkbook() {
-  var ss = openWorkbook_(WORKBOOK_IDS.OIL_LUB);
+  var ss = openWorkbook_(getResolvedWorkbookId_("OIL_LUB"));
   var hdr = COLOR.OIL_LUB;
 
   /* W3-S01 Oil_Change_Actions (19 cols) */
@@ -939,7 +1093,7 @@ function initOilLubWorkbook() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function initOilAnalysisWorkbook() {
-  var ss = openWorkbook_(WORKBOOK_IDS.OIL_ANALYSIS);
+  var ss = openWorkbook_(getResolvedWorkbookId_("OIL_ANALYSIS"));
   var hdr = COLOR.OIL_ANALYSIS;
 
   /* W4-S01 Oil_Samples (14 cols) */

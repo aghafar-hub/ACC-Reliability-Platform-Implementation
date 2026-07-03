@@ -30,8 +30,8 @@ layer and the application code.
 | Metric | Count |
 |---|---|
 | Production workbooks | 4 |
-| Total sheets | 51 |
-| Total columns | 512 |
+| Total sheets | 60 |
+| Total columns | 588 |
 | Future reserved workbooks | 3 |
 
 ---
@@ -103,6 +103,9 @@ AUDIT_ACTION        CREATE | UPDATE | DELETE | APPROVE | REJECT
 WIDGET_TYPE         KPI_CARD | TABLE | CHART | CALENDAR
 AGG_PERIOD          DAILY | WEEKLY | MONTHLY
 ACCESS_LEVEL        FULL | READ_ONLY | NO_ACCESS
+ENTITY_STATUS       ACTIVE | INACTIVE
+MAPPING_STATUS      ACTIVE | INACTIVE
+CONTRACTOR_TYPE     MAINTENANCE | OIL_LAB | ANALYSIS | GENERAL | ELECTRICAL
 SPECIALTY           OIL_LAB | VIBRATION | GENERAL | ELECTRICAL
 SAMPLE_SOURCE       IN_SERVICE | DRAIN | FILTER
 AXIS                H | V | A
@@ -486,35 +489,32 @@ AXIS                H | V | A
 
 **Color:** Green (`#2E7D32`)  
 **Purpose:** Physical asset reference data. Equipment, lubrication points, vibration points, areas, contractors, and classification dictionaries. Updated rarely — only when physical assets change.  
-**Sheet count:** 13
+**Sheet count:** 22
+
+**Legacy Mapping Layer:** Seven configurable mapping sheets (W2-S15 through W2-S21) translate legacy source values into Platform Master Data. All migration transforms must resolve through these sheets — no hardcoded plant-specific translations in code.
 
 ---
 
 ### W2-S01 · Equipment_Master
 
-**Purpose:** Authoritative registry of all on-site equipment assets.  
+**Purpose:** Authoritative registry of all on-site equipment assets (frozen master fields only).  
 **Manual editor:** Maintenance Engineer or Admin  
-**Fallback notes:** Add equipment by appending a row. Assign `equipment_id` as `EQP-XXXX`. Never change an existing `equipment_id`.
+**Fallback notes:** Add equipment by appending a row. Assign `equipment_id` as `EQP-XXXX`. Never change an existing `equipment_id`. Legacy `Equipment_ID` / plant tag maps to `equipment_tag`.
 
 | # | Column | Type | Validation | Notes |
 |---|---|---|---|---|
 | A | `equipment_id` | `[PK]` | `EQP-XXXX` | Unique. Never change after creation. |
-| B | `equipment_tag` | `[R]` | Unique | Plant asset tag (e.g. `P-101`) |
+| B | `equipment_tag` | `[R]` | Unique | Plant asset tag / legacy Equipment_ID (e.g. `P-101`) |
 | C | `equipment_name` | `[R]` | — | Descriptive name |
-| D | `equipment_type_id` | `[FK]` | → Equipment_Types | — |
-| E | `area_id` | `[FK]` | → Areas | — |
-| F | `criticality` | `[R]` | `CRITICALITY` | A=most critical, C=least critical |
-| G | `is_active` | `[R]` | `BOOLEAN` | FALSE = decommissioned |
-| H | `description` | `[O]` | — | Free-text notes |
-| I | `manufacturer` | `[O]` | — | OEM company name |
-| J | `model` | `[O]` | — | Model number |
-| K | `serial_number` | `[O]` | — | Manufacturer serial number |
-| L | `install_date` | `[O]` | `YYYY-MM-DD` | Date commissioned |
-| M | `created_at` | `[S]` | ISO timestamp | — |
-| N | `updated_at` | `[S]` | ISO timestamp | — |
-| O | `created_by` | `[S]` | Email | — |
+| D | `area_id` | `[FK]` `[R]` | → Areas | Required — every equipment row must belong to an area |
+| E | `equipment_type_id` | `[FK]` | → Equipment_Types | — |
+| F | `parent_equipment_id` | `[FK]` `[O]` | → Equipment_Master | Parent asset for assemblies / sub-units |
+| G | `criticality` | `[R]` | `CRITICALITY` | A=most critical, C=least critical |
+| H | `status` | `[R]` | `ENTITY_STATUS` | `ACTIVE` \| `INACTIVE` |
+| I | `created_at` | `[S]` | ISO timestamp | — |
+| J | `updated_at` | `[S]` | ISO timestamp | — |
 
-**Column count: 15**
+**Column count: 10**
 
 ---
 
@@ -522,28 +522,25 @@ AXIS                H | V | A
 
 **Purpose:** Lubrication Points. The primary reference entity for all oil change, sampling, and analysis activities. Every operational action must link to a valid LP.  
 **Manual editor:** Lubrication Engineer or Admin  
-**Fallback notes:** Add LPs by appending rows (`LP-XXXX`). Do **not** edit `last_change_date` or `last_sample_date` — the app uses these for overdue detection. If you must update them manually after an emergency change, note the date in the `notes` column of the relevant history sheet first.
+**Fallback notes:** Add LPs by appending rows (`LP-XXXX`). Every LP must reference a valid `equipment_id`. Operational dates (last change/sample) are tracked in module history sheets, not on this master row.
 
 | # | Column | Type | Validation | Notes |
 |---|---|---|---|---|
 | A | `lp_id` | `[PK]` | `LP-XXXX` | Unique. Never change. |
-| B | `lp_code` | `[R]` | Unique | Human code (e.g. `LP-P101-GB`) |
+| B | `equipment_id` | `[FK]` `[R]` | → Equipment_Master | Required — every LP belongs to one equipment |
 | C | `lp_name` | `[R]` | — | Descriptive name |
-| D | `equipment_id` | `[FK]` | → Equipment_Master | — |
-| E | `lube_point_type` | `[R]` | `LUBE_POINT_TYPE` | Type of lubrication point |
-| F | `oil_type_id` | `[FK]` | → Oil_Types | Specified oil type for this LP |
-| G | `oil_brand_id` | `[FK]` | → Oil_Brands | Specified oil brand |
-| H | `oil_capacity_liters` | `[R]` | Number > 0 | Total oil volume in system |
-| I | `change_interval_days` | `[R]` | Integer > 0 | Days between scheduled oil changes |
-| J | `sampling_interval_days` | `[R]` | Integer > 0 | Days between scheduled oil samples |
-| K | `last_change_date` | `[A]` | `YYYY-MM-DD` | App updates after each completed change |
-| L | `last_sample_date` | `[A]` | `YYYY-MM-DD` | App updates after each completed sample |
-| M | `is_active` | `[R]` | `BOOLEAN` | FALSE = LP decommissioned |
-| N | `created_at` | `[S]` | ISO timestamp | — |
-| O | `updated_at` | `[S]` | ISO timestamp | — |
-| P | `created_by` | `[S]` | Email | — |
+| D | `lube_point_type` | `[R]` | `LUBE_POINT_TYPE` | Type of lubrication point |
+| E | `oil_type_id` | `[FK]` `[O]` | → Oil_Types | Specified oil type — missing value is a migration WARNING |
+| F | `oil_brand_id` | `[FK]` | → Oil_Brands | Specified oil brand |
+| G | `oil_capacity_liters` | `[R]` | Number > 0 | Total oil volume in system |
+| H | `change_interval_days` | `[R]` | Integer > 0 | Days between scheduled oil changes |
+| I | `sampling_required` | `[R]` | `BOOLEAN` | TRUE if periodic oil sampling applies |
+| J | `sampling_interval_days` | `[O]` | Integer > 0 | Days between samples (required when `sampling_required=TRUE`) |
+| K | `status` | `[R]` | `ENTITY_STATUS` | `ACTIVE` \| `INACTIVE` |
+| L | `created_at` | `[S]` | ISO timestamp | — |
+| M | `updated_at` | `[S]` | ISO timestamp | — |
 
-**Column count: 16**
+**Column count: 13**
 
 ---
 
@@ -573,40 +570,47 @@ AXIS                H | V | A
 
 ### W2-S04 · Areas
 
-**Purpose:** Plant areas and sections. Used to group equipment and assign routes.  
+**Purpose:** Plant areas and sections. Each area belongs to exactly one responsible contractor. Contractor data visibility is derived from area ownership (no shared areas).  
 **Manual editor:** Plant Admin or Maintenance Manager
 
 | # | Column | Type | Validation | Notes |
 |---|---|---|---|---|
 | A | `area_id` | `[PK]` | `AREA-XXX` | Unique |
-| B | `area_code` | `[R]` | Unique, UPPERCASE | Short code (e.g. `UTIL`) |
+| B | `area_code` | `[R]` | Unique, UPPERCASE | Short code (e.g. `111`, `UTIL`) |
 | C | `area_name` | `[R]` | — | Full area name |
-| D | `plant_section` | `[O]` | — | Plant section or production unit |
-| E | `responsible_supervisor` | `[O]` | Email | Supervisor responsible for this area |
-| F | `is_active` | `[R]` | `BOOLEAN` | — |
-| G | `created_at` | `[S]` | ISO timestamp | — |
+| D | `main_area` | `[O]` | — | Production unit / plant section (e.g. Kiln, Raw Mill) |
+| E | `line` | `[O]` | — | Production line identifier (e.g. `Line1`) |
+| F | `responsible_contractor_id` | `[R]` `[FK]` | → Contractors | Single owning contractor per area |
+| G | `status` | `[R]` | `AREA_STATUS` | `ACTIVE` \| `INACTIVE` |
+| H | `created_at` | `[S]` | ISO timestamp | — |
+| I | `updated_at` | `[S]` | ISO timestamp | — |
 
-**Column count: 7**
+> **Not used:** `secondary_contractor_id`, `is_shared_area`, `owner_notes` — one contractor per area only.
+
+**Column count: 9**
 
 ---
 
 ### W2-S05 · Contractors
 
-**Purpose:** External contractors and oil analysis laboratories.  
+**Purpose:** External contractors and oil analysis laboratories. Referenced by `Areas.responsible_contractor_id`.  
 **Manual editor:** Admin or Procurement
 
 | # | Column | Type | Validation | Notes |
 |---|---|---|---|---|
 | A | `contractor_id` | `[PK]` | `CTR-XXX` | Unique |
-| B | `contractor_name` | `[R]` | — | Company name |
-| C | `contact_person` | `[O]` | — | Primary contact name |
-| D | `email` | `[O]` | Email | — |
-| E | `phone` | `[O]` | — | — |
-| F | `specialty` | `[O]` | `SPECIALTY` | Contractor type |
-| G | `is_active` | `[R]` | `BOOLEAN` | — |
-| H | `created_at` | `[S]` | ISO timestamp | — |
+| B | `contractor_code` | `[R]` | Unique, UPPERCASE | Short code (e.g. `RHI`, `ASEC`) |
+| C | `contractor_name` | `[R]` | — | Company name |
+| D | `contractor_type` | `[R]` | `CONTRACTOR_TYPE` | e.g. `MAINTENANCE`, `OIL_LAB`, `GENERAL` |
+| E | `contact_person` | `[O]` | — | Primary contact name |
+| F | `email` | `[O]` | Email | — |
+| G | `phone` | `[O]` | — | — |
+| H | `scope` | `[O]` | — | Work scope / service description |
+| I | `status` | `[R]` | `ENTITY_STATUS` | `ACTIVE` \| `INACTIVE` |
+| J | `created_at` | `[S]` | ISO timestamp | — |
+| K | `updated_at` | `[S]` | ISO timestamp | — |
 
-**Column count: 8**
+**Column count: 11**
 
 ---
 
@@ -664,6 +668,33 @@ AXIS                H | V | A
 | F | `created_at` | `[S]` | ISO timestamp | — |
 
 **Column count: 6**
+
+---
+
+### W2-S08b · Oil_Products
+
+**Purpose:** Catalog of specific oil products (type + brand + commercial SKU). Links viscosity grade and safety data for LPs and inventory.  
+**Manual editor:** Lubrication Engineer or Procurement
+
+| # | Column | Type | Validation | Notes |
+|---|---|---|---|---|
+| A | `oil_product_id` | `[PK]` | `OP-XXX` | Unique |
+| B | `oil_type_id` | `[FK]` `[R]` | → Oil_Types | Base oil type / viscosity family |
+| C | `oil_brand_id` | `[FK]` `[R]` | → Oil_Brands | Brand / manufacturer line |
+| D | `product_name` | `[R]` | — | Commercial product name |
+| E | `iso_vg` | `[O]` | — | ISO viscosity grade (e.g. `VG46`) |
+| F | `application` | `[O]` | — | Intended application |
+| G | `oem_approval` | `[O]` | — | OEM approval reference |
+| H | `density` | `[O]` | Number | kg/L at 15°C |
+| I | `viscosity` | `[O]` | — | Nominal viscosity description |
+| J | `flash_point` | `[O]` | Number | °C |
+| K | `msds_url` | `[O]` | URL | Safety data sheet link |
+| L | `safety_notes` | `[O]` | — | Handling / storage notes |
+| M | `status` | `[R]` | `ENTITY_STATUS` | `ACTIVE` \| `INACTIVE` |
+| N | `created_at` | `[S]` | ISO timestamp | — |
+| O | `updated_at` | `[S]` | ISO timestamp | — |
+
+**Column count: 15**
 
 ---
 
@@ -767,7 +798,167 @@ AXIS                H | V | A
 
 **Column count: 7**
 
-**Workbook 2 total columns: 121**
+---
+
+### W2-S14 · Equipment_Line_Assignments
+
+**Purpose:** Preserves legacy Equipment Register line-level rows where one equipment code may appear on multiple production lines. Used for migration traceability and line-based reporting — not the authoritative equipment registry (`Equipment_Master` holds one row per `equipment_tag`).  
+**Manual editor:** Maintenance Engineer or Admin (migration team during cutover)
+
+| # | Column | Type | Validation | Notes |
+|---|---|---|---|---|
+| A | `assignment_id` | `[PK]` | `ELA-XXXX` | Unique |
+| B | `line` | `[R]` | — | Production line identifier |
+| C | `area` | `[O]` | — | Area name or code from source register |
+| D | `equipment_code` | `[R]` | — | Legacy equipment tag (maps to `equipment_tag`) |
+| E | `source_workbook` | `[R]` | — | Origin workbook name |
+| F | `source_sheet` | `[R]` | — | Origin sheet tab |
+| G | `source_row` | `[R]` | Integer | Origin row number |
+| H | `status` | `[R]` | `ENTITY_STATUS` | `ACTIVE` \| `INACTIVE` |
+| I | `created_at` | `[S]` | ISO timestamp | — |
+| J | `updated_at` | `[S]` | ISO timestamp | — |
+
+**Column count: 10**
+
+---
+
+### W2-S15 · Legacy_Area_Mapping
+
+**Purpose:** Data-driven translation of legacy area codes and names (from Users_Config, Operational, Equipment Register) into `Areas` rows. Editable by the Platform Owner — replaces all hardcoded area lookups in the migration engine.  
+**Manual editor:** Platform Owner or Migration Admin
+
+| # | Column | Type | Validation | Notes |
+|---|---|---|---|---|
+| A | `mapping_id` | `[PK]` | `MAP-AREA-XXXX` | Unique mapping row identifier |
+| B | `legacy_value` | `[R]` | — | Area code or name exactly as it appears in legacy source |
+| C | `legacy_workbook` | `[O]` | — | Source workbook label; blank = match any workbook |
+| D | `legacy_sheet` | `[O]` | — | Source sheet tab; blank = match any sheet |
+| E | `new_area_id` | `[FK]` `[R]` | → Areas | Target `area_id` when status is ACTIVE |
+| F | `new_area_code` | `[O]` | — | Denormalized `area_code` for human review |
+| G | `new_area_name` | `[O]` | — | Denormalized `area_name` for human review |
+| H | `responsible_contractor_id` | `[FK]` `[O]` | → Contractors | Optional contractor override |
+| I | `status` | `[R]` | `MAPPING_STATUS` | `ACTIVE` \| `INACTIVE` |
+| J | `notes` | `[O]` | — | Platform Owner notes |
+| K | `created_at` | `[S]` | ISO timestamp | — |
+| L | `updated_at` | `[S]` | ISO timestamp | — |
+
+**Column count: 12**
+
+---
+
+### W2-S16 · Legacy_Oil_Type_Mapping
+
+**Purpose:** Maps legacy lubricant type names (e.g. from `Lubricant Types.Name`, `Lubrication Points.Lubricant Type`) to `Oil_Types.oil_type_id`.  
+**Manual editor:** Platform Owner or Migration Admin
+
+| # | Column | Type | Validation | Notes |
+|---|---|---|---|---|
+| A | `mapping_id` | `[PK]` | `MAP-OIL-XXXX` | Unique |
+| B | `legacy_value` | `[R]` | — | Legacy lubricant type label |
+| C | `new_value` | `[FK]` `[R]` | → Oil_Types | Target `oil_type_id` |
+| D | `status` | `[R]` | `MAPPING_STATUS` | `ACTIVE` \| `INACTIVE` |
+| E | `notes` | `[O]` | — | Platform Owner notes |
+| F | `created_at` | `[S]` | ISO timestamp | — |
+| G | `updated_at` | `[S]` | ISO timestamp | — |
+
+**Column count: 7**
+
+---
+
+### W2-S17 · Legacy_Oil_Brand_Mapping
+
+**Purpose:** Maps legacy oil brand names to `Oil_Brands.brand_id`.  
+**Manual editor:** Platform Owner or Migration Admin
+
+| # | Column | Type | Validation | Notes |
+|---|---|---|---|---|
+| A | `mapping_id` | `[PK]` | `MAP-OBR-XXXX` | Unique |
+| B | `legacy_value` | `[R]` | — | Legacy brand name |
+| C | `new_value` | `[FK]` `[R]` | → Oil_Brands | Target `brand_id` |
+| D | `status` | `[R]` | `MAPPING_STATUS` | `ACTIVE` \| `INACTIVE` |
+| E | `notes` | `[O]` | — | Platform Owner notes |
+| F | `created_at` | `[S]` | ISO timestamp | — |
+| G | `updated_at` | `[S]` | ISO timestamp | — |
+
+**Column count: 7**
+
+---
+
+### W2-S18 · Legacy_Equipment_Type_Mapping
+
+**Purpose:** Maps legacy equipment type labels to `Equipment_Types.type_id`.  
+**Manual editor:** Platform Owner or Migration Admin
+
+| # | Column | Type | Validation | Notes |
+|---|---|---|---|---|
+| A | `mapping_id` | `[PK]` | `MAP-EQT-XXXX` | Unique |
+| B | `legacy_value` | `[R]` | — | Legacy equipment type label |
+| C | `new_value` | `[FK]` `[R]` | → Equipment_Types | Target `type_id` |
+| D | `status` | `[R]` | `MAPPING_STATUS` | `ACTIVE` \| `INACTIVE` |
+| E | `notes` | `[O]` | — | Platform Owner notes |
+| F | `created_at` | `[S]` | ISO timestamp | — |
+| G | `updated_at` | `[S]` | ISO timestamp | — |
+
+**Column count: 7**
+
+---
+
+### W2-S19 · Legacy_Contractor_Mapping
+
+**Purpose:** Maps legacy contractor names and codes (e.g. `RHI`, `ASEC`) to `Contractors.contractor_id`. Replaces all hardcoded contractor translations.  
+**Manual editor:** Platform Owner or Migration Admin
+
+| # | Column | Type | Validation | Notes |
+|---|---|---|---|---|
+| A | `mapping_id` | `[PK]` | `MAP-CTR-XXXX` | Unique |
+| B | `legacy_value` | `[R]` | — | Legacy contractor name or code |
+| C | `new_value` | `[FK]` `[R]` | → Contractors | Target `contractor_id` |
+| D | `status` | `[R]` | `MAPPING_STATUS` | `ACTIVE` \| `INACTIVE` |
+| E | `notes` | `[O]` | — | Platform Owner notes |
+| F | `created_at` | `[S]` | ISO timestamp | — |
+| G | `updated_at` | `[S]` | ISO timestamp | — |
+
+**Column count: 7**
+
+---
+
+### W2-S20 · Legacy_Status_Mapping
+
+**Purpose:** Maps legacy workflow status labels to `Status_Dictionary.status_code` values.  
+**Manual editor:** Platform Owner or Migration Admin
+
+| # | Column | Type | Validation | Notes |
+|---|---|---|---|---|
+| A | `mapping_id` | `[PK]` | `MAP-STS-XXXX` | Unique |
+| B | `legacy_value` | `[R]` | — | Legacy status label |
+| C | `new_value` | `[R]` | → Status_Dictionary | Target `status_code` |
+| D | `status` | `[R]` | `MAPPING_STATUS` | `ACTIVE` \| `INACTIVE` |
+| E | `notes` | `[O]` | — | Platform Owner notes |
+| F | `created_at` | `[S]` | ISO timestamp | — |
+| G | `updated_at` | `[S]` | ISO timestamp | — |
+
+**Column count: 7**
+
+---
+
+### W2-S21 · Legacy_Line_Mapping
+
+**Purpose:** Maps legacy production line labels (from Equipment Register) to normalized line identifiers used in `Areas.line` and `Equipment_Line_Assignments.line`.  
+**Manual editor:** Platform Owner or Migration Admin
+
+| # | Column | Type | Validation | Notes |
+|---|---|---|---|---|
+| A | `mapping_id` | `[PK]` | `MAP-LIN-XXXX` | Unique |
+| B | `legacy_value` | `[R]` | — | Legacy production line label |
+| C | `new_value` | `[R]` | — | Target line identifier |
+| D | `status` | `[R]` | `MAPPING_STATUS` | `ACTIVE` \| `INACTIVE` |
+| E | `notes` | `[O]` | — | Platform Owner notes |
+| F | `created_at` | `[S]` | ISO timestamp | — |
+| G | `updated_at` | `[S]` | ISO timestamp | — |
+
+**Column count: 7**
+
+**Workbook 2 total columns: 194**
 
 ---
 
@@ -1343,10 +1534,10 @@ Any non-terminal → CANCELLED
 | Workbook | Sheets | Columns |
 |---|---|---|
 | ACC_PLATFORM_SETTINGS_CONFIG | 16 | 142 |
-| ACC_PLATFORM_MASTER_DATA | 13 | 121 |
+| ACC_PLATFORM_MASTER_DATA | 15 | 141 |
 | ACC_OIL_LUBRICATION_DATA | 12 | 139 |
 | ACC_OIL_ANALYSIS_DATA | 10 | 111 |
-| **Total** | **51** | **513** |
+| **Total** | **53** | **535** |
 
 ---
 
@@ -1407,11 +1598,15 @@ MASTER DATA (W2) ← provides physical asset references
                          ← Oil_Inventory.oil_type_id
                          ← Oil_Forecast.oil_type_id
   Oil_Brands.id          ← LP_Master.oil_brand_id
+                         ← Oil_Products.oil_brand_id
                          ← Oil_Change_Actions.oil_brand_id
                          ← Oil_Change_History.oil_brand_id
                          ← Oil_Inventory.oil_brand_id
+  Oil_Products.id        ← (future inventory / LP product refs)
   Route_Templates.id     ← Oil_Routes.template_id
-  Contractors.id         ← Oil_Samples.lab_id
+  Contractors.id         ← Areas.responsible_contractor_id
+                         ← Oil_Samples.lab_id
+  Equipment_Line_Assignments.equipment_code ← traceability to Equipment_Master.equipment_tag
 
 OIL LUBRICATION (W3) ← internal references
   Oil_Change_Actions.id  ← Oil_Change_History.action_id
