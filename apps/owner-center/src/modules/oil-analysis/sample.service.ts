@@ -198,6 +198,20 @@ export interface OilPdfImportInput {
   readonly pdfFileUrl: string;
 }
 
+/** Engineer-reviewed PDF import payload — persisted only after review is completed. */
+export interface OilPdfImportReviewInput {
+  readonly equipmentId: string;
+  readonly labSampleId: string;
+  readonly sampledAt: string;
+  readonly lubricant?: string;
+  readonly contractorId?: string;
+  readonly lubricationPointId?: string | null;
+  readonly notes?: string;
+  readonly labResults: OilLabResultInput;
+  readonly pdf: OilPdfImportInput;
+  readonly overwriteReason?: string;
+}
+
 export interface OilLabResultInput {
   /** Omitted on manual entry — computed automatically from module thresholds. */
   readonly resultStatus?: OilLabResultStatus;
@@ -769,6 +783,11 @@ export class OilSampleLocalService {
     return this.repo.findByLabSampleId(labSampleId, excludeId) !== null;
   }
 
+  findByLabSampleId(labSampleId: string, excludeId?: string): OilSampleRow | null {
+    const row = this.repo.findByLabSampleId(labSampleId, excludeId);
+    return row && isActiveSample(row) ? row : null;
+  }
+
   create(input: OilSampleCreateInput): OilSampleRow {
     const equipmentId = input.equipmentId.trim();
     if (!equipmentId) throw new Error('Equipment ID is required.');
@@ -934,6 +953,83 @@ export class OilSampleLocalService {
       pdfImportStatus: 'rejected',
       pdfReviewNotes: rejectReason,
     });
+  }
+
+  /** Persist a new sample after engineer completes Add Sample review. */
+  saveFromPdfImportReview(input: OilPdfImportReviewInput, actor: string): OilSampleRow {
+    if (!actor.trim()) throw new Error('Reviewer name is required.');
+    if (this.isLabSampleIdDuplicate(input.labSampleId)) {
+      throw new Error(`Sample ID '${input.labSampleId}' already exists. Use overwrite with engineer approval.`);
+    }
+
+    const created = this.create({
+      equipmentId: input.equipmentId,
+      labSampleId: input.labSampleId,
+      sampledAt: input.sampledAt,
+      lubricant: input.lubricant,
+      contractorId: input.contractorId,
+      notes: input.notes,
+    });
+
+    const withPdf = this.attachPdfImport(created.id, input.pdf);
+    const withLab = this.saveLabResults(withPdf.id, input.labResults, actor.trim());
+    this.reviewPdfImport(withLab.id, 'Engineer reviewed and saved from Add Sample workflow.');
+
+    const lpId = input.lubricationPointId?.trim();
+    if (lpId) {
+      return this.confirmLpMapping(withLab.id, lpId, actor.trim(), 'Confirmed during Add Sample review.');
+    }
+    return this.findById(withLab.id) ?? withLab;
+  }
+
+  /** Overwrite an existing sample after engineer explicitly approves duplicate resolution. */
+  overwriteFromPdfImportReview(
+    existingInternalId: string,
+    input: OilPdfImportReviewInput,
+    actor: string,
+  ): OilSampleRow {
+    if (!actor.trim()) throw new Error('Reviewer name is required.');
+    const reason = input.overwriteReason?.trim();
+    if (!reason) throw new Error('Overwrite reason is required for engineer-approved replacement.');
+
+    const existing = this.findById(existingInternalId);
+    if (!existing) throw new Error('Sample not found.');
+    if (isSampleApprovalLocked(existing)) {
+      throw new Error('Sample is locked and cannot be overwritten without engineer unlock.');
+    }
+
+    const fromStatus = existing.approvalStatus ?? 'pending';
+    const overwriteAudit = applySampleAudit(existing, {
+      kind: 'approval',
+      action: 'edited',
+      actor: actor.trim(),
+      fromApprovalStatus: fromStatus,
+      toApprovalStatus: fromStatus,
+      reason: `Engineer-approved overwrite: ${reason}`,
+    });
+
+    this.repo.update(existingInternalId, {
+      equipmentId: input.equipmentId.trim(),
+      sampledAt: input.sampledAt.trim(),
+      lubricant: input.lubricant?.trim() ?? existing.lubricant,
+      contractorId: input.contractorId?.trim() ?? existing.contractorId,
+      notes: input.notes?.trim() ?? existing.notes,
+      importSource: 'pdf-import',
+      ...overwriteAudit,
+    });
+
+    const withPdf = this.attachPdfImport(existingInternalId, input.pdf);
+    const withLab = this.saveLabResults(withPdf.id, input.labResults, actor.trim());
+    this.reviewPdfImport(withLab.id, `Overwrite saved: ${reason}`);
+
+    const lpId = input.lubricationPointId?.trim();
+    if (lpId && withLab.lubricationPointId !== lpId) {
+      if (!withLab.lubricationPointId) {
+        return this.confirmLpMapping(withLab.id, lpId, actor.trim(), 'LP confirmed during overwrite review.');
+      }
+      this.repo.update(withLab.id, { lubricationPointId: lpId });
+    }
+    return this.findById(withLab.id) ?? withLab;
   }
 
   saveLabResults(sampleInternalId: string, input: OilLabResultInput, actor = 'System'): OilSampleRow {

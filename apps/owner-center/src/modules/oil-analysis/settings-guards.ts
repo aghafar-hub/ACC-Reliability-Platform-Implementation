@@ -49,6 +49,11 @@ export function isJsonExportEnabled(): boolean {
   return oilAnalysisSettingsService.getSettings().general.enableJsonExport;
 }
 
+export function getTimelineDirection(): 'ltr' | 'rtl' {
+  const settings = oilAnalysisSettingsService.getSettings();
+  return settings.timeline?.direction ?? settings.laboratory.timelineDirection;
+}
+
 export function isLabParameterVisible(id: OilAnalysisParameterId): boolean {
   return oilAnalysisSettingsService.isParameterEnabled(id);
 }
@@ -63,6 +68,9 @@ export function filterOilAnalysisSubNav(
   items: readonly ModuleSubNavItem[],
 ): readonly ModuleSubNavItem[] {
   return items.filter((item) => {
+    if (item.path === '/oil-analysis/add-sample') {
+      return isPdfImportEnabled() || isManualEntryEnabled();
+    }
     if (item.path === '/oil-analysis/pdf-import') return isPdfImportEnabled();
     if (item.path === '/oil-analysis/trends') return isTrendEngineEnabled();
     if (item.path === '/oil-analysis/review') return isApprovalWorkflowEnabled();

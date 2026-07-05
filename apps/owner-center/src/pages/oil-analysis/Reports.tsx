@@ -1,30 +1,48 @@
 // apps/owner-center/src/pages/oil-analysis/Reports.tsx
-// Oil Analysis — Reports (Sprint 08).
+// OA-008 — Oil Analysis Reports Center.
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
-import { StatusChip } from '../../components/StatusChip';
-import { SummaryCard } from '../../components/SummaryCard';
-import { OilAnalysisActionButton } from '../../components/oil-analysis/OilAnalysisActionButton';
+import { useAuth } from '../../context/AuthContext';
+import { usePlatformSdk } from '../../context/SdkContext';
 import { useOilAnalysisPermissions } from '../../hooks/useOilAnalysisPermissions';
+import { OilAnalysisActionButton } from '../../components/oil-analysis/OilAnalysisActionButton';
+import {
+  DataTable,
+  EmptyState,
+  ErrorState,
+  FilterBar,
+  KpiCard,
+  KpiGrid,
+  PageHeader,
+  ReportLayout,
+  ReportPreview,
+  ReportSection,
+  SectionCard,
+  StatusBadge,
+} from '../../components/ui';
+import type { DataTableColumn, FilterFieldConfig, StatusBadgeVariant } from '../../components/ui';
+import { resolveOilAnalysisContractorScope } from '../../modules/oil-analysis/contractor-scope';
+import {
+  OIL_REPORT_CATEGORIES,
+  OIL_REPORT_TEMPLATES,
+  getReportFavorites,
+  templateLabel,
+  templatesForCategory,
+  toggleReportFavorite,
+  type OilReportCategory,
+  type OilReportTemplateDef,
+  type OilReportType,
+} from '../../modules/oil-analysis/report-catalog';
 import {
   generateOilReport,
-  listReportAreas,
-  listReportContractors,
+  getReportFilterOptions,
+  hasReportData,
+  type OilReportFilters,
+  type OilReportOutput,
 } from '../../modules/oil-analysis/report.service';
-import type {
-  OilReportFilters,
-  OilReportType,
-  OilReportOutput,
-} from '../../modules/oil-analysis/report.service';
-import { exportReportCsv, exportReportJson } from '../../modules/oil-analysis/report-export';
-import type { TrendDirection } from '../../modules/trend-engine';
-import {
-  isCsvExportEnabled,
-  isJsonExportEnabled,
-  getVisibleLabReportParamColumns,
-} from '../../modules/oil-analysis/settings-guards';
-import type { OilAnalysisParameterId } from '../../modules/oil-analysis/settings-types';
+import { exportReportExcel, exportReportPdf } from '../../modules/oil-analysis/report-export';
+import { oilAnalysisSettingsService } from '../../modules/oil-analysis/settings.service';
 
 interface L10n<T> { en: T; ar: T; }
 
@@ -32,546 +50,707 @@ function t<T>(bundle: L10n<T>, locale: string): T {
   return locale === 'ar' ? bundle.ar : bundle.en;
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   if (!iso) return '—';
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? iso
-    : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function formatNum(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return '—';
-  return String(value);
+    : d.toLocaleDateString(locale === 'ar' ? 'ar-SA' : undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 }
 
 const COPY = {
-  title:        { en: 'Reports',                    ar: 'التقارير' },
-  desc:         { en: 'Generate engineering and operational reports from oil analysis data.', ar: 'إنشاء تقارير هندسية وتشغيلية من بيانات تحليل الزيت.' },
-  liveData:     { en: 'Live data',                  ar: 'بيانات حية' },
-  selReport:    { en: 'Report',                     ar: 'التقرير' },
-  dateFrom:     { en: 'Date From',                  ar: 'من تاريخ' },
-  dateTo:       { en: 'Date To',                    ar: 'إلى تاريخ' },
-  filterArea:   { en: 'All Areas',                  ar: 'جميع المناطق' },
-  filterContr:  { en: 'All Contractors',            ar: 'جميع المقاولين' },
-  filterCond:   { en: 'All Conditions',             ar: 'جميع الحالات' },
-  equipSearch:  { en: 'Search equipment, LP, sample…', ar: 'ابحث عن معدة أو نقطة أو عينة…' },
-  btnCsv:       { en: 'Export CSV',                 ar: 'تصدير CSV' },
-  btnJson:      { en: 'Export JSON',                ar: 'تصدير JSON' },
-  empty:        { en: 'No records match the current filters.', ar: 'لا توجد سجلات تطابق المرشحات الحالية.' },
-  repSummary:   { en: 'Sample Summary',             ar: 'ملخص العينات' },
-  repCritical:  { en: 'Critical Samples',           ar: 'العينات الحرجة' },
-  repPending:   { en: 'Pending Review',             ar: 'بانتظار المراجعة' },
-  repLab:       { en: 'Laboratory Results',         ar: 'نتائج المختبر' },
-  repHealth:    { en: 'Oil Health by Equipment',    ar: 'صحة الزيت حسب المعدة' },
-  kpiSamples:   { en: 'Samples',                    ar: 'العينات' },
-  kpiEquip:     { en: 'Equipment',                  ar: 'المعدات' },
-  kpiAreas:     { en: 'Areas',                      ar: 'المناطق' },
-  kpiContr:     { en: 'Contractors',                ar: 'المقاولين' },
-  kpiCritical:  { en: 'Critical / Caution',         ar: 'حرج / تحذير' },
-  kpiCritOnly:  { en: 'Critical',                   ar: 'حرج' },
-  kpiCaution:   { en: 'Caution',                    ar: 'تحذير' },
-  kpiPending:   { en: 'Pending Items',              ar: 'عناصر معلقة' },
-  kpiPdf:       { en: 'PDF Pending',                ar: 'PDF معلق' },
-  kpiMissingLp: { en: 'Missing LP',                 ar: 'نقطة مفقودة' },
-  kpiApproved:  { en: 'Approved Results',           ar: 'نتائج معتمدة' },
-  kpiHealth:    { en: 'Equipment / LP',             ar: 'معدة / نقطة' },
-  secBreakdown: { en: 'Breakdown',                  ar: 'التفصيل' },
-  secResults:   { en: 'Report Data',                ar: 'بيانات التقرير' },
-  grpEquip:     { en: 'By Equipment',               ar: 'حسب المعدة' },
-  grpArea:      { en: 'By Area',                    ar: 'حسب المنطقة' },
-  grpContr:     { en: 'By Contractor',              ar: 'حسب المقاول' },
-  grpStatus:    { en: 'By Status',                  ar: 'حسب الحالة' },
-  grpCond:      { en: 'By Condition',               ar: 'حسب الحالة الفنية' },
-  colKey:       { en: 'Group',                      ar: 'المجموعة' },
-  colCount:     { en: 'Count',                      ar: 'العدد' },
-  colSample:    { en: 'Sample ID',                  ar: 'معرّف العينة' },
-  colEquip:     { en: 'Equipment',                  ar: 'المعدة' },
-  colLp:        { en: 'LP',                         ar: 'النقطة' },
-  colLab:       { en: 'Lab Sample ID',              ar: 'معرّف المختبر' },
-  colDate:      { en: 'Sample Date',                ar: 'تاريخ العينة' },
-  colAlert:     { en: 'Alert Type',                 ar: 'نوع التنبيه' },
-  colCond:      { en: 'Condition',                  ar: 'الحالة' },
-  colAbnormal:  { en: 'Abnormal Fields',            ar: 'حقول شاذة' },
-  colApproval:  { en: 'Approval',                   ar: 'الاعتماد' },
-  colStatus:    { en: 'Status',                     ar: 'الحالة' },
-  colPdf:       { en: 'PDF Status',                 ar: 'حالة PDF' },
-  colReason:    { en: 'Pending Reason',             ar: 'سبب الانتظار' },
-  colIron:      { en: 'Iron',                       ar: 'الحديد' },
-  colCopper:    { en: 'Copper',                     ar: 'النحاس' },
-  colSilicon:   { en: 'Silicon',                    ar: 'السيليكون' },
-  colWater:     { en: 'Water %',                    ar: 'الماء %' },
-  colPq:        { en: 'PQ Index',                   ar: 'مؤشر PQ' },
-  colVis:       { en: 'Viscosity',                  ar: 'اللزوجة' },
-  colTan:       { en: 'TAN',                        ar: 'TAN' },
-  colOx:        { en: 'Oxidation',                  ar: 'الأكسدة' },
-  colParticle:  { en: 'Particle Count',             ar: 'عدد الجسيمات' },
-  colTrend:     { en: 'Trend',                      ar: 'الاتجاه' },
-  condPending:  { en: 'Pending',                    ar: 'معلّق' },
-  condNormal:   { en: 'Normal',                     ar: 'طبيعي' },
-  condMonitor:  { en: 'Monitor',                    ar: 'مراقبة' },
-  condCaution:  { en: 'Caution',                    ar: 'تحذير' },
-  condCritical: { en: 'Critical',                   ar: 'حرج' },
+  title: { en: 'Reports', ar: 'التقارير' },
+  subtitle: {
+    en: 'Professional oil analysis reporting — select a template, apply filters, preview, and export.',
+    ar: 'تقارير تحليل الزيت الاحترافية — اختر قالباً، طبّق الفلاتر، عاين، ثم صدّر.',
+  },
+  stepCategory: { en: '1. Select category', ar: '١. اختر الفئة' },
+  stepReport: { en: '2. Select report', ar: '٢. اختر التقرير' },
+  stepFilters: { en: '3. Apply filters', ar: '٣. طبّق الفلاتر' },
+  stepPreview: { en: '4. Preview & export', ar: '٤. المعاينة والتصدير' },
+  favorites: { en: 'Favorites', ar: 'المفضلة' },
+  pin: { en: 'Pin', ar: 'تثبيت' },
+  unpin: { en: 'Unpin', ar: 'إلغاء التثبيت' },
+  preview: { en: 'Generate preview', ar: 'إنشاء المعاينة' },
+  exportPdf: { en: 'Export PDF', ar: 'تصدير PDF' },
+  exportExcel: { en: 'Export Excel', ar: 'تصدير Excel' },
+  empty: {
+    en: 'No records match the current filters.',
+    ar: 'لا توجد سجلات تطابق المرشحات الحالية.',
+  },
+  emptyTitle: { en: 'No data for this report', ar: 'لا توجد بيانات لهذا التقرير' },
+  lpFilter: { en: 'LP_ID', ar: 'LP_ID' },
+  selectAll: { en: 'Select all', ar: 'تحديد الكل' },
+  clearLp: { en: 'Clear selection', ar: 'مسح التحديد' },
+  filterDate: { en: 'Date range', ar: 'نطاق التاريخ' },
+  filterEquipment: { en: 'Equipment_ID', ar: 'Equipment_ID' },
+  filterArea: { en: 'Area', ar: 'المنطقة' },
+  filterContractor: { en: 'Contractor', ar: 'المقاول' },
+  filterOilType: { en: 'Oil Type', ar: 'نوع الزيت' },
+  filterReportStatus: { en: 'Report Status', ar: 'حالة التقرير' },
+  filterEquipStatus: { en: 'Equipment Status', ar: 'حالة المعدة' },
+  filterSampleId: { en: 'Sample ID', ar: 'معرّف العينة' },
+  filterAll: { en: 'All', ar: 'الكل' },
+  clearFilters: { en: 'Clear filters', ar: 'مسح الفلاتر' },
+  secData: { en: 'Report Data', ar: 'بيانات التقرير' },
+  secBreakdown: { en: 'Breakdown', ar: 'التفصيل' },
+  secCharts: { en: 'Charts', ar: 'المخططات' },
+  colGroup: { en: 'Group', ar: 'المجموعة' },
+  colCount: { en: 'Count', ar: 'العدد' },
+  liveData: { en: 'Live data', ar: 'بيانات حية' },
+  accOnly: { en: 'ACC only', ar: 'ACC فقط' },
 } as const;
 
-const REPORT_OPTIONS: readonly { id: OilReportType; label: L10n<string> }[] = [
-  { id: 'sample-summary',     label: COPY.repSummary },
-  { id: 'critical-samples',   label: COPY.repCritical },
-  { id: 'pending-review',     label: COPY.repPending },
-  { id: 'laboratory-results', label: COPY.repLab },
-  { id: 'oil-health',         label: COPY.repHealth },
-];
-
-const CONDITION_OPTIONS: readonly { id: string; label: L10n<string> }[] = [
-  { id: '',          label: COPY.filterCond },
-  { id: 'pending',   label: COPY.condPending },
-  { id: 'normal',    label: COPY.condNormal },
-  { id: 'monitor',   label: COPY.condMonitor },
-  { id: 'caution',   label: COPY.condCaution },
-  { id: 'critical',  label: COPY.condCritical },
-];
-
-const TREND_LABELS: Record<TrendDirection, L10n<string>> = {
-  stable:           { en: 'Stable',          ar: 'مستقر' },
-  improving:        { en: 'Improving',       ar: 'يتحسن' },
-  rising:           { en: 'Rising',          ar: 'مرتفع' },
-  'rapidly-rising': { en: 'Rapidly Rising',  ar: 'يرتفع بسرعة' },
-  'sudden-change':  { en: 'Sudden Change',   ar: 'تغير مفاجئ' },
+const EQUIPMENT_STATUS_LABELS: Record<string, L10n<string>> = {
+  normal: { en: 'Normal', ar: 'طبيعي' },
+  caution: { en: 'Caution', ar: 'حذر' },
+  alert: { en: 'Alert', ar: 'تنبيه' },
+  pending: { en: 'Pending', ar: 'قيد الانتظار' },
+  none: { en: 'No sample', ar: 'لا توجد عينة' },
+  overdue: { en: 'Overdue', ar: 'متأخر' },
 };
 
-function kpiLabel(key: string, locale: string): string {
-  const map: Record<string, L10n<string>> = {
-    samples:          COPY.kpiSamples,
-    equipment:        COPY.kpiEquip,
-    areas:            COPY.kpiAreas,
-    contractors:      COPY.kpiContr,
-    'critical/caution': COPY.kpiCritical,
-    critical:         COPY.kpiCritOnly,
-    caution:          COPY.kpiCaution,
-    pending:          COPY.kpiPending,
-    'pdf-pending':      COPY.kpiPdf,
-    'missing-lp':       COPY.kpiMissingLp,
-    'approved-results': COPY.kpiApproved,
-    'equipment-lp':     COPY.kpiHealth,
-  };
-  return map[key] ? t(map[key]!, locale) : key;
+function statusVariant(value: string): StatusBadgeVariant {
+  if (value === 'alert' || value === 'critical') return 'alert';
+  if (value === 'caution' || value === 'monitor') return 'caution';
+  if (value === 'normal') return 'normal';
+  if (value === 'overdue') return 'overdue';
+  if (value === 'pending') return 'pending-review';
+  return 'disabled';
 }
 
-function kpiModifier(key: string): 'neutral' | 'info' | 'warning' | 'caution' {
-  if (key === 'critical' || key === 'critical/caution') return 'caution';
-  if (key === 'caution' || key === 'pdf-pending' || key === 'missing-lp') return 'warning';
-  if (key === 'pending') return 'warning';
-  return 'info';
+interface LpMultiSelectProps {
+  readonly lpIds: readonly string[];
+  readonly selected: readonly string[];
+  readonly onChange: (next: string[]) => void;
+  readonly locale: string;
 }
 
-const LAB_PARAM_COLUMN_LABELS: Record<OilAnalysisParameterId, L10n<string>> = {
-  iron:          COPY.colIron,
-  copper:        COPY.colCopper,
-  silicon:       COPY.colSilicon,
-  water:         COPY.colWater,
-  pqIndex:       COPY.colPq,
-  viscosity:     COPY.colVis,
-  tan:           COPY.colTan,
-  oxidation:     COPY.colOx,
-  particleCount: COPY.colParticle,
-};
-
-function labParamCellValue(
-  row: {
-    readonly ironPpm: number | null;
-    readonly copperPpm: number | null;
-    readonly siliconPpm: number | null;
-    readonly waterPercent: number | null;
-    readonly pqIndex: number | null;
-    readonly viscosity100c: number | null;
-    readonly tan: number | null;
-    readonly oxidation: number | null;
-    readonly particleCount: number | null;
-  },
-  id: OilAnalysisParameterId,
-): string {
-  switch (id) {
-    case 'iron': return formatNum(row.ironPpm);
-    case 'copper': return formatNum(row.copperPpm);
-    case 'silicon': return formatNum(row.siliconPpm);
-    case 'water': return formatNum(row.waterPercent);
-    case 'pqIndex': return formatNum(row.pqIndex);
-    case 'viscosity': return formatNum(row.viscosity100c);
-    case 'tan': return formatNum(row.tan);
-    case 'oxidation': return formatNum(row.oxidation);
-    case 'particleCount': return formatNum(row.particleCount);
-    default: return '—';
-  }
-}
-
-interface BreakdownTableProps {
-  readonly title: string;
-  readonly rows: readonly { key: string; count: number }[];
-}
-
-function BreakdownTable({ title, rows }: BreakdownTableProps): React.ReactElement {
-  const { locale } = useLanguage();
+function LpMultiSelect({ lpIds, selected, onChange, locale }: LpMultiSelectProps): React.ReactElement {
   const l = (b: L10n<string>) => t(b, locale);
+  const allSelected = lpIds.length > 0 && selected.length === lpIds.length;
 
   return (
-    <div className="oa-report-breakdown">
-      <h3 className="oa-report-breakdown__title">{title}</h3>
-      {rows.length === 0 ? (
-        <p className="db-panel__empty">—</p>
+    <div className="acc-oa-reports__lp-select">
+      <div className="acc-oa-reports__lp-select-header">
+        <span className="acc-oa-reports__lp-select-label">{l(COPY.lpFilter)}</span>
+        <div className="acc-oa-reports__lp-select-actions">
+          <button
+            type="button"
+            className="acc-btn acc-btn--ghost acc-btn--sm"
+            onClick={() => onChange(allSelected ? [] : [...lpIds])}
+          >
+            {allSelected ? l(COPY.clearLp) : l(COPY.selectAll)}
+          </button>
+        </div>
+      </div>
+      <div className="acc-oa-reports__lp-select-grid">
+        {lpIds.map((lpId) => {
+          const checked = selected.includes(lpId);
+          return (
+            <label key={lpId} className="acc-oa-reports__lp-option">
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => {
+                  onChange(
+                    checked ? selected.filter((id) => id !== lpId) : [...selected, lpId],
+                  );
+                }}
+              />
+              <span>{lpId}</span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+interface SimpleBarChartProps {
+  readonly title: string;
+  readonly labels: readonly string[];
+  readonly values: readonly number[];
+  readonly colors?: readonly string[];
+}
+
+function SimpleBarChart({ title, labels, values, colors }: SimpleBarChartProps): React.ReactElement {
+  const max = Math.max(...values, 1);
+  const width = 360;
+  const height = 160;
+  const pad = { top: 12, right: 8, bottom: 32, left: 8 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+  const barW = innerW / Math.max(labels.length, 1) - 6;
+
+  return (
+    <div className="acc-oa-reports__chart">
+      <h4 className="acc-oa-reports__chart-title">{title}</h4>
+      {values.every((v) => v === 0) ? (
+        <p className="acc-oa-reports__chart-empty">—</p>
       ) : (
-        <table className="ur-table oc-table oa-report-table">
-          <thead>
-            <tr>
-              <th>{l(COPY.colKey)}</th>
-              <th>{l(COPY.colCount)}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.key}>
-                <td>{row.key}</td>
-                <td>{row.count}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <svg viewBox={`0 0 ${width} ${height}`} className="acc-oa-reports__chart-svg" role="img" aria-label={title}>
+          {labels.map((label, i) => {
+            const value = values[i] ?? 0;
+            const barH = (value / max) * innerH;
+            const x = pad.left + i * (barW + 6);
+            const y = pad.top + innerH - barH;
+            return (
+              <g key={label}>
+                <rect
+                  x={x}
+                  y={y}
+                  width={barW}
+                  height={barH}
+                  rx={2}
+                  fill={colors?.[i] ?? 'var(--color-primary, #2563eb)'}
+                />
+                <text x={x + barW / 2} y={height - 6} textAnchor="middle" className="acc-oa-reports__chart-label">
+                  {label.length > 8 ? `${label.slice(0, 7)}…` : label}
+                </text>
+                {value > 0 && (
+                  <text x={x + barW / 2} y={y - 3} textAnchor="middle" className="acc-oa-reports__chart-value">
+                    {value}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
       )}
     </div>
   );
 }
 
-function ReportBody({ output }: { output: OilReportOutput }): React.ReactElement {
-  const { locale } = useLanguage();
-  const l = (b: L10n<string>) => t(b, locale);
-  const { report } = output;
-
-  if (report.kind === 'sample-summary') {
-    return (
-      <div className="oa-report-breakdowns">
-        <BreakdownTable title={l(COPY.grpEquip)} rows={report.byEquipment} />
-        <BreakdownTable title={l(COPY.grpArea)} rows={report.byArea} />
-        <BreakdownTable title={l(COPY.grpContr)} rows={report.byContractor} />
-        <BreakdownTable title={l(COPY.grpStatus)} rows={report.byStatus} />
-        <BreakdownTable title={l(COPY.grpCond)} rows={report.byCondition} />
-      </div>
-    );
-  }
-
-  if (report.kind === 'critical-samples') {
-    if (report.rows.length === 0) return <p className="db-panel__empty">{l(COPY.empty)}</p>;
-    return (
-      <table className="ur-table oc-table oa-report-table">
-        <thead>
-          <tr>
-            <th>{l(COPY.colSample)}</th>
-            <th>{l(COPY.colEquip)}</th>
-            <th>{l(COPY.colLp)}</th>
-            <th>{l(COPY.colLab)}</th>
-            <th>{l(COPY.colDate)}</th>
-            <th>{l(COPY.colAlert)}</th>
-            <th>{l(COPY.colCond)}</th>
-            <th>{l(COPY.colAbnormal)}</th>
-            <th>{l(COPY.colApproval)}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {report.rows.map((row) => (
-            <tr key={row.sampleId}>
-              <td>{row.sampleId}</td>
-              <td>{row.equipmentId}</td>
-              <td>{row.lubricationPointId}</td>
-              <td>{row.labSampleId}</td>
-              <td>{formatDate(row.sampledAt)}</td>
-              <td>{row.alertType}</td>
-              <td>{row.condition}</td>
-              <td>{row.abnormalFields}</td>
-              <td>{row.approvalStatus}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  }
-
-  if (report.kind === 'pending-review') {
-    if (report.rows.length === 0) return <p className="db-panel__empty">{l(COPY.empty)}</p>;
-    return (
-      <table className="ur-table oc-table oa-report-table">
-        <thead>
-          <tr>
-            <th>{l(COPY.colSample)}</th>
-            <th>{l(COPY.colEquip)}</th>
-            <th>{l(COPY.colLp)}</th>
-            <th>{l(COPY.colLab)}</th>
-            <th>{l(COPY.colDate)}</th>
-            <th>{l(COPY.colStatus)}</th>
-            <th>{l(COPY.colApproval)}</th>
-            <th>{l(COPY.colPdf)}</th>
-            <th>{l(COPY.colReason)}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {report.rows.map((row) => (
-            <tr key={row.sampleId}>
-              <td>{row.sampleId}</td>
-              <td>{row.equipmentId}</td>
-              <td>{row.lubricationPointId}</td>
-              <td>{row.labSampleId}</td>
-              <td>{formatDate(row.sampledAt)}</td>
-              <td>{row.status}</td>
-              <td>{row.approvalStatus}</td>
-              <td>{row.pdfImportStatus}</td>
-              <td>{row.pendingReason}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  }
-
-  if (report.kind === 'laboratory-results') {
-    if (report.rows.length === 0) return <p className="db-panel__empty">{l(COPY.empty)}</p>;
-    const paramColumns = getVisibleLabReportParamColumns();
-    return (
-      <div className="oa-report-table-wrap">
-        <table className="ur-table oc-table oa-report-table oa-report-table--wide">
-          <thead>
-            <tr>
-              <th>{l(COPY.colSample)}</th>
-              <th>{l(COPY.colEquip)}</th>
-              <th>{l(COPY.colLp)}</th>
-              <th>{l(COPY.colLab)}</th>
-              <th>{l(COPY.colDate)}</th>
-              {paramColumns.map((col) => (
-                <th key={col.id}>{l(LAB_PARAM_COLUMN_LABELS[col.id])}</th>
-              ))}
-              <th>{l(COPY.colApproval)}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.rows.map((row) => (
-              <tr key={row.sampleId}>
-                <td>{row.sampleId}</td>
-                <td>{row.equipmentId}</td>
-                <td>{row.lubricationPointId}</td>
-                <td>{row.labSampleId}</td>
-                <td>{formatDate(row.sampledAt)}</td>
-                {paramColumns.map((col) => (
-                  <td key={col.id}>{labParamCellValue(row, col.id)}</td>
-                ))}
-                <td>{row.approvalStatus}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  if (report.kind === 'oil-health') {
-    if (report.rows.length === 0) return <p className="db-panel__empty">{l(COPY.empty)}</p>;
-    return (
-      <table className="ur-table oc-table oa-report-table">
-        <thead>
-          <tr>
-            <th>{l(COPY.colEquip)}</th>
-            <th>{l(COPY.colLp)}</th>
-            <th>{l(COPY.colSample)}</th>
-            <th>{l(COPY.colLab)}</th>
-            <th>{l(COPY.colCond)}</th>
-            <th>{l(COPY.colDate)}</th>
-            <th>{l(COPY.colTrend)}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {report.rows.map((row) => (
-            <tr key={`${row.equipmentId}-${row.lubricationPointId}`}>
-              <td>{row.equipmentId}</td>
-              <td>{row.lubricationPointId}</td>
-              <td>{row.sampleId}</td>
-              <td>{row.labSampleId}</td>
-              <td>{row.condition}</td>
-              <td>{formatDate(row.lastSampleDate)}</td>
-              <td>
-                {row.trendDirection
-                  ? l(TREND_LABELS[row.trendDirection])
-                  : '—'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  }
-
-  return <p className="db-panel__empty">{l(COPY.empty)}</p>;
+interface ReportPreviewBodyProps {
+  readonly output: OilReportOutput;
+  readonly locale: string;
 }
 
-function hasReportData(output: OilReportOutput): boolean {
+function ReportPreviewBody({ output, locale }: ReportPreviewBodyProps): React.ReactElement {
+  const l = (b: L10n<string>) => t(b, locale);
   const { report } = output;
-  switch (report.kind) {
-    case 'sample-summary':
-      return report.sampleCount > 0;
-    default:
-      return report.rows.length > 0;
-  }
+  const settings = oilAnalysisSettingsService.getSettings();
+  const showCharts = settings.reportSettings.enableCharts;
+
+  const tableColumns: DataTableColumn<{ id: string } & Record<string, string | number | null>>[] =
+    report.tableColumns.map((col) => ({
+      id: col.id,
+      header: col.label,
+      renderCell: (row) => {
+        const val = row[col.id];
+        const text = val === null || val === undefined ? '—' : String(val);
+        if (col.id === 'status' || col.id === 'condition') {
+          return <StatusBadge variant={statusVariant(text)} label={text} size="sm" />;
+        }
+        return text;
+      },
+    }));
+
+  const tableData = report.tableRows.map((row, index) => ({
+    id: String(row.sampleId ?? row.lpId ?? row.equipmentId ?? index),
+    ...row,
+  }));
+
+  return (
+    <>
+      {showCharts &&
+        report.charts.map((chart) => (
+          <ReportSection key={chart.title} title={chart.title}>
+            <SimpleBarChart
+              title={chart.title}
+              labels={chart.slices.map((s) => s.label)}
+              values={chart.slices.map((s) => s.value)}
+              colors={chart.slices.map((s) => s.color ?? 'var(--color-primary)')}
+            />
+          </ReportSection>
+        ))}
+
+      {report.tableRows.length > 0 && (
+        <ReportSection title={l(COPY.secData)}>
+          <DataTable
+            columns={tableColumns}
+            data={tableData}
+          />
+        </ReportSection>
+      )}
+
+      {report.breakdowns.map((breakdown) =>
+        breakdown.rows.length > 0 ? (
+          <ReportSection key={breakdown.title} title={breakdown.title}>
+            <table className="acc-data-table acc-data-table--compact">
+              <thead>
+                <tr>
+                  <th>{l(COPY.colGroup)}</th>
+                  <th>{l(COPY.colCount)}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {breakdown.rows.map((row) => (
+                  <tr key={row.key}>
+                    <td>{row.key}</td>
+                    <td>{row.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ReportSection>
+        ) : null,
+      )}
+    </>
+  );
 }
 
 export default function Reports(): React.ReactElement {
   const { locale } = useLanguage();
   const l = (b: L10n<string>) => t(b, locale);
+  const sdk = usePlatformSdk();
+  const { user } = useAuth();
   const permissions = useOilAnalysisPermissions();
+  const scope = useMemo(() => resolveOilAnalysisContractorScope(sdk), [sdk]);
 
-  const areas = useMemo(() => listReportAreas(), []);
-  const contractors = useMemo(() => listReportContractors(), []);
+  const filterOptions = useMemo(() => getReportFilterOptions(scope), [scope]);
 
+  const [category, setCategory] = useState<OilReportCategory>('operational');
   const [reportType, setReportType] = useState<OilReportType>('sample-summary');
+  const [favorites, setFavorites] = useState<OilReportType[]>(() => getReportFavorites());
+  const [previewRequested, setPreviewRequested] = useState(true);
+
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [selectedLpIds, setSelectedLpIds] = useState<string[]>([]);
+  const [equipmentId, setEquipmentId] = useState('');
   const [area, setArea] = useState('');
   const [contractor, setContractor] = useState('');
-  const [equipmentSearch, setEquipmentSearch] = useState('');
-  const [condition, setCondition] = useState('');
+  const [oilType, setOilType] = useState('');
+  const [reportStatus, setReportStatus] = useState('');
+  const [equipmentStatus, setEquipmentStatus] = useState('');
+  const [sampleId, setSampleId] = useState('');
 
-  const filters: OilReportFilters = useMemo(() => ({
-    reportType,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    area: area || undefined,
-    contractor: contractor || undefined,
-    equipmentSearch: equipmentSearch || undefined,
-    condition: condition || undefined,
-  }), [reportType, dateFrom, dateTo, area, contractor, equipmentSearch, condition]);
+  const filters: OilReportFilters = useMemo(
+    () => ({
+      reportType,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      lpIds: selectedLpIds.length > 0 ? selectedLpIds : undefined,
+      equipmentId: equipmentId || undefined,
+      area: area || undefined,
+      contractor: contractor || undefined,
+      oilType: oilType || undefined,
+      reportStatus: reportStatus || undefined,
+      equipmentStatus: equipmentStatus || undefined,
+      sampleId: sampleId || undefined,
+    }),
+    [
+      reportType,
+      dateFrom,
+      dateTo,
+      selectedLpIds,
+      equipmentId,
+      area,
+      contractor,
+      oilType,
+      reportStatus,
+      equipmentStatus,
+      sampleId,
+    ],
+  );
 
-  const output = useMemo(() => generateOilReport(filters), [filters]);
+  const output = useMemo(
+    () => (previewRequested ? generateOilReport(scope, filters) : null),
+    [previewRequested, scope, filters],
+  );
 
-  const hasData = hasReportData(output);
-  const csvExportEnabled = isCsvExportEnabled();
-  const jsonExportEnabled = isJsonExportEnabled();
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (dateFrom || dateTo) count += 1;
+    if (selectedLpIds.length > 0) count += 1;
+    if (equipmentId) count += 1;
+    if (area) count += 1;
+    if (contractor) count += 1;
+    if (oilType) count += 1;
+    if (reportStatus) count += 1;
+    if (equipmentStatus) count += 1;
+    if (sampleId) count += 1;
+    return count;
+  }, [
+    dateFrom,
+    dateTo,
+    selectedLpIds,
+    equipmentId,
+    area,
+    contractor,
+    oilType,
+    reportStatus,
+    equipmentStatus,
+    sampleId,
+  ]);
+
+  const categoryTemplates = useMemo(
+    () => templatesForCategory(category, scope.canViewAllContractors),
+    [category, scope.canViewAllContractors],
+  );
+
+  const favoriteTemplates = useMemo(
+    () =>
+      favorites
+        .map((id) => OIL_REPORT_TEMPLATES.find((t) => t.id === id))
+        .filter((t): t is OilReportTemplateDef => Boolean(t))
+        .filter((t) => !t.accOnly || scope.canViewAllContractors),
+    [favorites, scope.canViewAllContractors],
+  );
+
+  const handleToggleFavorite = useCallback((type: OilReportType) => {
+    setFavorites(toggleReportFavorite(type));
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    setDateFrom('');
+    setDateTo('');
+    setSelectedLpIds([]);
+    setEquipmentId('');
+    setArea('');
+    setContractor('');
+    setOilType('');
+    setReportStatus('');
+    setEquipmentStatus('');
+    setSampleId('');
+  }, []);
+
+  const filterFields: FilterFieldConfig[] = useMemo(() => {
+    const fields: FilterFieldConfig[] = [
+      {
+        id: 'dateRange',
+        label: l(COPY.filterDate),
+        type: 'date-range',
+        valueFrom: dateFrom,
+        valueTo: dateTo,
+      },
+      {
+        id: 'equipmentId',
+        label: l(COPY.filterEquipment),
+        type: 'select',
+        value: equipmentId,
+        options: filterOptions.equipmentIds.map((id) => ({ value: id, label: id })),
+      },
+      {
+        id: 'area',
+        label: l(COPY.filterArea),
+        type: 'select',
+        value: area,
+        options: filterOptions.areas.map((id) => ({ value: id, label: id })),
+      },
+      {
+        id: 'oilType',
+        label: l(COPY.filterOilType),
+        type: 'select',
+        value: oilType,
+        options: filterOptions.oilTypes.map((id) => ({ value: id, label: id })),
+      },
+      {
+        id: 'reportStatus',
+        label: l(COPY.filterReportStatus),
+        type: 'select',
+        value: reportStatus,
+        options: filterOptions.reportStatuses.map((id) => ({ value: id, label: id })),
+      },
+      {
+        id: 'equipmentStatus',
+        label: l(COPY.filterEquipStatus),
+        type: 'select',
+        value: equipmentStatus,
+        options: filterOptions.equipmentStatuses.map((id) => ({
+          value: id,
+          label: EQUIPMENT_STATUS_LABELS[id] ? l(EQUIPMENT_STATUS_LABELS[id]!) : id,
+        })),
+      },
+      {
+        id: 'sampleId',
+        label: l(COPY.filterSampleId),
+        type: 'select',
+        value: sampleId,
+        options: [],
+        hidden: true,
+      },
+    ];
+
+    if (scope.canViewAllContractors) {
+      fields.splice(3, 0, {
+        id: 'contractor',
+        label: l(COPY.filterContractor),
+        type: 'select',
+        value: contractor,
+        options: filterOptions.contractors.map((id) => ({ value: id, label: id })),
+      });
+    }
+
+    return fields;
+  }, [
+    l,
+    dateFrom,
+    dateTo,
+    equipmentId,
+    area,
+    contractor,
+    oilType,
+    reportStatus,
+    equipmentStatus,
+    sampleId,
+    filterOptions,
+    scope.canViewAllContractors,
+  ]);
+
+  const handleFilterChange = useCallback((id: string, value: string) => {
+    switch (id) {
+      case 'equipmentId':
+        setEquipmentId(value);
+        break;
+      case 'area':
+        setArea(value);
+        break;
+      case 'contractor':
+        setContractor(value);
+        break;
+      case 'oilType':
+        setOilType(value);
+        break;
+      case 'reportStatus':
+        setReportStatus(value);
+        break;
+      case 'equipmentStatus':
+        setEquipmentStatus(value);
+        break;
+      default:
+        break;
+    }
+  }, []);
+
+  const templateTitle = useMemo(() => {
+    const template = categoryTemplates.find((t) => t.id === reportType);
+    return template ? templateLabel(template, locale).title : reportType;
+  }, [categoryTemplates, reportType, locale]);
+
+  const filterSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (dateFrom) parts.push(`${l(COPY.filterDate)}: ${dateFrom}`);
+    if (dateTo) parts.push(`→ ${dateTo}`);
+    if (selectedLpIds.length > 0) parts.push(`${selectedLpIds.length} LP`);
+    if (equipmentId) parts.push(equipmentId);
+    if (area) parts.push(area);
+    if (contractor) parts.push(contractor);
+    if (oilType) parts.push(oilType);
+    if (reportStatus) parts.push(reportStatus);
+    if (equipmentStatus) parts.push(equipmentStatus);
+    if (sampleId) parts.push(sampleId);
+    return parts.length > 0 ? parts.join(' · ') : l(COPY.filterAll);
+  }, [
+    dateFrom,
+    dateTo,
+    selectedLpIds,
+    equipmentId,
+    area,
+    contractor,
+    oilType,
+    reportStatus,
+    equipmentStatus,
+    sampleId,
+    l,
+  ]);
+
+  if (!user) {
+    return <ErrorState title="Authentication required" message="Please sign in to access Oil Analysis reports." />;
+  }
 
   return (
-    <div className="ur-page oa-report-page">
-      <header className="ur-page__header">
-        <div className="ur-page__header-text">
-          <h1 className="ur-page__title">{l(COPY.title)}</h1>
-          <p className="ur-page__desc">{l(COPY.desc)}</p>
-        </div>
-        <StatusChip status="operational" label={l(COPY.liveData)} />
-      </header>
+    <div className="acc-page acc-oa-reports">
+      <PageHeader
+        title={l(COPY.title)}
+        subtitle={l(COPY.subtitle)}
+        status={{ variant: 'normal', label: l(COPY.liveData) }}
+      />
 
-      <div className="oa-trend-toolbar ol-explorer-toolbar">
-        <div className="ol-explorer-filters">
-          <label className="oa-trend-field">
-            <span className="oa-trend-field__label">{l(COPY.selReport)}</span>
-            <select
-              className="ol-explorer-select"
-              value={reportType}
-              onChange={(e) => setReportType(e.target.value as OilReportType)}
+      <SectionCard title={l(COPY.stepCategory)}>
+        <div className="acc-oa-reports__categories">
+          {OIL_REPORT_CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              className={`acc-oa-reports__category-card${category === cat.id ? ' acc-oa-reports__category-card--active' : ''}`}
+              onClick={() => setCategory(cat.id)}
             >
-              {REPORT_OPTIONS.map((opt) => (
-                <option key={opt.id} value={opt.id}>{l(opt.label)}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="oa-trend-field">
-            <span className="oa-trend-field__label">{l(COPY.dateFrom)}</span>
-            <input
-              type="date"
-              className="ur-form-input"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-          </label>
-
-          <label className="oa-trend-field">
-            <span className="oa-trend-field__label">{l(COPY.dateTo)}</span>
-            <input
-              type="date"
-              className="ur-form-input"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
-          </label>
-
-          <label className="oa-trend-field">
-            <span className="oa-trend-field__label">{l(COPY.filterArea)}</span>
-            <select className="ol-explorer-select" value={area} onChange={(e) => setArea(e.target.value)}>
-              <option value="">{l(COPY.filterArea)}</option>
-              {areas.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
-          </label>
-
-          <label className="oa-trend-field">
-            <span className="oa-trend-field__label">{l(COPY.filterContr)}</span>
-            <select className="ol-explorer-select" value={contractor} onChange={(e) => setContractor(e.target.value)}>
-              <option value="">{l(COPY.filterContr)}</option>
-              {contractors.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </label>
-
-          <label className="oa-trend-field">
-            <span className="oa-trend-field__label">{l(COPY.filterCond)}</span>
-            <select className="ol-explorer-select" value={condition} onChange={(e) => setCondition(e.target.value)}>
-              {CONDITION_OPTIONS.map((opt) => (
-                <option key={opt.id} value={opt.id}>{l(opt.label)}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="oa-trend-field oa-trend-field--search">
-            <span className="oa-trend-field__label">{l(COPY.equipSearch)}</span>
-            <input
-              type="search"
-              className="ol-explorer-search"
-              placeholder={l(COPY.equipSearch)}
-              value={equipmentSearch}
-              onChange={(e) => setEquipmentSearch(e.target.value)}
-            />
-          </label>
+              <span className="acc-oa-reports__category-title">
+                {locale === 'ar' ? cat.labelAr : cat.labelEn}
+              </span>
+            </button>
+          ))}
         </div>
+      </SectionCard>
 
-        <div className="oa-report-actions">
-          <OilAnalysisActionButton
-            type="button"
-            className="ur-btn ur-btn--ghost ur-btn--sm"
-            allowed={permissions.canExportReports}
-            disabled={!hasData || !csvExportEnabled}
-            onClick={() => exportReportCsv(output)}
-          >
-            {l(COPY.btnCsv)}
-          </OilAnalysisActionButton>
-          <OilAnalysisActionButton
-            type="button"
-            className="ur-btn ur-btn--ghost ur-btn--sm"
-            allowed={permissions.canExportReports}
-            disabled={!hasData || !jsonExportEnabled}
-            onClick={() => exportReportJson(output)}
-          >
-            {l(COPY.btnJson)}
-          </OilAnalysisActionButton>
-        </div>
-      </div>
-
-      <div className="ur-summary-grid">
-        {output.kpis.map((kpi) => (
-          <SummaryCard
-            key={kpi.label}
-            value={String(kpi.value)}
-            label={kpiLabel(kpi.label, locale)}
-            modifier={kpiModifier(kpi.label)}
-          />
-        ))}
-      </div>
-
-      <section className="dashboard-section">
-        <h2 className="dashboard-section__title">{l(COPY.secResults)}</h2>
-        <div className="db-panel">
-          <div className="db-panel__body">
-            <ReportBody output={output} />
+      {favoriteTemplates.length > 0 && (
+        <SectionCard title={l(COPY.favorites)}>
+          <div className="acc-oa-reports__templates">
+            {favoriteTemplates.map((template) => {
+              const { title, description } = templateLabel(template, locale);
+              const isActive = reportType === template.id;
+              return (
+                <button
+                  key={template.id}
+                  type="button"
+                  className={`acc-oa-reports__template-card${isActive ? ' acc-oa-reports__template-card--active' : ''}`}
+                  onClick={() => {
+                    setReportType(template.id);
+                    setCategory(template.category);
+                    setPreviewRequested(true);
+                  }}
+                >
+                  <span className="acc-oa-reports__template-title">{title}</span>
+                  <span className="acc-oa-reports__template-desc">{description}</span>
+                </button>
+              );
+            })}
           </div>
+        </SectionCard>
+      )}
+
+      <SectionCard title={l(COPY.stepReport)}>
+        <div className="acc-oa-reports__templates">
+          {categoryTemplates.map((template) => {
+            const { title, description } = templateLabel(template, locale);
+            const isActive = reportType === template.id;
+            const isFavorite = favorites.includes(template.id);
+            return (
+              <div
+                key={template.id}
+                className={`acc-oa-reports__template-card${isActive ? ' acc-oa-reports__template-card--active' : ''}`}
+              >
+                <button
+                  type="button"
+                  className="acc-oa-reports__template-select"
+                  onClick={() => {
+                    setReportType(template.id);
+                    setPreviewRequested(true);
+                  }}
+                >
+                  <span className="acc-oa-reports__template-title">
+                    {title}
+                    {template.accOnly && (
+                      <StatusBadge variant="info" label={l(COPY.accOnly)} size="sm" />
+                    )}
+                  </span>
+                  <span className="acc-oa-reports__template-desc">{description}</span>
+                </button>
+                <button
+                  type="button"
+                  className="acc-oa-reports__pin-btn"
+                  aria-label={isFavorite ? l(COPY.unpin) : l(COPY.pin)}
+                  onClick={() => handleToggleFavorite(template.id)}
+                >
+                  {isFavorite ? '★' : '☆'}
+                </button>
+              </div>
+            );
+          })}
         </div>
-      </section>
+      </SectionCard>
+
+      <SectionCard title={l(COPY.stepFilters)}>
+        <FilterBar
+          searchValue={sampleId}
+          searchPlaceholder={l(COPY.filterSampleId)}
+          onSearchChange={setSampleId}
+          filters={filterFields}
+          onFilterChange={handleFilterChange}
+          onDateFromChange={(_, value) => setDateFrom(value)}
+          onDateToChange={(_, value) => setDateTo(value)}
+          onClear={handleClearFilters}
+          clearLabel={l(COPY.clearFilters)}
+          activeFilterCount={activeFilterCount}
+          trailing={
+            <OilAnalysisActionButton
+              type="button"
+              className="acc-btn acc-btn--primary"
+              allowed
+              onClick={() => setPreviewRequested(true)}
+            >
+              {l(COPY.preview)}
+            </OilAnalysisActionButton>
+          }
+        />
+
+        {filterOptions.lpIds.length > 0 && (
+          <LpMultiSelect
+            lpIds={filterOptions.lpIds}
+            selected={selectedLpIds}
+            onChange={setSelectedLpIds}
+            locale={locale}
+          />
+        )}
+      </SectionCard>
+
+      <SectionCard title={l(COPY.stepPreview)}>
+        {!previewRequested || !output ? (
+          <EmptyState
+            title={l(COPY.preview)}
+            description={l(COPY.subtitle)}
+          />
+        ) : !hasReportData(output) ? (
+          <EmptyState title={l(COPY.emptyTitle)} description={l(COPY.empty)} />
+        ) : (
+          <>
+            {output.kpis.length > 0 && (
+              <KpiGrid>
+                {output.kpis.map((kpi) => (
+                  <KpiCard
+                    key={kpi.label}
+                    label={kpi.label}
+                    value={String(kpi.value)}
+                    severity="info"
+                  />
+                ))}
+              </KpiGrid>
+            )}
+
+            <ReportPreview
+              onExportPdf={
+                permissions.canExportReports
+                  ? () => exportReportPdf(output, locale)
+                  : undefined
+              }
+              onExportExcel={
+                permissions.canExportReports
+                  ? () => exportReportExcel(output, locale)
+                  : undefined
+              }
+              exportPdfLabel={l(COPY.exportPdf)}
+              exportExcelLabel={l(COPY.exportExcel)}
+            >
+              <ReportLayout
+                title={templateTitle}
+                subtitle="ACC Reliability Platform — Oil Analysis"
+                reference={output.reference}
+                generatedAt={formatDate(output.generatedAt, locale)}
+                generatedBy={user.displayName ?? user.email ?? '—'}
+                filterSummary={filterSummary}
+                footer={
+                  oilAnalysisSettingsService.getSettings().reportSettings.enableFooter ? (
+                    <p className="acc-report__footer-text">
+                      ACC Reliability Platform — Confidential Engineering Report
+                    </p>
+                  ) : undefined
+                }
+              >
+                <ReportPreviewBody output={output} locale={locale} />
+              </ReportLayout>
+            </ReportPreview>
+          </>
+        )}
+      </SectionCard>
     </div>
   );
 }

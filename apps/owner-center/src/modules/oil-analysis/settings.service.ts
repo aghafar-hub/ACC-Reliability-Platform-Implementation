@@ -17,11 +17,25 @@ export type {
   OilAnalysisModuleSettings,
   OilAnalysisGeneralSettings,
   OilAnalysisLaboratorySettings,
+  OilAnalysisPdfImportSettings,
+  OilAnalysisSamplingRulesSettings,
+  OilAnalysisAutomaticWorkflowSettings,
+  OilAnalysisReportSettings,
+  OilAnalysisTimelineSettings,
+  OilAnalysisDashboardSettings,
+  OilAnalysisAdvancedSettings,
   OilAnalysisParameterSetting,
   OilAnalysisConditionRules,
   OilAnalysisParameterId,
   OilAnalysisConditionLevel,
   OilAnalysisSettingsAudit,
+  OilAnalysisTimelineDirection,
+  OilAnalysisWorkflowTriggerStatus,
+  OilAnalysisTimelineEventDensity,
+  OilAnalysisReportExportFormat,
+  OilAnalysisSamplingFrequency,
+  OilAnalysisOilChangeFrequency,
+  OilAnalysisDashboardWidgetId,
 } from './settings-types';
 
 const STORAGE_KEY = 'acc.oil-analysis.settings.v1';
@@ -125,6 +139,65 @@ export function createDefaultOilAnalysisSettings(): OilAnalysisModuleSettings {
       defaultReportLanguage: 'en',
       units: { ppm: 'ppm', cSt: 'cSt', percent: '%' },
       dateFormat: 'YYYY-MM-DD',
+      timelineDirection: 'ltr',
+    },
+    pdfImport: {
+      enableOcr: true,
+      ocrConfidenceThreshold: 0.85,
+      duplicateDetectionBySampleId: true,
+      maximumBatchSize: 25,
+      acceptedFileTypes: '.pdf',
+      googleDriveFolder: '',
+      saveOriginalPdf: true,
+      keepOriginalPdfVersion: true,
+    },
+    samplingRules: {
+      defaultSamplingFrequency: '90-days',
+      autoCalculateNextSample: true,
+      allowManualOverride: true,
+      autoCalculateNextOilChange: true,
+      defaultOilChangeFrequency: '12-months',
+      alertBeforeDueDays: 14,
+    },
+    automaticWorkflow: {
+      autoDraftAction: true,
+      triggerStatus: 'caution-and-alert',
+      manualActionCreation: true,
+      notifyAccEngineer: true,
+      notifyContractor: true,
+      enableReviewQueue: true,
+    },
+    reportSettings: {
+      defaultExportFormat: 'pdf',
+      enableCharts: true,
+      enableCompanyHeader: true,
+      enableFooter: true,
+      watermark: false,
+    },
+    timeline: {
+      direction: 'ltr',
+      showFutureEvents: true,
+      eventDensity: 'normal',
+      defaultTimelineZoom: 100,
+    },
+    dashboard: {
+      enableKpiCards: true,
+      visibleDashboardWidgets: [
+        'immediate-attention',
+        'needs-review',
+        'recent-activity',
+        'engineering-priorities',
+        'charts',
+      ],
+      autoRefreshIntervalMinutes: 5,
+      defaultLandingWidget: 'immediate-attention',
+    },
+    advanced: {
+      processingTimeoutSeconds: 120,
+      maximumConcurrentImports: 3,
+      cacheRefreshMinutes: 15,
+      importLogsEnabled: true,
+      ocrDebugMode: false,
     },
     parameters: DEFAULT_PARAMETERS.map((p) => ({
       ...p,
@@ -162,6 +235,30 @@ export function createDefaultOilAnalysisSettings(): OilAnalysisModuleSettings {
   };
 }
 
+function syncLegacyFromOa009(
+  general: OilAnalysisModuleSettings['general'],
+  laboratory: OilAnalysisModuleSettings['laboratory'],
+  pdfImport: OilAnalysisModuleSettings['pdfImport'],
+  automaticWorkflow: OilAnalysisModuleSettings['automaticWorkflow'],
+  timeline: OilAnalysisModuleSettings['timeline'],
+): {
+  general: OilAnalysisModuleSettings['general'];
+  laboratory: OilAnalysisModuleSettings['laboratory'];
+} {
+  return {
+    general: {
+      ...general,
+      enablePdfImport: pdfImport.enableOcr || general.enablePdfImport,
+      defaultApprovalWorkflowEnabled: automaticWorkflow.enableReviewQueue,
+      requireEngineerApproval: automaticWorkflow.enableReviewQueue,
+    },
+    laboratory: {
+      ...laboratory,
+      timelineDirection: timeline.direction,
+    },
+  };
+}
+
 function normalizeSettings(raw: unknown): OilAnalysisModuleSettings {
   const defaults = createDefaultOilAnalysisSettings();
   if (!raw || typeof raw !== 'object') return defaults;
@@ -174,6 +271,34 @@ function normalizeSettings(raw: unknown): OilAnalysisModuleSettings {
     units: { ...defaults.laboratory.units, ...(doc.laboratory?.units ?? {}) },
   };
 
+  const legacyTimelineDirection =
+    doc.timeline?.direction ?? doc.laboratory?.timelineDirection ?? defaults.timeline.direction;
+
+  const pdfImport = { ...defaults.pdfImport, ...(doc.pdfImport ?? {}) };
+  const samplingRules = { ...defaults.samplingRules, ...(doc.samplingRules ?? {}) };
+  const automaticWorkflow = {
+    ...defaults.automaticWorkflow,
+    ...(doc.automaticWorkflow ?? {}),
+    enableReviewQueue:
+      doc.automaticWorkflow?.enableReviewQueue
+      ?? (general.defaultApprovalWorkflowEnabled && general.requireEngineerApproval),
+  };
+  const reportSettings = { ...defaults.reportSettings, ...(doc.reportSettings ?? {}) };
+  const timeline = {
+    ...defaults.timeline,
+    ...(doc.timeline ?? {}),
+    direction: legacyTimelineDirection,
+  };
+  const dashboard = {
+    ...defaults.dashboard,
+    ...(doc.dashboard ?? {}),
+    visibleDashboardWidgets:
+      doc.dashboard?.visibleDashboardWidgets?.length
+        ? doc.dashboard.visibleDashboardWidgets
+        : defaults.dashboard.visibleDashboardWidgets,
+  };
+  const advanced = { ...defaults.advanced, ...(doc.advanced ?? {}) };
+
   const parameters = mergeParameters(doc.parameters, defaults.parameters);
   const conditionRules = {
     levels: doc.conditionRules?.levels?.length
@@ -182,7 +307,28 @@ function normalizeSettings(raw: unknown): OilAnalysisModuleSettings {
   };
   const audit = { ...defaults.audit, ...(doc.audit ?? {}) };
 
-  return { general, laboratory, parameters, conditionRules, audit };
+  const synced = syncLegacyFromOa009(
+    general,
+    laboratory,
+    pdfImport,
+    automaticWorkflow,
+    timeline,
+  );
+
+  return {
+    general: synced.general,
+    laboratory: synced.laboratory,
+    pdfImport,
+    samplingRules,
+    automaticWorkflow,
+    reportSettings,
+    timeline,
+    dashboard,
+    advanced,
+    parameters,
+    conditionRules,
+    audit,
+  };
 }
 
 function mergeParameters(
@@ -229,8 +375,17 @@ class OilAnalysisSettingsRepository {
   }
 
   save(settings: OilAnalysisModuleSettings, actor: string, changeSummary: string): OilAnalysisModuleSettings {
+    const synced = syncLegacyFromOa009(
+      settings.general,
+      settings.laboratory,
+      settings.pdfImport,
+      settings.automaticWorkflow,
+      settings.timeline,
+    );
     this.cached = {
       ...settings,
+      general: synced.general,
+      laboratory: synced.laboratory,
       audit: {
         lastChangeSummary: changeSummary,
         changedBy: actor,

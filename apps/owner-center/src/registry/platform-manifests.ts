@@ -24,6 +24,7 @@ import type { UIModuleManifest } from '../types/module-registry-types';
 // ── Lazy page loaders ─────────────────────────────────────────────────────────
 // Created at module level for stable references and correct code splitting.
 
+const EngineeringActionsPage      = React.lazy(() => import('../pages/EngineeringActionsPage'));
 const OilLubricationPage         = React.lazy(() => import('../pages/OilLubricationPage'));
 const OilAnalysisPage            = React.lazy(() => import('../pages/OilAnalysisPage'));
 const VibrationAnalysisPage      = React.lazy(() => import('../pages/VibrationAnalysisPage'));
@@ -88,6 +89,22 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
   },
 
   // ── 2. Oil Lubrication ─────────────────────────────────────────────────────
+  {
+    moduleId:                'platform.engineering-actions',
+    displayName:             'Engineering Actions',
+    version:                 MODULE_VERSION,
+    requiredPlatformVersion: PLATFORM_VERSION,
+    requiredSdkVersion:      SDK_VERSION,
+    description:             'Platform-wide corrective and investigative engineering actions.',
+    icon:                    'check-square',
+    category:                'Platform',
+    routePath:               '/engineering-actions',
+    navigationLabel:         { en: 'Engineering Actions', ar: 'إجراءات الهندسة' },
+    alwaysVisible:           true,
+    sidebarSection:          'platform-main',
+    component:               EngineeringActionsPage,
+  },
+
   // Business module — sidebar switches to module context when user enters.
   {
     moduleId:                'oil-lubrication',
@@ -139,12 +156,16 @@ export const PLATFORM_MODULE_MANIFESTS: readonly UIModuleManifest[] = Object.fre
     component:               OilAnalysisPage,
     moduleNavItems: [
       { path: '/oil-analysis',               icon: 'home',         label: { en: 'Dashboard',   ar: 'لوحة المعلومات'  }, end: true },
+      { path: '/oil-analysis/register',       icon: 'tag',          label: { en: 'Equipment & LP Register', ar: 'سجل المعدات ونقاط التشحيم' } },
+      { path: '/oil-analysis/add-sample',    icon: 'plus-circle',  label: { en: 'Add Sample',  ar: 'إضافة عينة'      } },
       { path: '/oil-analysis/samples',       icon: 'clipboard',    label: { en: 'Samples',     ar: 'العينات'         } },
       { path: '/oil-analysis/intake',        icon: 'package',      label: { en: 'Intake',      ar: 'الاستقبال'       } },
       { path: '/oil-analysis/lp-mapping',    icon: 'link',         label: { en: 'LP Mapping',  ar: 'ربط نقطة التشحيم' } },
       { path: '/oil-analysis/lab-results',   icon: 'activity',     label: { en: 'Lab Results', ar: 'نتائج المختبر'   } },
       { path: '/oil-analysis/pdf-import',    icon: 'file-text',    label: { en: 'PDF Import',  ar: 'استيراد PDF'     } },
       { path: '/oil-analysis/review',         icon: 'check-circle', label: { en: 'Engineer Review', ar: 'مراجعة المهندس' } },
+      { path: '/oil-analysis/actions',        icon: 'check-square', label: { en: 'Actions',       ar: 'الإجراءات'       } },
+      { path: '/oil-analysis/timeline',       icon: 'clock',        label: { en: 'Timeline',      ar: 'الجدول الزمني'   } },
       { path: '/oil-analysis/trends',        icon: 'trending-up',  label: { en: 'Trends',      ar: 'الاتجاهات'       } },
       { path: '/oil-analysis/reports',       icon: 'file-text',    label: { en: 'Reports',     ar: 'التقارير'        } },
       { path: '/oil-analysis/settings',      icon: 'sliders',      label: { en: 'Settings',    ar: 'الإعدادات'       } },

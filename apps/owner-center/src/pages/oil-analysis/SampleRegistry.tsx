@@ -623,7 +623,7 @@ export default function SampleRegistry(): React.ReactElement {
             <option value="critical">{l(COPY.condCritical)}</option>
           </select>
         </div>
-        <Link to="/oil-analysis/intake" className="ur-btn ur-btn--primary oc-toolbar__record-btn">
+        <Link to="/oil-analysis/add-sample" className="ur-btn ur-btn--primary oc-toolbar__record-btn">
           {l(COPY.addLink)}
         </Link>
       </div>

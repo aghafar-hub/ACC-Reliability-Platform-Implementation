@@ -1,16 +1,27 @@
 // apps/owner-center/src/pages/oil-analysis/ModuleSettings.tsx
-// Oil Analysis — Module Administration (Sprint 09).
+// OA-009 — Oil Analysis module settings (approved UI freeze).
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { usePlatformSdk } from '../../context/SdkContext';
-import { StatusChip } from '../../components/StatusChip';
-import { OilAnalysisActionButton } from '../../components/oil-analysis/OilAnalysisActionButton';
 import { useOilAnalysisPermissions } from '../../hooks/useOilAnalysisPermissions';
+import { OilAnalysisActionButton } from '../../components/oil-analysis/OilAnalysisActionButton';
+import {
+  PageHeader,
+  SectionCard,
+  StatusBadge,
+  ErrorState,
+  useIsMobile,
+} from '../../components/ui';
 import type {
   OilAnalysisModuleSettings,
-  OilAnalysisParameterSetting,
-  OilAnalysisConditionLevel,
+  OilAnalysisDashboardWidgetId,
+  OilAnalysisOilChangeFrequency,
+  OilAnalysisReportExportFormat,
+  OilAnalysisSamplingFrequency,
+  OilAnalysisTimelineDirection,
+  OilAnalysisTimelineEventDensity,
+  OilAnalysisWorkflowTriggerStatus,
 } from '../../modules/oil-analysis/settings-types';
 import { oilAnalysisSettingsService } from '../../modules/oil-analysis/settings.service';
 
@@ -20,130 +31,163 @@ function t<T>(bundle: L10n<T>, locale: string): T {
   return locale === 'ar' ? bundle.ar : bundle.en;
 }
 
-function formatAuditDate(iso: string): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-}
-
-function parseThreshold(value: string): number | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const n = Number.parseFloat(trimmed);
-  return Number.isFinite(n) ? n : null;
-}
-
-function formatThreshold(value: number | null): string {
-  return value === null ? '' : String(value);
-}
-
 const COPY = {
-  title:           { en: 'Module Settings',              ar: 'إعدادات الوحدة' },
-  desc:            { en: 'Configure Oil Analysis module behaviour, parameters, and condition rules.', ar: 'ضبط سلوك وحدة تحليل الزيت والمعاملات وقواعد الحالة.' },
-  liveData:        { en: 'Cached settings',              ar: 'إعدادات مخزنة' },
-  btnSave:         { en: 'Save Settings',                ar: 'حفظ الإعدادات' },
-  btnSaved:        { en: 'Settings saved.',              ar: 'تم حفظ الإعدادات.' },
-  secGeneral:      { en: 'General Settings',             ar: 'الإعدادات العامة' },
-  secLaboratory:   { en: 'Laboratory Settings',          ar: 'إعدادات المختبر' },
-  secParameters:   { en: 'Parameter Settings',           ar: 'إعدادات المعاملات' },
-  secConditions:   { en: 'Condition Rules',              ar: 'قواعد الحالة' },
-  secPermissions:  { en: 'Permissions',                  ar: 'الصلاحيات' },
-  secData:         { en: 'Data Management',              ar: 'إدارة البيانات' },
-  secAudit:        { en: 'Audit',                        ar: 'التدقيق' },
-  fldDefStatus:    { en: 'Default Sample Status',        ar: 'حالة العينة الافتراضية' },
-  fldApprovalWf:   { en: 'Default Approval Workflow Enabled', ar: 'تفعيل سير الموافقة الافتراضي' },
-  fldReqApproval:  { en: 'Require Engineer Approval',    ar: 'اشتراط اعتماد المهندس' },
-  fldTrend:        { en: 'Enable Trend Engine',          ar: 'تفعيل محرك الاتجاهات' },
-  fldPdf:          { en: 'Enable PDF Import',            ar: 'تفعيل استيراد PDF' },
-  fldManual:       { en: 'Enable Manual Entry',          ar: 'تفعيل الإدخال اليدوي' },
-  fldCsv:          { en: 'Enable CSV Export',            ar: 'تفعيل تصدير CSV' },
-  fldJson:         { en: 'Enable JSON Export',           ar: 'تفعيل تصدير JSON' },
-  stImported:      { en: 'Imported',                     ar: 'مستورد' },
-  stPending:       { en: 'Pending Review',               ar: 'بانتظار المراجعة' },
-  fldLab:          { en: 'Default Laboratory',           ar: 'المختبر الافتراضي' },
-  fldPrefix:       { en: 'Sample Number Prefix',         ar: 'بادئة رقم العينة' },
-  fldCurrency:     { en: 'Default Currency (future)',    ar: 'العملة الافتراضية (مستقبلاً)' },
-  fldLang:         { en: 'Default Report Language',      ar: 'لغة التقرير الافتراضية' },
-  fldUnitPpm:      { en: 'Unit — ppm',                   ar: 'وحدة — ppm' },
-  fldUnitCst:      { en: 'Unit — cSt',                   ar: 'وحدة — cSt' },
-  fldUnitPct:      { en: 'Unit — %',                     ar: 'وحدة — %' },
-  fldDateFmt:      { en: 'Date Format',                  ar: 'تنسيق التاريخ' },
-  colParam:        { en: 'Parameter',                    ar: 'المعامل' },
-  colUnit:         { en: 'Unit',                         ar: 'الوحدة' },
-  colEnabled:      { en: 'Enabled',                      ar: 'مفعّل' },
-  colMonitor:      { en: 'Monitor ≥',                    ar: 'مراقبة ≥' },
-  colCaution:      { en: 'Caution ≥',                    ar: 'تحذير ≥' },
-  colCritical:     { en: 'Critical ≥',                   ar: 'حرج ≥' },
-  paramHint:       { en: 'Disabling a parameter hides it from entry and trends. Sample data is never deleted.', ar: 'إخفاء المعامل يمنع ظهوره في الإدخال والاتجاهات. بيانات العينات لا تُحذف أبداً.' },
-  condNormal:      { en: 'Normal',                       ar: 'طبيعي' },
-  condMonitor:     { en: 'Monitor',                      ar: 'مراقبة' },
-  condCaution:     { en: 'Caution',                      ar: 'تحذير' },
-  condCritical:    { en: 'Critical',                     ar: 'حرج' },
-  permReadOnly:    { en: 'Read-only view of Oil Analysis permissions. Future permissions will appear here automatically.', ar: 'عرض للقراءة فقط لصلاحيات تحليل الزيت. ستظهر الصلاحيات المستقبلية هنا تلقائياً.' },
-  btnExport:       { en: 'Export Settings JSON',         ar: 'تصدير إعدادات JSON' },
-  btnImport:       { en: 'Import Settings JSON',         ar: 'استيراد إعدادات JSON' },
-  btnReset:        { en: 'Reset Module Settings',        ar: 'إعادة تعيين إعدادات الوحدة' },
-  resetTitle:      { en: 'Reset Module Settings?',       ar: 'إعادة تعيين إعدادات الوحدة؟' },
-  resetDesc:       { en: 'This restores all module settings to factory defaults. Sample and lab data will not be deleted.', ar: 'يستعيد جميع إعدادات الوحدة إلى القيم الافتراضية. لن تُحذف بيانات العينات أو المختبر.' },
-  resetConfirm:    { en: 'Reset Settings',               ar: 'إعادة التعيين' },
-  resetCancel:     { en: 'Cancel',                       ar: 'إلغاء' },
-  auditLast:       { en: 'Last Settings Change',         ar: 'آخر تغيير للإعدادات' },
-  auditBy:         { en: 'Changed By',                   ar: 'تم التغيير بواسطة' },
-  auditAt:         { en: 'Changed At',                   ar: 'وقت التغيير' },
-  langEn:          { en: 'English',                      ar: 'الإنجليزية' },
-  langAr:          { en: 'Arabic',                       ar: 'العربية' },
-  yes:             { en: 'Yes',                          ar: 'نعم' },
-  no:              { en: 'No',                           ar: 'لا' },
+  title: { en: 'Settings', ar: 'الإعدادات' },
+  subtitle: {
+    en: 'Configure Oil Analysis module behaviour. Branding and notifications inherit from platform settings.',
+    ar: 'ضبط سلوك وحدة تحليل الزيت. العلامة التجارية والإشعارات موروثة من إعدادات المنصة.',
+  },
+  breadcrumbModule: { en: 'Oil Analysis', ar: 'تحليل الزيت' },
+  statusCached: { en: 'Cached settings', ar: 'إعدادات مخزنة' },
+  btnSave: { en: 'Save Settings', ar: 'حفظ الإعدادات' },
+  btnSaved: { en: 'Settings saved.', ar: 'تم حفظ الإعدادات.' },
+  inheritedNote: {
+    en: 'Inherited from platform App Owner settings',
+    ar: 'موروث من إعدادات مالك التطبيق للمنصة',
+  },
+  futureReady: { en: 'Future-ready', ar: 'جاهز للمستقبل' },
+
+  secPdf: { en: 'PDF Import & OCR', ar: 'استيراد PDF والتعرف الضوئي' },
+  secSampling: { en: 'Sampling Rules', ar: 'قواعد أخذ العينات' },
+  secWorkflow: { en: 'Automatic Workflow', ar: 'سير العمل التلقائي' },
+  secReport: { en: 'Report Settings', ar: 'إعدادات التقارير' },
+  secTimeline: { en: 'Timeline Settings', ar: 'إعدادات الجدول الزمني' },
+  secDashboard: { en: 'Dashboard Settings', ar: 'إعدادات لوحة المعلومات' },
+  secAdvanced: { en: 'Advanced Settings', ar: 'الإعدادات المتقدمة' },
+  expandAdvanced: { en: 'Show advanced settings', ar: 'عرض الإعدادات المتقدمة' },
+  collapseAdvanced: { en: 'Hide advanced settings', ar: 'إخفاء الإعدادات المتقدمة' },
+
+  enableOcr: { en: 'Enable OCR', ar: 'تفعيل التعرف الضوئي' },
+  ocrThreshold: { en: 'OCR Confidence Threshold', ar: 'حد ثقة التعرف الضوئي' },
+  duplicateDetection: { en: 'Duplicate Detection (Sample ID)', ar: 'كشف التكرار (معرّف العينة)' },
+  maxBatch: { en: 'Maximum Batch Size', ar: 'الحد الأقصى لحجم الدفعة' },
+  acceptedTypes: { en: 'Accepted File Types', ar: 'أنواع الملفات المقبولة' },
+  driveFolder: { en: 'Google Drive Folder', ar: 'مجلد Google Drive' },
+  saveOriginalPdf: { en: 'Save Original PDF', ar: 'حفظ PDF الأصلي' },
+  keepPdfVersion: { en: 'Keep Original PDF Version', ar: 'الاحتفاظ بنسخة PDF الأصلية' },
+
+  defaultSamplingFreq: { en: 'Default Sampling Frequency', ar: 'فترة أخذ العينات الافتراضية' },
+  autoNextSample: { en: 'Auto Calculate Next Sample', ar: 'حساب العينة التالية تلقائياً' },
+  manualOverride: { en: 'Allow Manual Override', ar: 'السماح بالتجاوز اليدوي' },
+  autoNextOilChange: { en: 'Auto Calculate Next Oil Change', ar: 'حساب تغيير الزيت التالي تلقائياً' },
+  defaultOilChangeFreq: { en: 'Default Oil Change Frequency', ar: 'فترة تغيير الزيت الافتراضية' },
+  alertBeforeDue: { en: 'Alert Before Due (Days)', ar: 'تنبيه قبل الاستحقاق (أيام)' },
+
+  autoDraftAction: { en: 'Auto Draft Action', ar: 'إنشاء إجراء مسودة تلقائياً' },
+  triggerStatus: { en: 'Trigger Status', ar: 'حالة التفعيل' },
+  triggerAlert: { en: 'Alert', ar: 'تنبيه' },
+  triggerCautionAlert: { en: 'Caution + Alert', ar: 'حذر + تنبيه' },
+  manualAction: { en: 'Manual Action Creation', ar: 'إنشاء إجراء يدوي' },
+  notifyEngineer: { en: 'Notify ACC Engineer', ar: 'إشعار مهندس ACC' },
+  notifyContractor: { en: 'Notify Contractor', ar: 'إشعار المقاول' },
+  enableReviewQueue: { en: 'Enable Review Queue', ar: 'تفعيل قائمة المراجعة' },
+
+  defaultExport: { en: 'Default Export Format', ar: 'تنسيق التصدير الافتراضي' },
+  enableCharts: { en: 'Enable Charts', ar: 'تفعيل المخططات' },
+  enableHeader: { en: 'Enable Company Header', ar: 'تفعيل ترويسة الشركة' },
+  enableFooter: { en: 'Enable Footer', ar: 'تفعيل التذييل' },
+  watermark: { en: 'Watermark', ar: 'علامة مائية' },
+
+  timelineDirection: { en: 'Timeline Direction', ar: 'اتجاه الجدول الزمني' },
+  timelineLtr: { en: 'Left → Right', ar: 'من اليسار إلى اليمين' },
+  timelineRtl: { en: 'Right → Left', ar: 'من اليمين إلى اليسار' },
+  showFutureEvents: { en: 'Show Future Events', ar: 'عرض الأحداث المستقبلية' },
+  eventDensity: { en: 'Timeline Event Density', ar: 'كثافة أحداث الجدول الزمني' },
+  densityCompact: { en: 'Compact', ar: 'مضغوط' },
+  densityNormal: { en: 'Normal', ar: 'عادي' },
+  densityComfortable: { en: 'Comfortable', ar: 'مريح' },
+  defaultZoom: { en: 'Default Timeline Zoom', ar: 'تكبير الجدول الزمني الافتراضي' },
+
+  enableKpi: { en: 'Enable KPI Cards', ar: 'تفعيل بطاقات KPI' },
+  visibleWidgets: { en: 'Visible Dashboard Widgets', ar: 'عناصر لوحة المعلومات المرئية' },
+  autoRefresh: { en: 'Auto Refresh Interval (minutes)', ar: 'فترة التحديث التلقائي (دقائق)' },
+  landingWidget: { en: 'Default Landing Widget', ar: 'عنصر الهبوط الافتراضي' },
+
+  processingTimeout: { en: 'Processing Timeout (seconds)', ar: 'مهلة المعالجة (ثوانٍ)' },
+  maxConcurrent: { en: 'Maximum Concurrent Imports', ar: 'الحد الأقصى للاستيراد المتزامن' },
+  cacheRefresh: { en: 'Cache Refresh (minutes)', ar: 'تحديث الذاكرة المؤقتة (دقائق)' },
+  importLogs: { en: 'Import Logs', ar: 'سجلات الاستيراد' },
+  ocrDebug: { en: 'OCR Debug Mode', ar: 'وضع تصحيح التعرف الضوئي' },
+
+  freq30: { en: '30 days', ar: '30 يوماً' },
+  freq60: { en: '60 days', ar: '60 يوماً' },
+  freq90: { en: '90 days', ar: '90 يوماً' },
+  freq180: { en: '180 days', ar: '180 يوماً' },
+  freq365: { en: '365 days', ar: '365 يوماً' },
+  oil6: { en: '6 months', ar: '6 أشهر' },
+  oil12: { en: '12 months', ar: '12 شهراً' },
+  oil18: { en: '18 months', ar: '18 شهراً' },
+  oil24: { en: '24 months', ar: '24 شهراً' },
+  exportPdf: { en: 'PDF', ar: 'PDF' },
+  exportExcel: { en: 'Excel', ar: 'Excel' },
+  exportBoth: { en: 'PDF + Excel', ar: 'PDF + Excel' },
+
+  widgetImmediate: { en: 'Immediate Attention', ar: 'اهتمام فوري' },
+  widgetReview: { en: 'Needs Review', ar: 'يحتاج مراجعة' },
+  widgetRecent: { en: 'Recent Activity', ar: 'النشاط الأخير' },
+  widgetPriorities: { en: 'Engineering Priorities', ar: 'أولويات الهندسة' },
+  widgetCharts: { en: 'Charts', ar: 'المخططات' },
 } as const;
 
-const PERMISSION_ROWS: readonly { code: string; label: L10n<string> }[] = [
-  { code: 'oil-analysis:sample:view',     label: { en: 'View Samples',         ar: 'عرض العينات' } },
-  { code: 'oil-analysis:sample:import',   label: { en: 'Create Sample',        ar: 'إنشاء عينة' } },
-  { code: 'oil-analysis:sample:enter-results', label: { en: 'Edit Sample',     ar: 'تعديل العينة' } },
-  { code: 'oil-analysis:sample:approve',  label: { en: 'Approve Sample',       ar: 'اعتماد العينة' } },
-  { code: 'oil-analysis:reports:export',  label: { en: 'Export Reports',       ar: 'تصدير التقارير' } },
-  { code: 'oil-analysis:settings:manage', label: { en: 'Settings',             ar: 'الإعدادات' } },
-  { code: 'oil-analysis:sample:confirm-lp', label: { en: 'Confirm LP Mapping',   ar: 'تأكيد ربط نقطة التشحيم' } },
-  { code: 'oil-analysis:reports:view',    label: { en: 'View Reports',         ar: 'عرض التقارير' } },
+const WIDGET_OPTIONS: readonly { id: OilAnalysisDashboardWidgetId; label: L10n<string> }[] = [
+  { id: 'immediate-attention', label: COPY.widgetImmediate },
+  { id: 'needs-review', label: COPY.widgetReview },
+  { id: 'recent-activity', label: COPY.widgetRecent },
+  { id: 'engineering-priorities', label: COPY.widgetPriorities },
+  { id: 'charts', label: COPY.widgetCharts },
 ];
 
-const CONDITION_LEVEL_LABELS: Record<OilAnalysisConditionLevel, L10n<string>> = {
-  normal:   COPY.condNormal,
-  monitor:  COPY.condMonitor,
-  caution:  COPY.condCaution,
-  critical: COPY.condCritical,
-};
+function SettingsField({
+  id,
+  label,
+  hint,
+  children,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div className="acc-settings-field">
+      <label className="acc-settings-field__label" htmlFor={id}>{label}</label>
+      {children}
+      {hint && <p className="acc-settings-field__hint">{hint}</p>}
+    </div>
+  );
+}
 
 function ToggleField({
   id,
   label,
   checked,
+  disabled,
   onChange,
 }: {
   id: string;
   label: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: (value: boolean) => void;
 }): React.ReactElement {
   return (
-    <label className="oa-settings-toggle" htmlFor={id}>
+    <label className="acc-settings-toggle" htmlFor={id}>
       <input
         id={id}
         type="checkbox"
+        role="switch"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
       />
-      <span>{label}</span>
+      <span className="acc-settings-toggle__track" aria-hidden="true" />
+      <span className="acc-settings-toggle__label">{label}</span>
     </label>
   );
+}
+
+function InheritedBadge({ label }: { label: string }): React.ReactElement {
+  return <StatusBadge variant="info" label={label} className="acc-settings-inherited-badge" />;
 }
 
 export default function ModuleSettings(): React.ReactElement {
@@ -151,14 +195,14 @@ export default function ModuleSettings(): React.ReactElement {
   const l = (b: L10n<string>) => t(b, locale);
   const sdk = usePlatformSdk();
   const permissions = useOilAnalysisPermissions();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   const [draft, setDraft] = useState<OilAnalysisModuleSettings>(() =>
     oilAnalysisSettingsService.getSettings(),
   );
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showReset, setShowReset] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const actor = useMemo(() => {
     const user = sdk.auth.getCurrentUser();
@@ -182,459 +226,619 @@ export default function ModuleSettings(): React.ReactElement {
     }
   }
 
-  function handleExport(): void {
-    const blob = new Blob([oilAnalysisSettingsService.exportSettingsJson()], {
-      type: 'application/json',
+  function toggleWidget(widgetId: OilAnalysisDashboardWidgetId, enabled: boolean): void {
+    const current = new Set(draft.dashboard.visibleDashboardWidgets);
+    if (enabled) current.add(widgetId);
+    else current.delete(widgetId);
+    updateDraft({
+      ...draft,
+      dashboard: {
+        ...draft.dashboard,
+        visibleDashboardWidgets: WIDGET_OPTIONS
+          .map((w) => w.id)
+          .filter((id) => current.has(id)),
+      },
     });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `oil-analysis-settings-${new Date().toISOString().slice(0, 10)}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
   }
 
-  function handleImportClick(): void {
-    fileInputRef.current?.click();
-  }
-
-  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>): void {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const text = typeof reader.result === 'string' ? reader.result : '';
-        const updated = oilAnalysisSettingsService.importSettingsJson(text, actor);
-        setDraft(updated);
-        setSaved(true);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Import failed.');
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  function handleReset(): void {
-    const updated = oilAnalysisSettingsService.resetToDefaults(actor);
-    setDraft(updated);
-    setSaved(true);
-    setShowReset(false);
-    setError(null);
-  }
-
-  function updateParameter(
-    index: number,
-    patch: Partial<OilAnalysisParameterSetting>,
-  ): void {
-    const parameters = draft.parameters.map((p, i) =>
-      i === index ? { ...p, ...patch, thresholds: { ...p.thresholds, ...(patch.thresholds ?? {}) } } : p,
-    );
-    updateDraft({ ...draft, parameters });
-  }
-
-  function updateConditionLevel(
-    level: OilAnalysisConditionLevel,
-    description: string,
-  ): void {
-    const levels = draft.conditionRules.levels.map((rule) => {
-      if (rule.level !== level) return rule;
-      return locale === 'ar'
-        ? { ...rule, descriptionAr: description }
-        : { ...rule, descriptionEn: description };
-    });
-    updateDraft({ ...draft, conditionRules: { levels } });
-  }
+  const inheritedHint = l(COPY.inheritedNote);
 
   return (
-    <div className="ur-page oa-settings-page">
-      <header className="ur-page__header">
-        <div className="ur-page__header-text">
-          <h1 className="ur-page__title">{l(COPY.title)}</h1>
-          <p className="ur-page__desc">{l(COPY.desc)}</p>
-        </div>
-        <StatusChip status="operational" label={l(COPY.liveData)} />
-      </header>
+    <div className="acc-settings-page">
+      <PageHeader
+        title={l(COPY.title)}
+        subtitle={l(COPY.subtitle)}
+        breadcrumbs={[
+          { label: l(COPY.breadcrumbModule), href: '/oil-analysis' },
+          { label: l(COPY.title) },
+        ]}
+        status={{ variant: 'info', label: l(COPY.statusCached) }}
+        actions={(
+          <OilAnalysisActionButton
+            type="button"
+            className="acc-btn acc-btn--primary"
+            allowed={permissions.canManageSettings}
+            onClick={handleSave}
+          >
+            {l(COPY.btnSave)}
+          </OilAnalysisActionButton>
+        )}
+      />
 
-      {error && <p className="ur-form-error" role="alert">{error}</p>}
-      {saved && !error && <p className="oa-settings-success" role="status">{l(COPY.btnSaved)}</p>}
+      {error && (
+        <ErrorState
+          title={l(COPY.title)}
+          message={error}
+          onRetry={() => setError(null)}
+        />
+      )}
 
-      <div className="oa-settings-actions">
-        <OilAnalysisActionButton
-          type="button"
-          className="ur-btn ur-btn--primary"
-          allowed={permissions.canManageSettings}
-          onClick={handleSave}
-        >
-          {l(COPY.btnSave)}
-        </OilAnalysisActionButton>
-      </div>
+      {!error && saved && (
+        <p className="acc-settings-saved" role="status">
+          <StatusBadge variant="completed" label={l(COPY.btnSaved)} />
+        </p>
+      )}
 
-      {/* Section 1 — General Settings */}
-      <section className="dashboard-section">
-        <h2 className="dashboard-section__title">{l(COPY.secGeneral)}</h2>
-        <div className="ol-form-grid">
-          <div className="ur-form-field">
-            <label className="ur-form-label" htmlFor="oa-def-status">{l(COPY.fldDefStatus)}</label>
-            <select
-              id="oa-def-status"
-              className="ur-form-input"
-              value={draft.general.defaultSampleStatus}
-              onChange={(e) => updateDraft({
+      <div className={`acc-settings-grid${isMobile ? ' acc-settings-grid--single' : ''}`}>
+        {/* 1 — PDF Import & OCR */}
+        <SectionCard title={l(COPY.secPdf)} bodyClassName="acc-settings-card-body">
+          <div className="acc-settings-fields">
+            <ToggleField
+              id="oa-pdf-ocr"
+              label={l(COPY.enableOcr)}
+              checked={draft.pdfImport.enableOcr}
+              onChange={(v) => updateDraft({
                 ...draft,
+                pdfImport: { ...draft.pdfImport, enableOcr: v },
+                general: { ...draft.general, enablePdfImport: v },
+              })}
+            />
+            <SettingsField id="oa-ocr-threshold" label={l(COPY.ocrThreshold)}>
+              <input
+                id="oa-ocr-threshold"
+                className="acc-settings-input"
+                type="number"
+                min={0}
+                max={1}
+                step={0.01}
+                value={draft.pdfImport.ocrConfidenceThreshold}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  pdfImport: {
+                    ...draft.pdfImport,
+                    ocrConfidenceThreshold: Number.parseFloat(e.target.value) || 0,
+                  },
+                })}
+              />
+            </SettingsField>
+            <ToggleField
+              id="oa-duplicate"
+              label={l(COPY.duplicateDetection)}
+              checked={draft.pdfImport.duplicateDetectionBySampleId}
+              onChange={(v) => updateDraft({
+                ...draft,
+                pdfImport: { ...draft.pdfImport, duplicateDetectionBySampleId: v },
+              })}
+            />
+            <SettingsField id="oa-batch-size" label={l(COPY.maxBatch)}>
+              <input
+                id="oa-batch-size"
+                className="acc-settings-input"
+                type="number"
+                min={1}
+                max={100}
+                value={draft.pdfImport.maximumBatchSize}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  pdfImport: {
+                    ...draft.pdfImport,
+                    maximumBatchSize: Number.parseInt(e.target.value, 10) || 1,
+                  },
+                })}
+              />
+            </SettingsField>
+            <SettingsField id="oa-file-types" label={l(COPY.acceptedTypes)}>
+              <input
+                id="oa-file-types"
+                className="acc-settings-input"
+                value={draft.pdfImport.acceptedFileTypes}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  pdfImport: { ...draft.pdfImport, acceptedFileTypes: e.target.value },
+                })}
+              />
+            </SettingsField>
+            <SettingsField id="oa-drive-folder" label={l(COPY.driveFolder)}>
+              <input
+                id="oa-drive-folder"
+                className="acc-settings-input"
+                placeholder="Drive folder ID or path"
+                value={draft.pdfImport.googleDriveFolder}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  pdfImport: { ...draft.pdfImport, googleDriveFolder: e.target.value },
+                })}
+              />
+            </SettingsField>
+            <ToggleField
+              id="oa-save-pdf"
+              label={l(COPY.saveOriginalPdf)}
+              checked={draft.pdfImport.saveOriginalPdf}
+              onChange={(v) => updateDraft({
+                ...draft,
+                pdfImport: { ...draft.pdfImport, saveOriginalPdf: v },
+              })}
+            />
+            <ToggleField
+              id="oa-keep-pdf"
+              label={l(COPY.keepPdfVersion)}
+              checked={draft.pdfImport.keepOriginalPdfVersion}
+              onChange={(v) => updateDraft({
+                ...draft,
+                pdfImport: { ...draft.pdfImport, keepOriginalPdfVersion: v },
+              })}
+            />
+          </div>
+        </SectionCard>
+
+        {/* 2 — Sampling Rules */}
+        <SectionCard title={l(COPY.secSampling)} bodyClassName="acc-settings-card-body">
+          <div className="acc-settings-fields">
+            <SettingsField id="oa-sampling-freq" label={l(COPY.defaultSamplingFreq)}>
+              <select
+                id="oa-sampling-freq"
+                className="acc-settings-input"
+                value={draft.samplingRules.defaultSamplingFrequency}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  samplingRules: {
+                    ...draft.samplingRules,
+                    defaultSamplingFrequency: e.target.value as OilAnalysisSamplingFrequency,
+                  },
+                })}
+              >
+                <option value="30-days">{l(COPY.freq30)}</option>
+                <option value="60-days">{l(COPY.freq60)}</option>
+                <option value="90-days">{l(COPY.freq90)}</option>
+                <option value="180-days">{l(COPY.freq180)}</option>
+                <option value="365-days">{l(COPY.freq365)}</option>
+              </select>
+            </SettingsField>
+            <ToggleField
+              id="oa-auto-next-sample"
+              label={l(COPY.autoNextSample)}
+              checked={draft.samplingRules.autoCalculateNextSample}
+              onChange={(v) => updateDraft({
+                ...draft,
+                samplingRules: { ...draft.samplingRules, autoCalculateNextSample: v },
+              })}
+            />
+            <ToggleField
+              id="oa-manual-override"
+              label={l(COPY.manualOverride)}
+              checked={draft.samplingRules.allowManualOverride}
+              onChange={(v) => updateDraft({
+                ...draft,
+                samplingRules: { ...draft.samplingRules, allowManualOverride: v },
+              })}
+            />
+            <ToggleField
+              id="oa-auto-oil-change"
+              label={l(COPY.autoNextOilChange)}
+              checked={draft.samplingRules.autoCalculateNextOilChange}
+              onChange={(v) => updateDraft({
+                ...draft,
+                samplingRules: { ...draft.samplingRules, autoCalculateNextOilChange: v },
+              })}
+            />
+            <SettingsField id="oa-oil-change-freq" label={l(COPY.defaultOilChangeFreq)}>
+              <select
+                id="oa-oil-change-freq"
+                className="acc-settings-input"
+                value={draft.samplingRules.defaultOilChangeFrequency}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  samplingRules: {
+                    ...draft.samplingRules,
+                    defaultOilChangeFrequency: e.target.value as OilAnalysisOilChangeFrequency,
+                  },
+                })}
+              >
+                <option value="6-months">{l(COPY.oil6)}</option>
+                <option value="12-months">{l(COPY.oil12)}</option>
+                <option value="18-months">{l(COPY.oil18)}</option>
+                <option value="24-months">{l(COPY.oil24)}</option>
+              </select>
+            </SettingsField>
+            <SettingsField id="oa-alert-days" label={l(COPY.alertBeforeDue)}>
+              <input
+                id="oa-alert-days"
+                className="acc-settings-input"
+                type="number"
+                min={0}
+                max={90}
+                value={draft.samplingRules.alertBeforeDueDays}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  samplingRules: {
+                    ...draft.samplingRules,
+                    alertBeforeDueDays: Number.parseInt(e.target.value, 10) || 0,
+                  },
+                })}
+              />
+            </SettingsField>
+          </div>
+        </SectionCard>
+
+        {/* 3 — Automatic Workflow */}
+        <SectionCard title={l(COPY.secWorkflow)} bodyClassName="acc-settings-card-body">
+          <div className="acc-settings-fields">
+            <ToggleField
+              id="oa-auto-draft"
+              label={l(COPY.autoDraftAction)}
+              checked={draft.automaticWorkflow.autoDraftAction}
+              onChange={(v) => updateDraft({
+                ...draft,
+                automaticWorkflow: { ...draft.automaticWorkflow, autoDraftAction: v },
+              })}
+            />
+            <SettingsField id="oa-trigger-status" label={l(COPY.triggerStatus)}>
+              <select
+                id="oa-trigger-status"
+                className="acc-settings-input"
+                value={draft.automaticWorkflow.triggerStatus}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  automaticWorkflow: {
+                    ...draft.automaticWorkflow,
+                    triggerStatus: e.target.value as OilAnalysisWorkflowTriggerStatus,
+                  },
+                })}
+              >
+                <option value="alert">{l(COPY.triggerAlert)}</option>
+                <option value="caution-and-alert">{l(COPY.triggerCautionAlert)}</option>
+              </select>
+            </SettingsField>
+            <ToggleField
+              id="oa-manual-action"
+              label={l(COPY.manualAction)}
+              checked={draft.automaticWorkflow.manualActionCreation}
+              onChange={(v) => updateDraft({
+                ...draft,
+                automaticWorkflow: { ...draft.automaticWorkflow, manualActionCreation: v },
+              })}
+            />
+            <div className="acc-settings-field acc-settings-field--inherited">
+              <ToggleField
+                id="oa-notify-engineer"
+                label={l(COPY.notifyEngineer)}
+                checked={draft.automaticWorkflow.notifyAccEngineer}
+                disabled
+                onChange={() => undefined}
+              />
+              <InheritedBadge label={inheritedHint} />
+            </div>
+            <div className="acc-settings-field acc-settings-field--inherited">
+              <ToggleField
+                id="oa-notify-contractor"
+                label={l(COPY.notifyContractor)}
+                checked={draft.automaticWorkflow.notifyContractor}
+                disabled
+                onChange={() => undefined}
+              />
+              <InheritedBadge label={inheritedHint} />
+            </div>
+            <ToggleField
+              id="oa-review-queue"
+              label={l(COPY.enableReviewQueue)}
+              checked={draft.automaticWorkflow.enableReviewQueue}
+              onChange={(v) => updateDraft({
+                ...draft,
+                automaticWorkflow: { ...draft.automaticWorkflow, enableReviewQueue: v },
                 general: {
                   ...draft.general,
-                  defaultSampleStatus: e.target.value as OilAnalysisModuleSettings['general']['defaultSampleStatus'],
+                  defaultApprovalWorkflowEnabled: v,
+                  requireEngineerApproval: v,
                 },
               })}
-            >
-              <option value="imported">{l(COPY.stImported)}</option>
-              <option value="pending-review">{l(COPY.stPending)}</option>
-            </select>
+            />
           </div>
-        </div>
-        <div className="oa-settings-toggle-grid">
-          <ToggleField
-            id="oa-approval-wf"
-            label={l(COPY.fldApprovalWf)}
-            checked={draft.general.defaultApprovalWorkflowEnabled}
-            onChange={(v) => updateDraft({ ...draft, general: { ...draft.general, defaultApprovalWorkflowEnabled: v } })}
-          />
-          <ToggleField
-            id="oa-req-approval"
-            label={l(COPY.fldReqApproval)}
-            checked={draft.general.requireEngineerApproval}
-            onChange={(v) => updateDraft({ ...draft, general: { ...draft.general, requireEngineerApproval: v } })}
-          />
-          <ToggleField
-            id="oa-trend"
-            label={l(COPY.fldTrend)}
-            checked={draft.general.enableTrendEngine}
-            onChange={(v) => updateDraft({ ...draft, general: { ...draft.general, enableTrendEngine: v } })}
-          />
-          <ToggleField
-            id="oa-pdf"
-            label={l(COPY.fldPdf)}
-            checked={draft.general.enablePdfImport}
-            onChange={(v) => updateDraft({ ...draft, general: { ...draft.general, enablePdfImport: v } })}
-          />
-          <ToggleField
-            id="oa-manual"
-            label={l(COPY.fldManual)}
-            checked={draft.general.enableManualEntry}
-            onChange={(v) => updateDraft({ ...draft, general: { ...draft.general, enableManualEntry: v } })}
-          />
-          <ToggleField
-            id="oa-csv"
-            label={l(COPY.fldCsv)}
-            checked={draft.general.enableCsvExport}
-            onChange={(v) => updateDraft({ ...draft, general: { ...draft.general, enableCsvExport: v } })}
-          />
-          <ToggleField
-            id="oa-json-export"
-            label={l(COPY.fldJson)}
-            checked={draft.general.enableJsonExport}
-            onChange={(v) => updateDraft({ ...draft, general: { ...draft.general, enableJsonExport: v } })}
-          />
-        </div>
-      </section>
+        </SectionCard>
 
-      {/* Section 2 — Laboratory Settings */}
-      <section className="dashboard-section">
-        <h2 className="dashboard-section__title">{l(COPY.secLaboratory)}</h2>
-        <div className="ol-form-grid">
-          <div className="ur-form-field">
-            <label className="ur-form-label" htmlFor="oa-lab-name">{l(COPY.fldLab)}</label>
-            <input
-              id="oa-lab-name"
-              className="ur-form-input"
-              value={draft.laboratory.defaultLaboratory}
-              onChange={(e) => updateDraft({
+        {/* 4 — Report Settings */}
+        <SectionCard title={l(COPY.secReport)} bodyClassName="acc-settings-card-body">
+          <div className="acc-settings-fields">
+            <SettingsField id="oa-export-format" label={l(COPY.defaultExport)}>
+              <select
+                id="oa-export-format"
+                className="acc-settings-input"
+                value={draft.reportSettings.defaultExportFormat}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  reportSettings: {
+                    ...draft.reportSettings,
+                    defaultExportFormat: e.target.value as OilAnalysisReportExportFormat,
+                  },
+                })}
+              >
+                <option value="pdf">{l(COPY.exportPdf)}</option>
+                <option value="excel">{l(COPY.exportExcel)}</option>
+                <option value="pdf-excel">{l(COPY.exportBoth)}</option>
+              </select>
+            </SettingsField>
+            <ToggleField
+              id="oa-enable-charts"
+              label={l(COPY.enableCharts)}
+              checked={draft.reportSettings.enableCharts}
+              onChange={(v) => updateDraft({
                 ...draft,
-                laboratory: { ...draft.laboratory, defaultLaboratory: e.target.value },
+                reportSettings: { ...draft.reportSettings, enableCharts: v },
               })}
             />
+            <div className="acc-settings-field acc-settings-field--inherited">
+              <ToggleField
+                id="oa-company-header"
+                label={l(COPY.enableHeader)}
+                checked={draft.reportSettings.enableCompanyHeader}
+                disabled
+                onChange={() => undefined}
+              />
+              <InheritedBadge label={inheritedHint} />
+            </div>
+            <div className="acc-settings-field acc-settings-field--inherited">
+              <ToggleField
+                id="oa-footer"
+                label={l(COPY.enableFooter)}
+                checked={draft.reportSettings.enableFooter}
+                disabled
+                onChange={() => undefined}
+              />
+              <InheritedBadge label={inheritedHint} />
+            </div>
+            <div className="acc-settings-field acc-settings-field--inherited">
+              <ToggleField
+                id="oa-watermark"
+                label={l(COPY.watermark)}
+                checked={draft.reportSettings.watermark}
+                disabled
+                onChange={() => undefined}
+              />
+              <InheritedBadge label={inheritedHint} />
+            </div>
           </div>
-          <div className="ur-form-field">
-            <label className="ur-form-label" htmlFor="oa-prefix">{l(COPY.fldPrefix)}</label>
-            <input
-              id="oa-prefix"
-              className="ur-form-input"
-              value={draft.laboratory.sampleNumberPrefix}
-              onChange={(e) => updateDraft({
-                ...draft,
-                laboratory: { ...draft.laboratory, sampleNumberPrefix: e.target.value.toUpperCase() },
-              })}
-              maxLength={6}
-            />
-          </div>
-          <div className="ur-form-field">
-            <label className="ur-form-label" htmlFor="oa-currency">{l(COPY.fldCurrency)}</label>
-            <input
-              id="oa-currency"
-              className="ur-form-input"
-              value={draft.laboratory.defaultCurrency}
-              onChange={(e) => updateDraft({
-                ...draft,
-                laboratory: { ...draft.laboratory, defaultCurrency: e.target.value },
-              })}
-            />
-          </div>
-          <div className="ur-form-field">
-            <label className="ur-form-label" htmlFor="oa-lang">{l(COPY.fldLang)}</label>
-            <select
-              id="oa-lang"
-              className="ur-form-input"
-              value={draft.laboratory.defaultReportLanguage}
-              onChange={(e) => updateDraft({
-                ...draft,
-                laboratory: {
-                  ...draft.laboratory,
-                  defaultReportLanguage: e.target.value as 'en' | 'ar',
-                },
-              })}
-            >
-              <option value="en">{l(COPY.langEn)}</option>
-              <option value="ar">{l(COPY.langAr)}</option>
-            </select>
-          </div>
-          <div className="ur-form-field">
-            <label className="ur-form-label" htmlFor="oa-unit-ppm">{l(COPY.fldUnitPpm)}</label>
-            <input
-              id="oa-unit-ppm"
-              className="ur-form-input"
-              value={draft.laboratory.units.ppm}
-              onChange={(e) => updateDraft({
-                ...draft,
-                laboratory: {
-                  ...draft.laboratory,
-                  units: { ...draft.laboratory.units, ppm: e.target.value },
-                },
-              })}
-            />
-          </div>
-          <div className="ur-form-field">
-            <label className="ur-form-label" htmlFor="oa-unit-cst">{l(COPY.fldUnitCst)}</label>
-            <input
-              id="oa-unit-cst"
-              className="ur-form-input"
-              value={draft.laboratory.units.cSt}
-              onChange={(e) => updateDraft({
-                ...draft,
-                laboratory: {
-                  ...draft.laboratory,
-                  units: { ...draft.laboratory.units, cSt: e.target.value },
-                },
-              })}
-            />
-          </div>
-          <div className="ur-form-field">
-            <label className="ur-form-label" htmlFor="oa-unit-pct">{l(COPY.fldUnitPct)}</label>
-            <input
-              id="oa-unit-pct"
-              className="ur-form-input"
-              value={draft.laboratory.units.percent}
-              onChange={(e) => updateDraft({
-                ...draft,
-                laboratory: {
-                  ...draft.laboratory,
-                  units: { ...draft.laboratory.units, percent: e.target.value },
-                },
-              })}
-            />
-          </div>
-          <div className="ur-form-field">
-            <label className="ur-form-label" htmlFor="oa-date-fmt">{l(COPY.fldDateFmt)}</label>
-            <select
-              id="oa-date-fmt"
-              className="ur-form-input"
-              value={draft.laboratory.dateFormat}
-              onChange={(e) => updateDraft({
-                ...draft,
-                laboratory: {
-                  ...draft.laboratory,
-                  dateFormat: e.target.value as OilAnalysisModuleSettings['laboratory']['dateFormat'],
-                },
-              })}
-            >
-              <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-              <option value="DD-MMM-YYYY">DD-MMM-YYYY</option>
-            </select>
-          </div>
-        </div>
-      </section>
+        </SectionCard>
 
-      {/* Section 3 — Parameter Settings */}
-      <section className="dashboard-section">
-        <h2 className="dashboard-section__title">{l(COPY.secParameters)}</h2>
-        <p className="oa-settings-hint">{l(COPY.paramHint)}</p>
-        <div className="oa-report-table-wrap">
-          <table className="ur-table oa-settings-param-table">
-            <thead>
-              <tr>
-                <th>{l(COPY.colParam)}</th>
-                <th>{l(COPY.colUnit)}</th>
-                <th>{l(COPY.colEnabled)}</th>
-                <th>{l(COPY.colMonitor)}</th>
-                <th>{l(COPY.colCaution)}</th>
-                <th>{l(COPY.colCritical)}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {draft.parameters.map((param, index) => (
-                <tr key={param.id}>
-                  <td>{locale === 'ar' ? param.labelAr : param.labelEn}</td>
-                  <td>{param.unit || '—'}</td>
-                  <td>
+        {/* 5 — Timeline Settings */}
+        <SectionCard title={l(COPY.secTimeline)} bodyClassName="acc-settings-card-body">
+          <div className="acc-settings-fields">
+            <SettingsField id="oa-timeline-dir" label={l(COPY.timelineDirection)}>
+              <select
+                id="oa-timeline-dir"
+                className="acc-settings-input"
+                value={draft.timeline.direction}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  timeline: {
+                    ...draft.timeline,
+                    direction: e.target.value as OilAnalysisTimelineDirection,
+                  },
+                  laboratory: {
+                    ...draft.laboratory,
+                    timelineDirection: e.target.value as OilAnalysisTimelineDirection,
+                  },
+                })}
+              >
+                <option value="ltr">{l(COPY.timelineLtr)}</option>
+                <option value="rtl">{l(COPY.timelineRtl)}</option>
+              </select>
+            </SettingsField>
+            <ToggleField
+              id="oa-future-events"
+              label={l(COPY.showFutureEvents)}
+              checked={draft.timeline.showFutureEvents}
+              onChange={(v) => updateDraft({
+                ...draft,
+                timeline: { ...draft.timeline, showFutureEvents: v },
+              })}
+            />
+            <SettingsField id="oa-event-density" label={l(COPY.eventDensity)}>
+              <select
+                id="oa-event-density"
+                className="acc-settings-input"
+                value={draft.timeline.eventDensity}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  timeline: {
+                    ...draft.timeline,
+                    eventDensity: e.target.value as OilAnalysisTimelineEventDensity,
+                  },
+                })}
+              >
+                <option value="compact">{l(COPY.densityCompact)}</option>
+                <option value="normal">{l(COPY.densityNormal)}</option>
+                <option value="comfortable">{l(COPY.densityComfortable)}</option>
+              </select>
+            </SettingsField>
+            <SettingsField
+              id="oa-timeline-zoom"
+              label={l(COPY.defaultZoom)}
+              hint={l(COPY.futureReady)}
+            >
+              <input
+                id="oa-timeline-zoom"
+                className="acc-settings-input"
+                type="number"
+                min={50}
+                max={200}
+                step={10}
+                value={draft.timeline.defaultTimelineZoom}
+                disabled
+                readOnly
+              />
+            </SettingsField>
+          </div>
+        </SectionCard>
+
+        {/* 6 — Dashboard Settings */}
+        <SectionCard title={l(COPY.secDashboard)} bodyClassName="acc-settings-card-body">
+          <div className="acc-settings-fields">
+            <ToggleField
+              id="oa-kpi-cards"
+              label={l(COPY.enableKpi)}
+              checked={draft.dashboard.enableKpiCards}
+              onChange={(v) => updateDraft({
+                ...draft,
+                dashboard: { ...draft.dashboard, enableKpiCards: v },
+              })}
+            />
+            <div className="acc-settings-field">
+              <span className="acc-settings-field__label" id="oa-widgets-label">
+                {l(COPY.visibleWidgets)}
+              </span>
+              <div className="acc-settings-checkbox-group" role="group" aria-labelledby="oa-widgets-label">
+                {WIDGET_OPTIONS.map((widget) => (
+                  <label key={widget.id} className="acc-settings-checkbox">
                     <input
                       type="checkbox"
-                      checked={param.enabled}
-                      aria-label={`${locale === 'ar' ? param.labelAr : param.labelEn} enabled`}
-                      onChange={(e) => updateParameter(index, { enabled: e.target.checked })}
+                      checked={draft.dashboard.visibleDashboardWidgets.includes(widget.id)}
+                      onChange={(e) => toggleWidget(widget.id, e.target.checked)}
                     />
-                  </td>
-                  <td>
-                    <input
-                      className="ur-form-input oa-settings-threshold"
-                      value={formatThreshold(param.thresholds.monitor)}
-                      onChange={(e) => updateParameter(index, {
-                        thresholds: { ...param.thresholds, monitor: parseThreshold(e.target.value) },
-                      })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="ur-form-input oa-settings-threshold"
-                      value={formatThreshold(param.thresholds.caution)}
-                      onChange={(e) => updateParameter(index, {
-                        thresholds: { ...param.thresholds, caution: parseThreshold(e.target.value) },
-                      })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="ur-form-input oa-settings-threshold"
-                      value={formatThreshold(param.thresholds.critical)}
-                      onChange={(e) => updateParameter(index, {
-                        thresholds: { ...param.thresholds, critical: parseThreshold(e.target.value) },
-                      })}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                    <span>{l(widget.label)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <SettingsField id="oa-refresh" label={l(COPY.autoRefresh)}>
+              <input
+                id="oa-refresh"
+                className="acc-settings-input"
+                type="number"
+                min={1}
+                max={60}
+                value={draft.dashboard.autoRefreshIntervalMinutes}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  dashboard: {
+                    ...draft.dashboard,
+                    autoRefreshIntervalMinutes: Number.parseInt(e.target.value, 10) || 1,
+                  },
+                })}
+              />
+            </SettingsField>
+            <SettingsField id="oa-landing-widget" label={l(COPY.landingWidget)}>
+              <select
+                id="oa-landing-widget"
+                className="acc-settings-input"
+                value={draft.dashboard.defaultLandingWidget}
+                onChange={(e) => updateDraft({
+                  ...draft,
+                  dashboard: {
+                    ...draft.dashboard,
+                    defaultLandingWidget: e.target.value as OilAnalysisDashboardWidgetId,
+                  },
+                })}
+              >
+                {WIDGET_OPTIONS.map((widget) => (
+                  <option key={widget.id} value={widget.id}>{l(widget.label)}</option>
+                ))}
+              </select>
+            </SettingsField>
+          </div>
+        </SectionCard>
 
-      {/* Section 4 — Condition Rules */}
-      <section className="dashboard-section">
-        <h2 className="dashboard-section__title">{l(COPY.secConditions)}</h2>
-        <div className="oa-settings-condition-grid">
-          {draft.conditionRules.levels.map((rule) => (
-            <div key={rule.level} className="oa-settings-condition-card">
-              <h3 className="oa-settings-condition-card__title">
-                {l(CONDITION_LEVEL_LABELS[rule.level])}
-              </h3>
-              <textarea
-                className="ur-form-input"
-                rows={3}
-                value={locale === 'ar' ? rule.descriptionAr : rule.descriptionEn}
-                onChange={(e) => updateConditionLevel(rule.level, e.target.value)}
+        {/* 7 — Advanced Settings (collapsed by default) */}
+        <SectionCard
+          title={l(COPY.secAdvanced)}
+          className="acc-settings-advanced-card"
+          bodyClassName="acc-settings-card-body"
+          actions={(
+            <button
+              type="button"
+              className="acc-btn acc-btn--ghost acc-settings-advanced-toggle"
+              aria-expanded={advancedOpen}
+              onClick={() => setAdvancedOpen((open) => !open)}
+            >
+              {advancedOpen ? l(COPY.collapseAdvanced) : l(COPY.expandAdvanced)}
+            </button>
+          )}
+        >
+          {advancedOpen ? (
+            <div className="acc-settings-fields">
+              <SettingsField id="oa-timeout" label={l(COPY.processingTimeout)}>
+                <input
+                  id="oa-timeout"
+                  className="acc-settings-input"
+                  type="number"
+                  min={30}
+                  max={600}
+                  value={draft.advanced.processingTimeoutSeconds}
+                  onChange={(e) => updateDraft({
+                    ...draft,
+                    advanced: {
+                      ...draft.advanced,
+                      processingTimeoutSeconds: Number.parseInt(e.target.value, 10) || 30,
+                    },
+                  })}
+                />
+              </SettingsField>
+              <SettingsField id="oa-concurrent" label={l(COPY.maxConcurrent)}>
+                <input
+                  id="oa-concurrent"
+                  className="acc-settings-input"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={draft.advanced.maximumConcurrentImports}
+                  onChange={(e) => updateDraft({
+                    ...draft,
+                    advanced: {
+                      ...draft.advanced,
+                      maximumConcurrentImports: Number.parseInt(e.target.value, 10) || 1,
+                    },
+                  })}
+                />
+              </SettingsField>
+              <SettingsField id="oa-cache-refresh" label={l(COPY.cacheRefresh)}>
+                <input
+                  id="oa-cache-refresh"
+                  className="acc-settings-input"
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={draft.advanced.cacheRefreshMinutes}
+                  onChange={(e) => updateDraft({
+                    ...draft,
+                    advanced: {
+                      ...draft.advanced,
+                      cacheRefreshMinutes: Number.parseInt(e.target.value, 10) || 1,
+                    },
+                  })}
+                />
+              </SettingsField>
+              <ToggleField
+                id="oa-import-logs"
+                label={l(COPY.importLogs)}
+                checked={draft.advanced.importLogsEnabled}
+                onChange={(v) => updateDraft({
+                  ...draft,
+                  advanced: { ...draft.advanced, importLogsEnabled: v },
+                })}
+              />
+              <ToggleField
+                id="oa-ocr-debug"
+                label={l(COPY.ocrDebug)}
+                checked={draft.advanced.ocrDebugMode}
+                onChange={(v) => updateDraft({
+                  ...draft,
+                  advanced: { ...draft.advanced, ocrDebugMode: v },
+                })}
               />
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Section 5 — Permissions View */}
-      <section className="dashboard-section">
-        <h2 className="dashboard-section__title">{l(COPY.secPermissions)}</h2>
-        <p className="oa-settings-hint">{l(COPY.permReadOnly)}</p>
-        <ul className="oa-settings-perm-list">
-          {PERMISSION_ROWS.map((row) => (
-            <li key={row.code} className="oa-settings-perm-list__item">
-              <span className="oa-settings-perm-list__label">{l(row.label)}</span>
-              <code className="oa-settings-perm-list__code">{row.code}</code>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* Section 6 — Data Management */}
-      <section className="dashboard-section">
-        <h2 className="dashboard-section__title">{l(COPY.secData)}</h2>
-        <div className="oa-settings-data-actions">
-          <button type="button" className="ur-btn ur-btn--secondary" onClick={handleExport}>
-            {l(COPY.btnExport)}
-          </button>
-          <button type="button" className="ur-btn ur-btn--secondary" onClick={handleImportClick}>
-            {l(COPY.btnImport)}
-          </button>
-          <button type="button" className="ur-btn ur-btn--ghost" onClick={() => setShowReset(true)}>
-            {l(COPY.btnReset)}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/json,.json"
-            className="oa-settings-file-input"
-            onChange={handleImportFile}
-          />
-        </div>
-      </section>
-
-      {/* Section 7 — Audit */}
-      <section className="dashboard-section">
-        <h2 className="dashboard-section__title">{l(COPY.secAudit)}</h2>
-        <dl className="oa-settings-audit">
-          <div className="oa-settings-audit__row">
-            <dt>{l(COPY.auditLast)}</dt>
-            <dd>{draft.audit.lastChangeSummary}</dd>
-          </div>
-          <div className="oa-settings-audit__row">
-            <dt>{l(COPY.auditBy)}</dt>
-            <dd>{draft.audit.changedBy}</dd>
-          </div>
-          <div className="oa-settings-audit__row">
-            <dt>{l(COPY.auditAt)}</dt>
-            <dd>{formatAuditDate(draft.audit.changedAt)}</dd>
-          </div>
-        </dl>
-      </section>
-
-      {showReset && (
-        <div
-          className="ur-dialog-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="oa-reset-title"
-          onClick={() => setShowReset(false)}
-        >
-          <div className="ur-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="ur-dialog__header">
-              <span id="oa-reset-title" className="ur-dialog__title">{l(COPY.resetTitle)}</span>
-              <button className="ur-dialog__close" aria-label="Close" onClick={() => setShowReset(false)}>✕</button>
-            </div>
-            <div className="ur-dialog__body">
-              <p>{l(COPY.resetDesc)}</p>
-            </div>
-            <div className="ur-dialog__footer">
-              <button type="button" className="ur-btn ur-btn--primary" onClick={handleReset}>
-                {l(COPY.resetConfirm)}
-              </button>
-              <button type="button" className="ur-btn ur-btn--ghost" onClick={() => setShowReset(false)}>
-                {l(COPY.resetCancel)}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          ) : (
+            <p className="acc-settings-advanced-collapsed">{l(COPY.expandAdvanced)}</p>
+          )}
+        </SectionCard>
+      </div>
     </div>
   );
 }

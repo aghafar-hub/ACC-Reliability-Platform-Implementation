@@ -1,44 +1,40 @@
 // apps/owner-center/src/modules/oil-analysis/report.service.ts
-// Oil Analysis report generation (Sprint 08).
-//
-// Pure business logic — no React. Uses sample data and trend engine outputs.
-// Engineering reports include approved/locked results only unless the report
-// is explicitly a pending/review report.
+// OA-008 — Oil Analysis report generation (contractor-scoped, on-read).
 
+import type { OilReportType } from './report-catalog';
+import { findReportTemplate } from './report-catalog';
+import type { OilAnalysisContractorScope } from './contractor-scope';
+import { lpRegisterService, type LpRegisterConditionStatus, type LpRegisterKpis } from './lp-register.service';
+import { oilChangeService, type OcTask } from '../oil-lubrication/oil-change.service';
+import { getPlatformSdk } from '../platform/platform-master-access';
 import {
   oilSampleService,
   computeSampleCondition,
   hasLabResults,
-  parseRatingLevel,
+  type OilSampleRow,
+  type SampleCondition,
 } from './sample.service';
-import type { OilSampleRow, SampleCondition } from './sample.service';
-import { analyzeOilParameterTrend, isTrendEligibleSample } from './trend.service';
-import type { TrendDirection } from '../trend-engine';
-import { isSampleResultFinalized, isApprovalWorkflowEnabled } from './approval-workflow';
-import { evaluateParameterCondition } from './threshold-engine';
-import type { OilAnalysisParameterId } from './settings-types';
+import { isApprovalWorkflowEnabled, isSampleResultFinalized } from './approval-workflow';
 
-// ── Report types ──────────────────────────────────────────────────────────────
+// ── Filters & output ──────────────────────────────────────────────────────────
 
-export type OilReportType =
-  | 'sample-summary'
-  | 'critical-samples'
-  | 'pending-review'
-  | 'laboratory-results'
-  | 'oil-health';
+export type { OilReportType };
 
 export interface OilReportFilters {
   readonly reportType: OilReportType;
   readonly dateFrom?: string;
   readonly dateTo?: string;
+  readonly lpIds?: readonly string[];
+  readonly equipmentId?: string;
   readonly area?: string;
   readonly contractor?: string;
-  readonly equipmentSearch?: string;
-  readonly condition?: string;
+  readonly oilType?: string;
+  readonly reportStatus?: string;
+  readonly equipmentStatus?: string;
+  readonly sampleId?: string;
 }
 
 export interface OilReportKpis {
-  readonly total: number;
   readonly label: string;
   readonly value: number;
 }
@@ -48,140 +44,262 @@ export interface GroupCountRow {
   readonly count: number;
 }
 
-export interface SampleSummaryReport {
-  readonly kind: 'sample-summary';
-  readonly sampleCount: number;
-  readonly byEquipment: readonly GroupCountRow[];
-  readonly byArea: readonly GroupCountRow[];
-  readonly byContractor: readonly GroupCountRow[];
-  readonly byStatus: readonly GroupCountRow[];
-  readonly byCondition: readonly GroupCountRow[];
+export interface OilReportColumn {
+  readonly id: string;
+  readonly label: string;
 }
 
-export interface CriticalSampleRow {
-  readonly sampleId: string;
-  readonly equipmentId: string;
-  readonly lubricationPointId: string;
-  readonly labSampleId: string;
-  readonly alertType: string;
-  readonly condition: SampleCondition;
-  readonly abnormalFields: string;
-  readonly approvalStatus: string;
-  readonly sampledAt: string;
+export interface OilReportChartSlice {
+  readonly label: string;
+  readonly value: number;
+  readonly color?: string;
 }
 
-export interface CriticalSamplesReport {
-  readonly kind: 'critical-samples';
-  readonly rows: readonly CriticalSampleRow[];
+export interface OilReportChart {
+  readonly title: string;
+  readonly slices: readonly OilReportChartSlice[];
 }
 
-export interface PendingReviewRow {
-  readonly sampleId: string;
-  readonly equipmentId: string;
-  readonly lubricationPointId: string;
-  readonly labSampleId: string;
-  readonly status: string;
-  readonly approvalStatus: string;
-  readonly pdfImportStatus: string;
-  readonly pendingReason: string;
-  readonly sampledAt: string;
+export interface OilReportBreakdown {
+  readonly title: string;
+  readonly rows: readonly GroupCountRow[];
 }
 
-export interface PendingReviewReport {
-  readonly kind: 'pending-review';
-  readonly rows: readonly PendingReviewRow[];
-  readonly pdfPendingCount: number;
-  readonly missingLpCount: number;
+export interface OilReportResult {
+  readonly kind: OilReportType;
+  readonly title: string;
+  readonly tableColumns: readonly OilReportColumn[];
+  readonly tableRows: readonly Record<string, string | number | null>[];
+  readonly breakdowns: readonly OilReportBreakdown[];
+  readonly charts: readonly OilReportChart[];
 }
-
-export interface LaboratoryResultRow {
-  readonly sampleId: string;
-  readonly equipmentId: string;
-  readonly lubricationPointId: string;
-  readonly labSampleId: string;
-  readonly sampledAt: string;
-  readonly ironPpm: number | null;
-  readonly copperPpm: number | null;
-  readonly siliconPpm: number | null;
-  readonly waterPercent: number | null;
-  readonly pqIndex: number | null;
-  readonly viscosity100c: number | null;
-  readonly tan: number | null;
-  readonly oxidation: number | null;
-  readonly particleCount: number | null;
-  readonly approvalStatus: string;
-}
-
-export interface LaboratoryResultsReport {
-  readonly kind: 'laboratory-results';
-  readonly rows: readonly LaboratoryResultRow[];
-}
-
-export interface OilHealthRow {
-  readonly equipmentId: string;
-  readonly lubricationPointId: string;
-  readonly sampleId: string;
-  readonly labSampleId: string;
-  readonly condition: SampleCondition;
-  readonly lastSampleDate: string;
-  readonly trendDirection: TrendDirection | null;
-}
-
-export interface OilHealthReport {
-  readonly kind: 'oil-health';
-  readonly rows: readonly OilHealthRow[];
-}
-
-export type OilReportResult =
-  | SampleSummaryReport
-  | CriticalSamplesReport
-  | PendingReviewReport
-  | LaboratoryResultsReport
-  | OilHealthReport;
 
 export interface OilReportOutput {
   readonly filters: OilReportFilters;
   readonly kpis: readonly OilReportKpis[];
   readonly report: OilReportResult;
   readonly generatedAt: string;
+  readonly reference: string;
+}
+
+export interface OilReportFilterOptions {
+  readonly lpIds: readonly string[];
+  readonly equipmentIds: readonly string[];
+  readonly areas: readonly string[];
+  readonly contractors: readonly string[];
+  readonly oilTypes: readonly string[];
+  readonly reportStatuses: readonly string[];
+  readonly equipmentStatuses: readonly string[];
+}
+
+// ── Scoped row model ──────────────────────────────────────────────────────────
+
+interface ScopedLpRow {
+  readonly lpId: string;
+  readonly equipmentId: string;
+  readonly equipmentName: string;
+  readonly area: string;
+  readonly contractorId: string;
+  readonly oilType: string;
+  readonly lastSampleStatus: LpRegisterConditionStatus;
+  readonly isSampleOverdue: boolean;
+  readonly nextSampleDate: string | null;
+  readonly lastSampleDate: string | null;
+  readonly reportStatus: string;
+  readonly latestSample: OilSampleRow | null;
+}
+
+function computeScopedKpis(rows: readonly ScopedLpRow[]): LpRegisterKpis {
+  return {
+    total: rows.length,
+    normal: rows.filter((r) => r.lastSampleStatus === 'normal').length,
+    caution: rows.filter((r) => r.lastSampleStatus === 'caution').length,
+    alert: rows.filter((r) => r.lastSampleStatus === 'alert').length,
+    pending: rows.filter((r) => r.lastSampleStatus === 'pending').length,
+    noSample: rows.filter((r) => r.lastSampleStatus === 'none').length,
+    overdue: rows.filter((r) => r.isSampleOverdue).length,
+  };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function applyContractorScope(
+  scope: OilAnalysisContractorScope,
+  contractorFilter?: string,
+): string | undefined {
+  if (!scope.canViewAllContractors) return scope.lockedContractorId;
+  return contractorFilter?.trim() || undefined;
+}
+
+function distinctSorted(values: readonly string[]): string[] {
+  return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+}
+
+function resolveOilType(lpId: string): string {
+  const task = oilChangeService.listTasks().find((t) => t.lpId === lpId);
+  if (task?.oilType?.trim()) return task.oilType.trim();
+  const lp = getPlatformSdk().lubricationPoints.findByLpId(lpId);
+  return lp?.lubricant?.trim() || '—';
+}
+
+function resolveReportStatus(sample: OilSampleRow | null): string {
+  if (!sample) return 'No sample';
+  if (sample.approvalStatus === 'locked' || sample.approvalStatus === 'approved') {
+    return 'Approved';
+  }
+  if (sample.approvalStatus === 'under-review') return 'Under review';
+  if (sample.approvalStatus === 'pending') return 'Pending approval';
+  if (sample.pdfImportStatus === 'pending-review') return 'PDF pending review';
+  if (!hasLabResults(sample)) return 'Awaiting lab results';
+  return 'Analysed';
+}
+
+function latestSampleByLp(samples: readonly OilSampleRow[]): Map<string, OilSampleRow> {
+  const map = new Map<string, OilSampleRow>();
+  for (const sample of samples) {
+    const lpId = sample.lubricationPointId?.trim();
+    if (!lpId) continue;
+    const existing = map.get(lpId);
+    if (!existing || sample.sampledAt.localeCompare(existing.sampledAt) > 0) {
+      map.set(lpId, sample);
+    }
+  }
+  return map;
+}
+
+function buildScopedLpRows(
+  scope: OilAnalysisContractorScope,
+  contractorFilter?: string,
+): ScopedLpRow[] {
+  const latestByLp = latestSampleByLp(oilSampleService.list());
+  const baseRows = lpRegisterService.buildRows(scope);
+  const contractorScoped = applyContractorScope(scope, contractorFilter);
+
+  return baseRows
+    .filter((row) => !contractorScoped || row.contractorId === contractorScoped)
+    .map((row) => {
+      const sample = latestByLp.get(row.lpId) ?? null;
+      return {
+        lpId: row.lpId,
+        equipmentId: row.equipmentId,
+        equipmentName: row.equipmentName,
+        area: row.area,
+        contractorId: row.contractorId,
+        oilType: resolveOilType(row.lpId),
+        lastSampleStatus: row.lastSampleStatus,
+        isSampleOverdue: row.isSampleOverdue,
+        nextSampleDate: row.nextSampleDate,
+        lastSampleDate: row.lastSampleDate,
+        reportStatus: resolveReportStatus(sample),
+        latestSample: sample,
+      };
+    });
+}
+
+function matchesDateRange(iso: string | null, from?: string, to?: string): boolean {
+  if (!iso) return !from && !to;
+  if (from && iso < from) return false;
+  if (to && iso > to) return false;
+  return true;
+}
+
+function matchesLpFilters(
+  row: ScopedLpRow,
+  filters: OilReportFilters,
+): boolean {
+  if (filters.lpIds && filters.lpIds.length > 0 && !filters.lpIds.includes(row.lpId)) {
+    return false;
+  }
+  if (filters.equipmentId && row.equipmentId !== filters.equipmentId) return false;
+  if (filters.area && row.area !== filters.area) return false;
+  if (filters.oilType && row.oilType !== filters.oilType) return false;
+  if (filters.reportStatus && row.reportStatus !== filters.reportStatus) return false;
+
+  if (filters.equipmentStatus) {
+    if (filters.equipmentStatus === 'overdue') {
+      if (!row.isSampleOverdue) return false;
+    } else if (row.lastSampleStatus !== filters.equipmentStatus) {
+      return false;
+    }
+  }
+
+  if (filters.dateFrom || filters.dateTo) {
+    const inRange =
+      matchesDateRange(row.lastSampleDate, filters.dateFrom, filters.dateTo) ||
+      matchesDateRange(row.nextSampleDate, filters.dateFrom, filters.dateTo);
+    if (!inRange) return false;
+  }
+
+  return true;
+}
+
+function matchesSampleFilters(sample: OilSampleRow, filters: OilReportFilters): boolean {
+  if (!matchesDateRange(sample.sampledAt, filters.dateFrom, filters.dateTo)) return false;
+  if (filters.lpIds && filters.lpIds.length > 0) {
+    const lpId = sample.lubricationPointId?.trim() ?? '';
+    if (!lpId || !filters.lpIds.includes(lpId)) return false;
+  }
+  if (filters.equipmentId && sample.equipmentId !== filters.equipmentId) return false;
+  if (filters.area && sample.area !== filters.area) return false;
+  if (filters.contractor && sample.contractorId !== filters.contractor) return false;
+  if (filters.oilType) {
+    const lpId = sample.lubricationPointId?.trim() ?? '';
+    if (!lpId || resolveOilType(lpId) !== filters.oilType) return false;
+  }
+  if (filters.sampleId) {
+    const q = filters.sampleId.trim().toLowerCase();
+    const haystack = [sample.sampleId, sample.labSampleId, sample.id].join(' ').toLowerCase();
+    if (!haystack.includes(q)) return false;
+  }
+  if (filters.reportStatus) {
+    if (resolveReportStatus(sample) !== filters.reportStatus) return false;
+  }
+  if (filters.equipmentStatus) {
+    const cond = computeSampleCondition(sample);
+    const mapped =
+      cond === 'critical'
+        ? 'alert'
+        : cond === 'caution' || cond === 'monitor'
+          ? 'caution'
+          : cond === 'normal'
+            ? 'normal'
+            : cond === 'pending'
+              ? 'pending'
+              : 'none';
+    if (filters.equipmentStatus === 'overdue') return false;
+    if (mapped !== filters.equipmentStatus) return false;
+  }
+  return true;
+}
+
+function scopedSamples(
+  scope: OilAnalysisContractorScope,
+  filters: OilReportFilters,
+): OilSampleRow[] {
+  const contractorScoped = applyContractorScope(scope, filters.contractor);
+  return oilSampleService.list().filter((sample) => {
+    if (contractorScoped && sample.contractorId !== contractorScoped) return false;
+    return matchesSampleFilters(sample, filters);
+  });
+}
+
+function scopedLpRows(
+  scope: OilAnalysisContractorScope,
+  filters: OilReportFilters,
+): ScopedLpRow[] {
+  return buildScopedLpRows(scope, filters.contractor).filter((row) =>
+    matchesLpFilters(row, filters),
+  );
+}
 
 function isEngineeringEligible(row: OilSampleRow): boolean {
   if (!hasLabResults(row)) return false;
   return isSampleResultFinalized(row);
 }
 
-function matchesDateRange(row: OilSampleRow, filters: OilReportFilters): boolean {
-  const from = filters.dateFrom?.trim();
-  const to = filters.dateTo?.trim();
-  if (from && row.sampledAt < from) return false;
-  if (to && row.sampledAt > to) return false;
-  return true;
-}
-
-function matchesCommonFilters(row: OilSampleRow, filters: OilReportFilters): boolean {
-  if (!matchesDateRange(row, filters)) return false;
-  if (filters.area && row.area !== filters.area) return false;
-  if (filters.contractor && row.contractorId !== filters.contractor) return false;
-  if (filters.condition && computeSampleCondition(row) !== filters.condition) return false;
-  const q = filters.equipmentSearch?.trim().toLowerCase() ?? '';
-  if (q) {
-    const haystack = [
-      row.equipmentId,
-      row.lubricationPointId ?? '',
-      row.sampleId,
-      row.labSampleId,
-    ].join(' ').toLowerCase();
-    if (!haystack.includes(q)) return false;
-  }
-  return true;
-}
-
-function groupBy(
-  rows: readonly OilSampleRow[],
-  keyFn: (row: OilSampleRow) => string,
+function groupBy<T>(
+  rows: readonly T[],
+  keyFn: (row: T) => string,
 ): readonly GroupCountRow[] {
   const map = new Map<string, number>();
   for (const row of rows) {
@@ -193,54 +311,20 @@ function groupBy(
     .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
 }
 
-function listAbnormalFields(row: OilSampleRow): string[] {
-  const fields: string[] = [];
-
-  const paramChecks: readonly { id: OilAnalysisParameterId; value: number | null }[] = [
-    { id: 'iron', value: row.ironPpm },
-    { id: 'copper', value: row.copperPpm },
-    { id: 'silicon', value: row.siliconPpm },
-    { id: 'water', value: row.waterPercent },
-    { id: 'pqIndex', value: row.pqIndex },
-    { id: 'viscosity', value: row.viscosity100c },
-    { id: 'tan', value: row.tan },
-    { id: 'oxidation', value: row.oxidation },
-    {
-      id: 'particleCount',
-      value: [row.particle4, row.particle6, row.particle14]
-        .filter((v): v is number => v !== null && Number.isFinite(v))
-        .reduce((max, v) => Math.max(max, v), Number.NEGATIVE_INFINITY) === Number.NEGATIVE_INFINITY
-        ? null
-        : Math.max(
-            ...( [row.particle4, row.particle6, row.particle14].filter(
-              (v): v is number => v !== null && Number.isFinite(v),
-            ) ),
-          ),
-    },
-  ];
-
-  for (const { id, value } of paramChecks) {
-    const level = evaluateParameterCondition(id, value);
-    if (level && level !== 'normal') fields.push(`${id}:${level}`);
+function isPendingReviewRow(row: OilSampleRow): boolean {
+  if (row.status === 'needs-lp-mapping') return true;
+  if (!row.lubricationPointId) return true;
+  if (row.pdfImportStatus === 'pending-review') return true;
+  if (row.status === 'imported' || row.status === 'linked' || row.status === 'pending-review') {
+    return true;
   }
+  return false;
+}
 
-  if (row.resultStatus && row.resultStatus !== 'normal') {
-    fields.push(`resultStatus:${row.resultStatus}`);
-  }
-  if (row.alertType.trim()) fields.push(`alert:${row.alertType.trim()}`);
-
-  for (const [label, value] of [
-    ['contamination', row.contaminationRating],
-    ['equipment', row.equipmentRating],
-    ['lubricant', row.lubricantRating],
-  ] as const) {
-    const level = parseRatingLevel(value);
-    if (level === 'caution' || level === 'critical' || level === 'monitor') {
-      fields.push(`${label}:${level}`);
-    }
-  }
-
-  return fields;
+function isPendingApprovalRow(row: OilSampleRow): boolean {
+  if (!hasLabResults(row)) return false;
+  if (!isApprovalWorkflowEnabled()) return false;
+  return row.approvalStatus === 'pending' || row.approvalStatus === 'under-review';
 }
 
 function pendingReason(row: OilSampleRow): string {
@@ -253,205 +337,642 @@ function pendingReason(row: OilSampleRow): string {
   }
   if (hasLabResults(row) && row.approvalStatus === 'pending') reasons.push('pending-approval');
   if (row.approvalStatus === 'under-review') reasons.push('under-review');
-  if (hasLabResults(row) && isApprovalWorkflowEnabled() && !row.approvalStatus) {
-    reasons.push('awaiting-review');
-  }
   return reasons.join(', ') || row.status;
 }
 
-function isPendingReviewRow(row: OilSampleRow): boolean {
-  if (row.status === 'needs-lp-mapping') return true;
-  if (!row.lubricationPointId) return true;
-  if (row.pdfImportStatus === 'pending-review') return true;
-  if (row.status === 'imported' || row.status === 'linked' || row.status === 'pending-review') return true;
-  if (hasLabResults(row) && isApprovalWorkflowEnabled()
-    && (row.approvalStatus === 'pending' || row.approvalStatus === 'under-review')) {
-    return true;
-  }
-  return false;
+function monthKey(iso: string): string {
+  return iso.slice(0, 7);
 }
 
-function trendDirectionForLp(
-  equipmentId: string,
-  lubricationPointId: string | null,
-): TrendDirection | null {
-  if (!lubricationPointId) return null;
-  try {
-    const analysis = analyzeOilParameterTrend({
-      equipmentId,
-      lubricationPointId,
-      parameterId: 'iron',
-      timeRange: '1y',
-    });
-    if (analysis.summary.sampleCount < 2) return null;
-    return analysis.summary.direction;
-  } catch {
-    return null;
-  }
+function formatMonthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split('-');
+  const d = new Date(Number(year), Number(month) - 1, 1);
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
 }
 
-function dataRevisionToken(): string {
-  return oilSampleService.list().map((s) => `${s.id}:${s.updatedAt}`).join('|');
+function lpTableColumns(): OilReportColumn[] {
+  return [
+    { id: 'lpId', label: 'LP_ID' },
+    { id: 'equipmentId', label: 'Equipment_ID' },
+    { id: 'equipmentName', label: 'Equipment' },
+    { id: 'area', label: 'Area' },
+    { id: 'contractorId', label: 'Contractor' },
+    { id: 'oilType', label: 'Oil Type' },
+    { id: 'lastSampleDate', label: 'Last Sample' },
+    { id: 'nextSampleDate', label: 'Next Sample' },
+    { id: 'status', label: 'Status' },
+    { id: 'reportStatus', label: 'Report Status' },
+  ];
+}
+
+function lpToTableRow(row: ScopedLpRow): Record<string, string | number | null> {
+  return {
+    lpId: row.lpId,
+    equipmentId: row.equipmentId,
+    equipmentName: row.equipmentName,
+    area: row.area,
+    contractorId: row.contractorId,
+    oilType: row.oilType,
+    lastSampleDate: row.lastSampleDate ?? '—',
+    nextSampleDate: row.nextSampleDate ?? '—',
+    status: row.lastSampleStatus,
+    reportStatus: row.reportStatus,
+  };
+}
+
+function sampleTableColumns(): OilReportColumn[] {
+  return [
+    { id: 'sampleId', label: 'Sample ID' },
+    { id: 'equipmentId', label: 'Equipment_ID' },
+    { id: 'lpId', label: 'LP_ID' },
+    { id: 'labSampleId', label: 'Lab Sample ID' },
+    { id: 'sampledAt', label: 'Sample Date' },
+    { id: 'condition', label: 'Condition' },
+    { id: 'approvalStatus', label: 'Approval' },
+    { id: 'contractorId', label: 'Contractor' },
+  ];
+}
+
+function sampleToTableRow(row: OilSampleRow): Record<string, string | number | null> {
+  return {
+    sampleId: row.sampleId,
+    equipmentId: row.equipmentId,
+    lpId: row.lubricationPointId ?? '—',
+    labSampleId: row.labSampleId,
+    sampledAt: row.sampledAt,
+    condition: computeSampleCondition(row),
+    approvalStatus: row.approvalStatus ?? '—',
+    contractorId: row.contractorId,
+  };
+}
+
+function buildReference(reportType: OilReportType, generatedAt: string): string {
+  const date = generatedAt.slice(0, 10).replace(/-/g, '');
+  return `OA-RPT-${reportType.toUpperCase().replace(/-/g, '')}-${date}`;
 }
 
 // ── Report builders ───────────────────────────────────────────────────────────
 
-function buildSampleSummary(rows: readonly OilSampleRow[]): SampleSummaryReport {
-  const eligible = rows.filter(isEngineeringEligible);
-  return {
-    kind: 'sample-summary',
-    sampleCount: eligible.length,
-    byEquipment: groupBy(eligible, (r) => r.equipmentId),
-    byArea: groupBy(eligible, (r) => r.area),
-    byContractor: groupBy(eligible, (r) => r.contractorId),
-    byStatus: groupBy(eligible, (r) => r.status),
-    byCondition: groupBy(eligible, (r) => computeSampleCondition(r)),
-  };
-}
+function buildReport(
+  scope: OilAnalysisContractorScope,
+  filters: OilReportFilters,
+): OilReportResult {
+  const template = findReportTemplate(filters.reportType);
+  const title = template?.labelEn ?? filters.reportType;
+  const samples = scopedSamples(scope, filters);
+  const lpRows = scopedLpRows(scope, filters);
 
-function buildCriticalSamples(rows: readonly OilSampleRow[]): CriticalSamplesReport {
-  const eligible = rows.filter((row) => {
-    if (!isEngineeringEligible(row)) return false;
-    const cond = computeSampleCondition(row);
-    return cond === 'critical' || cond === 'caution';
-  });
-
-  return {
-    kind: 'critical-samples',
-    rows: eligible.map((row) => ({
-      sampleId: row.sampleId,
-      equipmentId: row.equipmentId,
-      lubricationPointId: row.lubricationPointId ?? '—',
-      labSampleId: row.labSampleId,
-      alertType: row.alertType || '—',
-      condition: computeSampleCondition(row),
-      abnormalFields: listAbnormalFields(row).join('; ') || '—',
-      approvalStatus: row.approvalStatus ?? '—',
-      sampledAt: row.sampledAt,
-    })),
-  };
-}
-
-function buildPendingReview(rows: readonly OilSampleRow[]): PendingReviewReport {
-  const pending = rows.filter(isPendingReviewRow);
-  return {
-    kind: 'pending-review',
-    pdfPendingCount: pending.filter((r) => r.pdfImportStatus === 'pending-review').length,
-    missingLpCount: pending.filter((r) => !r.lubricationPointId).length,
-    rows: pending.map((row) => ({
-      sampleId: row.sampleId,
-      equipmentId: row.equipmentId,
-      lubricationPointId: row.lubricationPointId ?? '—',
-      labSampleId: row.labSampleId,
-      status: row.status,
-      approvalStatus: row.approvalStatus ?? '—',
-      pdfImportStatus: row.pdfImportStatus,
-      pendingReason: pendingReason(row),
-      sampledAt: row.sampledAt,
-    })),
-  };
-}
-
-function buildLaboratoryResults(rows: readonly OilSampleRow[]): LaboratoryResultsReport {
-  const eligible = rows.filter(isEngineeringEligible);
-  return {
-    kind: 'laboratory-results',
-    rows: eligible.map((row) => ({
-      sampleId: row.sampleId,
-      equipmentId: row.equipmentId,
-      lubricationPointId: row.lubricationPointId ?? '—',
-      labSampleId: row.labSampleId,
-      sampledAt: row.sampledAt,
-      ironPpm: row.ironPpm,
-      copperPpm: row.copperPpm,
-      siliconPpm: row.siliconPpm,
-      waterPercent: row.waterPercent,
-      pqIndex: row.pqIndex,
-      viscosity100c: row.viscosity100c,
-      tan: row.tan,
-      oxidation: row.oxidation,
-      particleCount: row.particle6,
-      approvalStatus: row.approvalStatus ?? '—',
-    })),
-  };
-}
-
-function buildOilHealth(rows: readonly OilSampleRow[]): OilHealthReport {
-  const eligible = rows.filter(isTrendEligibleSample);
-  const latestByKey = new Map<string, OilSampleRow>();
-
-  for (const row of eligible) {
-    const key = `${row.equipmentId}::${row.lubricationPointId ?? ''}`;
-    const existing = latestByKey.get(key);
-    if (!existing || row.sampledAt > existing.sampledAt) {
-      latestByKey.set(key, row);
+  switch (filters.reportType) {
+    case 'sample-summary': {
+      const eligible = samples.filter(isEngineeringEligible);
+      const breakdowns: OilReportBreakdown[] = [
+        { title: 'By Equipment', rows: groupBy(eligible, (r) => r.equipmentId) },
+        { title: 'By Area', rows: groupBy(eligible, (r) => r.area) },
+        { title: 'By Contractor', rows: groupBy(eligible, (r) => r.contractorId) },
+        { title: 'By Condition', rows: groupBy(eligible, (r) => computeSampleCondition(r)) },
+      ];
+      const byCond = breakdowns[3]!.rows;
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: sampleTableColumns(),
+        tableRows: eligible.map(sampleToTableRow),
+        breakdowns,
+        charts: [
+          {
+            title: 'Condition Distribution',
+            slices: byCond.map((r) => ({
+              label: r.key,
+              value: r.count,
+              color:
+                r.key === 'critical'
+                  ? '#dc2626'
+                  : r.key === 'caution'
+                    ? '#d97706'
+                    : r.key === 'normal'
+                      ? '#16a34a'
+                      : '#6366f1',
+            })),
+          },
+        ],
+      };
     }
+
+    case 'samples-by-period': {
+      const eligible = samples.filter(isEngineeringEligible);
+      const months = groupBy(eligible, (r) => monthKey(r.sampledAt));
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: [
+          { id: 'period', label: 'Period' },
+          { id: 'count', label: 'Samples' },
+        ],
+        tableRows: months.map((m) => ({
+          period: formatMonthLabel(m.key),
+          count: m.count,
+        })),
+        breakdowns: [],
+        charts: [
+          {
+            title: 'Monthly Sample Volume',
+            slices: months.map((m) => ({
+              label: formatMonthLabel(m.key),
+              value: m.count,
+            })),
+          },
+        ],
+      };
+    }
+
+    case 'pending-reviews': {
+      const pending = samples.filter(isPendingReviewRow);
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: [
+          { id: 'sampleId', label: 'Sample ID' },
+          { id: 'equipmentId', label: 'Equipment_ID' },
+          { id: 'lpId', label: 'LP_ID' },
+          { id: 'sampledAt', label: 'Sample Date' },
+          { id: 'status', label: 'Status' },
+          { id: 'pendingReason', label: 'Pending Reason' },
+        ],
+        tableRows: pending.map((r) => ({
+          sampleId: r.sampleId,
+          equipmentId: r.equipmentId,
+          lpId: r.lubricationPointId ?? '—',
+          sampledAt: r.sampledAt,
+          status: r.status,
+          pendingReason: pendingReason(r),
+        })),
+        breakdowns: [],
+        charts: [],
+      };
+    }
+
+    case 'pending-approvals': {
+      const pending = samples.filter(isPendingApprovalRow);
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: [
+          { id: 'sampleId', label: 'Sample ID' },
+          { id: 'equipmentId', label: 'Equipment_ID' },
+          { id: 'lpId', label: 'LP_ID' },
+          { id: 'sampledAt', label: 'Sample Date' },
+          { id: 'condition', label: 'Condition' },
+          { id: 'approvalStatus', label: 'Approval Status' },
+        ],
+        tableRows: pending.map((r) => ({
+          sampleId: r.sampleId,
+          equipmentId: r.equipmentId,
+          lpId: r.lubricationPointId ?? '—',
+          sampledAt: r.sampledAt,
+          condition: computeSampleCondition(r),
+          approvalStatus: r.approvalStatus ?? '—',
+        })),
+        breakdowns: [],
+        charts: [],
+      };
+    }
+
+    case 'alert-equipment':
+    case 'caution-equipment':
+    case 'normal-equipment': {
+      const statusMap: Record<string, LpRegisterConditionStatus> = {
+        'alert-equipment': 'alert',
+        'caution-equipment': 'caution',
+        'normal-equipment': 'normal',
+      };
+      const target = statusMap[filters.reportType]!;
+      const filtered = lpRows.filter((r) => r.lastSampleStatus === target);
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: lpTableColumns(),
+        tableRows: filtered.map(lpToTableRow),
+        breakdowns: [
+          { title: 'By Area', rows: groupBy(filtered, (r) => r.area) },
+          { title: 'By Contractor', rows: groupBy(filtered, (r) => r.contractorId) },
+        ],
+        charts: [],
+      };
+    }
+
+    case 'critical-equipment': {
+      const criticalSamples = samples.filter(
+        (s) => isEngineeringEligible(s) && computeSampleCondition(s) === 'critical',
+      );
+      const equipmentIds = new Set(criticalSamples.map((s) => s.equipmentId));
+      const filtered = lpRows.filter(
+        (r) =>
+          equipmentIds.has(r.equipmentId) ||
+          r.lastSampleStatus === 'alert' ||
+          (r.latestSample !== null &&
+            computeSampleCondition(r.latestSample) === 'critical'),
+      );
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: lpTableColumns(),
+        tableRows: filtered.map(lpToTableRow),
+        breakdowns: [],
+        charts: [],
+      };
+    }
+
+    case 'equipment-history': {
+      const eligible = samples
+        .filter(isEngineeringEligible)
+        .sort((a, b) => b.sampledAt.localeCompare(a.sampledAt));
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: sampleTableColumns(),
+        tableRows: eligible.map(sampleToTableRow),
+        breakdowns: [
+          { title: 'By Equipment', rows: groupBy(eligible, (r) => r.equipmentId) },
+        ],
+        charts: [],
+      };
+    }
+
+    case 'lp-history': {
+      const eligible = samples
+        .filter((s) => isEngineeringEligible(s) && Boolean(s.lubricationPointId))
+        .sort((a, b) => b.sampledAt.localeCompare(a.sampledAt));
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: sampleTableColumns(),
+        tableRows: eligible.map(sampleToTableRow),
+        breakdowns: [
+          { title: 'By LP', rows: groupBy(eligible, (r) => r.lubricationPointId ?? '—') },
+        ],
+        charts: [],
+      };
+    }
+
+    case 'oil-type-history': {
+      const eligible = samples.filter(isEngineeringEligible);
+      const withOil = eligible.map((s) => ({
+        sample: s,
+        oilType: s.lubricationPointId ? resolveOilType(s.lubricationPointId) : s.lubricant || '—',
+      }));
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: [
+          ...sampleTableColumns(),
+          { id: 'oilType', label: 'Oil Type' },
+        ],
+        tableRows: withOil.map(({ sample, oilType }) => ({
+          ...sampleToTableRow(sample),
+          oilType,
+        })),
+        breakdowns: [
+          { title: 'By Oil Type', rows: groupBy(withOil, (r) => r.oilType) },
+        ],
+        charts: [
+          {
+            title: 'Oil Type Distribution',
+            slices: groupBy(withOil, (r) => r.oilType).map((r) => ({
+              label: r.key,
+              value: r.count,
+            })),
+          },
+        ],
+      };
+    }
+
+    case 'contractor-performance': {
+      const byContractor = groupBy(lpRows, (r) => r.contractorId);
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: [
+          { id: 'contractorId', label: 'Contractor' },
+          { id: 'totalLps', label: 'Total LPs' },
+          { id: 'alert', label: 'Alert' },
+          { id: 'caution', label: 'Caution' },
+          { id: 'normal', label: 'Normal' },
+          { id: 'overdue', label: 'Overdue' },
+          { id: 'compliancePct', label: 'Compliance %' },
+        ],
+        tableRows: byContractor.map((g) => {
+          const rows = lpRows.filter((r) => r.contractorId === g.key);
+          const overdue = rows.filter((r) => r.isSampleOverdue).length;
+          const compliant = rows.length - overdue;
+          return {
+            contractorId: g.key,
+            totalLps: rows.length,
+            alert: rows.filter((r) => r.lastSampleStatus === 'alert').length,
+            caution: rows.filter((r) => r.lastSampleStatus === 'caution').length,
+            normal: rows.filter((r) => r.lastSampleStatus === 'normal').length,
+            overdue,
+            compliancePct: rows.length > 0 ? Math.round((compliant / rows.length) * 100) : 0,
+          };
+        }),
+        breakdowns: [],
+        charts: [],
+      };
+    }
+
+    case 'kpi-summary': {
+      const kpis = computeScopedKpis(lpRows);
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: [
+          { id: 'metric', label: 'Metric' },
+          { id: 'value', label: 'Value' },
+        ],
+        tableRows: [
+          { metric: 'Total LPs', value: kpis.total },
+          { metric: 'Normal', value: kpis.normal },
+          { metric: 'Caution', value: kpis.caution },
+          { metric: 'Alert', value: kpis.alert },
+          { metric: 'Pending', value: kpis.pending },
+          { metric: 'No Sample', value: kpis.noSample },
+          { metric: 'Overdue Sampling', value: kpis.overdue },
+        ],
+        breakdowns: [],
+        charts: [
+          {
+            title: 'Equipment Health',
+            slices: [
+              { label: 'Alert', value: kpis.alert, color: '#dc2626' },
+              { label: 'Caution', value: kpis.caution, color: '#d97706' },
+              { label: 'Normal', value: kpis.normal, color: '#16a34a' },
+              { label: 'Pending', value: kpis.pending, color: '#6366f1' },
+              { label: 'No sample', value: kpis.noSample, color: '#94a3b8' },
+            ],
+          },
+        ],
+      };
+    }
+
+    case 'monthly-summary': {
+      const eligible = samples.filter(isEngineeringEligible);
+      const months = groupBy(eligible, (r) => monthKey(r.sampledAt));
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: [
+          { id: 'period', label: 'Month' },
+          { id: 'samples', label: 'Samples' },
+          { id: 'critical', label: 'Critical' },
+          { id: 'caution', label: 'Caution' },
+        ],
+        tableRows: months.map((m) => {
+          const monthSamples = eligible.filter((s) => monthKey(s.sampledAt) === m.key);
+          return {
+            period: formatMonthLabel(m.key),
+            samples: m.count,
+            critical: monthSamples.filter((s) => computeSampleCondition(s) === 'critical').length,
+            caution: monthSamples.filter(
+              (s) => {
+                const c = computeSampleCondition(s);
+                return c === 'caution' || c === 'monitor';
+              },
+            ).length,
+          };
+        }),
+        breakdowns: [],
+        charts: [
+          {
+            title: 'Monthly Samples',
+            slices: months.map((m) => ({ label: formatMonthLabel(m.key), value: m.count })),
+          },
+        ],
+      };
+    }
+
+    case 'area-summary': {
+      const byArea = groupBy(lpRows, (r) => r.area);
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: [
+          { id: 'area', label: 'Area' },
+          { id: 'totalLps', label: 'Total LPs' },
+          { id: 'alert', label: 'Alert' },
+          { id: 'caution', label: 'Caution' },
+          { id: 'normal', label: 'Normal' },
+          { id: 'overdue', label: 'Overdue' },
+        ],
+        tableRows: byArea.map((g) => {
+          const rows = lpRows.filter((r) => r.area === g.key);
+          return {
+            area: g.key,
+            totalLps: rows.length,
+            alert: rows.filter((r) => r.lastSampleStatus === 'alert').length,
+            caution: rows.filter((r) => r.lastSampleStatus === 'caution').length,
+            normal: rows.filter((r) => r.lastSampleStatus === 'normal').length,
+            overdue: rows.filter((r) => r.isSampleOverdue).length,
+          };
+        }),
+        breakdowns: [],
+        charts: [
+          {
+            title: 'LPs by Area',
+            slices: byArea.map((r) => ({ label: r.key, value: r.count })),
+          },
+        ],
+      };
+    }
+
+    case 'contractor-comparison': {
+      if (!scope.canViewAllContractors) {
+        return {
+          kind: filters.reportType,
+          title,
+          tableColumns: [],
+          tableRows: [],
+          breakdowns: [],
+          charts: [],
+        };
+      }
+      const contractors = distinctSorted(lpRows.map((r) => r.contractorId));
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: [
+          { id: 'contractorId', label: 'Contractor' },
+          { id: 'alert', label: 'Alert' },
+          { id: 'caution', label: 'Caution' },
+          { id: 'normal', label: 'Normal' },
+          { id: 'overdue', label: 'Overdue' },
+        ],
+        tableRows: contractors.map((contractorId) => {
+          const rows = lpRows.filter((r) => r.contractorId === contractorId);
+          return {
+            contractorId,
+            alert: rows.filter((r) => r.lastSampleStatus === 'alert').length,
+            caution: rows.filter((r) => r.lastSampleStatus === 'caution').length,
+            normal: rows.filter((r) => r.lastSampleStatus === 'normal').length,
+            overdue: rows.filter((r) => r.isSampleOverdue).length,
+          };
+        }),
+        breakdowns: [],
+        charts: contractors.map((contractorId) => {
+          const rows = lpRows.filter((r) => r.contractorId === contractorId);
+          return {
+            title: contractorId,
+            slices: [
+              { label: 'Alert', value: rows.filter((r) => r.lastSampleStatus === 'alert').length, color: '#dc2626' },
+              { label: 'Caution', value: rows.filter((r) => r.lastSampleStatus === 'caution').length, color: '#d97706' },
+              { label: 'Normal', value: rows.filter((r) => r.lastSampleStatus === 'normal').length, color: '#16a34a' },
+            ],
+          };
+        }),
+      };
+    }
+
+    case 'sampling-compliance': {
+      const compliant = lpRows.filter((r) => !r.isSampleOverdue && r.lastSampleDate);
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: lpTableColumns(),
+        tableRows: compliant.map(lpToTableRow),
+        breakdowns: [
+          { title: 'By Contractor', rows: groupBy(compliant, (r) => r.contractorId) },
+        ],
+        charts: [],
+      };
+    }
+
+    case 'overdue-sampling': {
+      const overdue = lpRows.filter((r) => r.isSampleOverdue);
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: lpTableColumns(),
+        tableRows: overdue.map(lpToTableRow),
+        breakdowns: [
+          { title: 'By Area', rows: groupBy(overdue, (r) => r.area) },
+        ],
+        charts: [
+          {
+            title: 'Overdue by Area',
+            slices: groupBy(overdue, (r) => r.area).map((r) => ({
+              label: r.key,
+              value: r.count,
+              color: '#ca8a04',
+            })),
+          },
+        ],
+      };
+    }
+
+    case 'oil-change-compliance': {
+      const contractorScoped = applyContractorScope(scope, filters.contractor);
+      const tasks = oilChangeService.listTasks().filter((task) => {
+        if (contractorScoped && task.contractorId !== contractorScoped) return false;
+        if (filters.area && task.area !== filters.area) return false;
+        if (filters.equipmentId && task.equipmentId !== filters.equipmentId) return false;
+        if (filters.lpIds && filters.lpIds.length > 0 && !filters.lpIds.includes(task.lpId)) {
+          return false;
+        }
+        return true;
+      });
+
+      const taskRow = (task: OcTask): Record<string, string | number | null> => ({
+        lpId: task.lpId,
+        equipmentId: task.equipmentId,
+        equipmentName: task.equipmentName,
+        area: task.area,
+        contractorId: task.contractorId,
+        oilType: task.oilType,
+        status: task.status,
+        dueDate: task.dueDate ?? '—',
+        lastChangeDate: task.lastChangeDate ?? '—',
+      });
+
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: [
+          { id: 'lpId', label: 'LP_ID' },
+          { id: 'equipmentId', label: 'Equipment_ID' },
+          { id: 'equipmentName', label: 'Equipment' },
+          { id: 'area', label: 'Area' },
+          { id: 'contractorId', label: 'Contractor' },
+          { id: 'oilType', label: 'Oil Type' },
+          { id: 'status', label: 'Status' },
+          { id: 'dueDate', label: 'Due Date' },
+          { id: 'lastChangeDate', label: 'Last Change' },
+        ],
+        tableRows: tasks.map(taskRow),
+        breakdowns: [
+          { title: 'By Status', rows: groupBy(tasks, (t) => t.status) },
+        ],
+        charts: [
+          {
+            title: 'Oil Change Status',
+            slices: groupBy(tasks, (t) => t.status).map((r) => ({
+              label: r.key,
+              value: r.count,
+            })),
+          },
+        ],
+      };
+    }
+
+    case 'missing-samples': {
+      const missing = lpRows.filter((r) => r.lastSampleStatus === 'none');
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: lpTableColumns(),
+        tableRows: missing.map(lpToTableRow),
+        breakdowns: [
+          { title: 'By Area', rows: groupBy(missing, (r) => r.area) },
+          { title: 'By Contractor', rows: groupBy(missing, (r) => r.contractorId) },
+        ],
+        charts: [],
+      };
+    }
+
+    default:
+      return {
+        kind: filters.reportType,
+        title,
+        tableColumns: [],
+        tableRows: [],
+        breakdowns: [],
+        charts: [],
+      };
   }
-
-  const healthRows: OilHealthRow[] = [...latestByKey.values()]
-    .sort((a, b) => a.equipmentId.localeCompare(b.equipmentId))
-    .map((row) => ({
-      equipmentId: row.equipmentId,
-      lubricationPointId: row.lubricationPointId ?? '—',
-      sampleId: row.sampleId,
-      labSampleId: row.labSampleId,
-      condition: computeSampleCondition(row),
-      lastSampleDate: row.sampledAt,
-      trendDirection: trendDirectionForLp(row.equipmentId, row.lubricationPointId),
-    }));
-
-  return { kind: 'oil-health', rows: healthRows };
 }
 
 function buildKpis(report: OilReportResult): readonly OilReportKpis[] {
+  const rowCount = report.tableRows.length;
   switch (report.kind) {
     case 'sample-summary':
       return [
-        { total: report.sampleCount, label: 'samples', value: report.sampleCount },
-        { total: report.sampleCount, label: 'equipment', value: report.byEquipment.length },
-        { total: report.sampleCount, label: 'areas', value: report.byArea.length },
-        { total: report.sampleCount, label: 'contractors', value: report.byContractor.length },
+        { label: 'samples', value: rowCount },
+        { label: 'breakdowns', value: report.breakdowns.length },
       ];
-    case 'critical-samples':
-      return [
-        { total: report.rows.length, label: 'critical/caution', value: report.rows.length },
-        {
-          total: report.rows.length,
-          label: 'critical',
-          value: report.rows.filter((r) => r.condition === 'critical').length,
-        },
-        {
-          total: report.rows.length,
-          label: 'caution',
-          value: report.rows.filter((r) => r.condition === 'caution').length,
-        },
-      ];
-    case 'pending-review':
-      return [
-        { total: report.rows.length, label: 'pending', value: report.rows.length },
-        { total: report.rows.length, label: 'pdf-pending', value: report.pdfPendingCount },
-        { total: report.rows.length, label: 'missing-lp', value: report.missingLpCount },
-      ];
-    case 'laboratory-results':
-      return [
-        { total: report.rows.length, label: 'approved-results', value: report.rows.length },
-      ];
-    case 'oil-health':
-      return [
-        { total: report.rows.length, label: 'equipment-lp', value: report.rows.length },
-        {
-          total: report.rows.length,
-          label: 'critical',
-          value: report.rows.filter((r) => r.condition === 'critical').length,
-        },
-        {
-          total: report.rows.length,
-          label: 'caution',
-          value: report.rows.filter((r) => r.condition === 'caution').length,
-        },
-      ];
+    case 'pending-reviews':
+      return [{ label: 'pending', value: rowCount }];
+    case 'pending-approvals':
+      return [{ label: 'pending-approval', value: rowCount }];
+    case 'kpi-summary':
+      return report.tableRows.map((r) => ({
+        label: String(r.metric ?? ''),
+        value: Number(r.value ?? 0),
+      }));
+    case 'overdue-sampling':
+      return [{ label: 'overdue', value: rowCount }];
+    case 'missing-samples':
+      return [{ label: 'missing', value: rowCount }];
+    case 'contractor-comparison':
+      return [{ label: 'contractors', value: rowCount }];
     default:
-      return [];
+      return [{ label: 'records', value: rowCount }];
   }
 }
 
@@ -487,72 +1008,77 @@ class OilReportCache {
 
 const reportCache = new OilReportCache();
 
-function cacheKey(filters: OilReportFilters): string {
-  return [
-    filters.reportType,
-    filters.dateFrom ?? '',
-    filters.dateTo ?? '',
-    filters.area ?? '',
-    filters.contractor ?? '',
-    filters.equipmentSearch ?? '',
-    filters.condition ?? '',
-    dataRevisionToken(),
-  ].join('|');
+function dataRevisionToken(): string {
+  return oilSampleService.list().map((s) => `${s.id}:${s.updatedAt}`).join('|');
+}
+
+function cacheKey(scope: OilAnalysisContractorScope, filters: OilReportFilters): string {
+  return JSON.stringify({
+    scope: scope.lockedContractorId,
+    all: scope.canViewAllContractors,
+    filters,
+    rev: dataRevisionToken(),
+  });
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export function listReportAreas(): string[] {
-  const areas = new Set<string>();
-  for (const row of oilSampleService.list()) {
-    if (row.area.trim()) areas.add(row.area);
-  }
-  return [...areas].sort();
+export function getReportFilterOptions(
+  scope: OilAnalysisContractorScope,
+): OilReportFilterOptions {
+  const lpRows = buildScopedLpRows(scope);
+  const samples = scopedSamples(scope, { reportType: 'sample-summary' });
+
+  return {
+    lpIds: distinctSorted(lpRows.map((r) => r.lpId)),
+    equipmentIds: distinctSorted(lpRows.map((r) => r.equipmentId)),
+    areas: distinctSorted(lpRows.map((r) => r.area)),
+    contractors: distinctSorted(lpRows.map((r) => r.contractorId)),
+    oilTypes: distinctSorted(lpRows.map((r) => r.oilType)),
+    reportStatuses: distinctSorted(samples.map((s) => resolveReportStatus(s))),
+    equipmentStatuses: ['normal', 'caution', 'alert', 'pending', 'none', 'overdue'],
+  };
 }
 
-export function listReportContractors(): string[] {
-  const contractors = new Set<string>();
-  for (const row of oilSampleService.list()) {
-    if (row.contractorId.trim()) contractors.add(row.contractorId);
-  }
-  return [...contractors].sort();
+/** @deprecated Use getReportFilterOptions(scope).areas */
+export function listReportAreas(scope: OilAnalysisContractorScope): string[] {
+  return [...getReportFilterOptions(scope).areas];
 }
 
-export function generateOilReport(filters: OilReportFilters): OilReportOutput {
-  const key = cacheKey(filters);
+/** @deprecated Use getReportFilterOptions(scope).contractors */
+export function listReportContractors(scope: OilAnalysisContractorScope): string[] {
+  return [...getReportFilterOptions(scope).contractors];
+}
+
+export function generateOilReport(
+  scope: OilAnalysisContractorScope,
+  filters: OilReportFilters,
+): OilReportOutput {
+  const key = cacheKey(scope, filters);
   const cached = reportCache.get(key);
   if (cached) return cached;
 
-  const allRows = oilSampleService.list().filter((row) => matchesCommonFilters(row, filters));
-
-  let report: OilReportResult;
-  switch (filters.reportType) {
-    case 'sample-summary':
-      report = buildSampleSummary(allRows);
-      break;
-    case 'critical-samples':
-      report = buildCriticalSamples(allRows);
-      break;
-    case 'pending-review':
-      report = buildPendingReview(allRows);
-      break;
-    case 'laboratory-results':
-      report = buildLaboratoryResults(allRows);
-      break;
-    case 'oil-health':
-      report = buildOilHealth(allRows);
-      break;
-    default:
-      report = buildSampleSummary(allRows);
-  }
-
+  const generatedAt = new Date().toISOString();
+  const report = buildReport(scope, filters);
   const output: OilReportOutput = {
     filters,
     kpis: buildKpis(report),
     report,
-    generatedAt: new Date().toISOString(),
+    generatedAt,
+    reference: buildReference(filters.reportType, generatedAt),
   };
 
   reportCache.set(key, output);
   return output;
 }
+
+export function hasReportData(output: OilReportOutput): boolean {
+  const { report } = output;
+  return (
+    report.tableRows.length > 0 ||
+    report.breakdowns.some((b) => b.rows.length > 0) ||
+    report.charts.some((c) => c.slices.some((s) => s.value > 0))
+  );
+}
+
+export type { SampleCondition };
