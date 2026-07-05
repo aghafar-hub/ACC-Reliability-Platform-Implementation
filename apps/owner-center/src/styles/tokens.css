@@ -1,0 +1,72 @@
+/* apps/owner-center/src/styles/tokens.css
+   ACC UI-V2 — Design Token Foundation (Milestone UI-V2-01)
+   Scope: additive only. All tokens are namespaced --accv2-* so they cannot
+   collide with or override the existing --acc-* tokens used by components/ui.
+   Nothing here is consumed outside components/ui-v2 and the Oil Analysis
+   Dashboard screen. */
+
+:root {
+  /* ── Surfaces ── */
+  --accv2-bg-canvas: #f2f4f7;
+  --accv2-surface: #ffffff;
+  --accv2-surface-dark: #0b1420;
+  --accv2-surface-dark-alt: #14212e;
+  --accv2-border: #dbe1e8;
+  --accv2-border-dark: #243241;
+
+  /* ── Text ── */
+  --accv2-text-primary: #0f172a;
+  --accv2-text-secondary: #57616e;
+  --accv2-text-muted: #8b96a3;
+  --accv2-text-inverse: #eef2f6;
+  --accv2-text-inverse-muted: #8fa0b0;
+
+  /* ── Brand accent (ACC leaf green — used sparingly, never for status) ── */
+  --accv2-brand: #1f7a5c;
+  --accv2-brand-strong: #145c44;
+
+  /* ── Semantic status (never repurposed for decoration) ── */
+  --accv2-status-alert: #dc2626;
+  --accv2-status-alert-bg: rgba(220, 38, 38, 0.12);
+  --accv2-status-caution: #d97706;
+  --accv2-status-caution-bg: rgba(217, 119, 6, 0.12);
+  --accv2-status-normal: #16a34a;
+  --accv2-status-normal-bg: rgba(22, 163, 74, 0.12);
+  --accv2-status-info: #2563eb;
+  --accv2-status-info-bg: rgba(37, 99, 235, 0.12);
+  --accv2-status-muted: #64748b;
+  --accv2-status-muted-bg: rgba(100, 116, 139, 0.12);
+
+  /* ── Typography ── */
+  --accv2-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --accv2-font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  --accv2-text-xs: 0.6875rem;
+  --accv2-text-sm: 0.75rem;
+  --accv2-text-base: 0.8125rem;
+  --accv2-text-md: 0.9375rem;
+  --accv2-text-lg: 1.125rem;
+  --accv2-text-xl: 1.375rem;
+  --accv2-text-2xl: 1.75rem;
+  --accv2-tracking-wide: 0.06em;
+
+  /* ── Spacing ── */
+  --accv2-space-1: 0.25rem;
+  --accv2-space-2: 0.5rem;
+  --accv2-space-3: 0.75rem;
+  --accv2-space-4: 1rem;
+  --accv2-space-5: 1.25rem;
+  --accv2-space-6: 1.5rem;
+  --accv2-space-8: 2rem;
+
+  /* ── Radius / elevation ── */
+  --accv2-radius-sm: 4px;
+  --accv2-radius-md: 8px;
+  --accv2-radius-lg: 14px;
+  --accv2-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --accv2-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
+  --accv2-shadow-dark: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  /* ── Motion ── */
+  --accv2-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --accv2-duration-fast: 120ms;
+}

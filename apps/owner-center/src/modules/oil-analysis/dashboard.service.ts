@@ -1,5 +1,10 @@
 // apps/owner-center/src/modules/oil-analysis/dashboard.service.ts
 // OA-006 Dashboard — contractor-scoped operational aggregates.
+// Industrial control-center redesign: KPI command strip, Critical Equipment
+// table, Today Action Queue, Review/Approval Queue, Sampling Forecast,
+// Contractor Comparison, single consolidated Recent Activity feed.
+// Charts limited to Equipment Health + Sample Trend (each answers a decision
+// question) — Oil Type Distribution dropped (informational only).
 
 import { getPlatformSdk } from '../platform/platform-master-access';
 import type { OilAnalysisContractorScope } from './contractor-scope';
@@ -38,6 +43,7 @@ export interface DashboardFilterOptions {
   readonly oilTypes: readonly string[];
 }
 
+/** Exactly the 9 approved KPI cards — see 090_OIL_ANALYSIS_UI_FREEZE_v1.0.md OA-006. */
 export interface DashboardKpis {
   readonly totalLpsWithSampling: number;
   readonly alertEquipment: number;
@@ -64,22 +70,44 @@ export interface DashboardLpRow {
   readonly lastSampleDate: string | null;
   readonly reportStatus: string;
   readonly lastAction: string;
+  readonly assignedTo: string;
 }
 
-export interface ImmediateAttentionRow {
+/** Critical Equipment table row. */
+export interface CriticalEquipmentRow {
   readonly id: string;
   readonly lpId: string;
   readonly equipmentId: string;
+  readonly equipmentName: string;
+  readonly area: string;
+  readonly contractorId: string;
   readonly reportStatus: string;
   readonly lastAction: string;
+  readonly assignedTo: string;
   readonly reason: 'alert' | 'caution' | 'overdue' | 'shutdown';
 }
 
+/** Compact stat-strip item (Review / Approval Queue). */
 export interface ReviewQueueItem {
   readonly id: string;
   readonly label: string;
   readonly count: number;
   readonly route: string;
+}
+
+/** Today Action Queue item. */
+export interface ActionQueueItem {
+  readonly id: string;
+  readonly title: string;
+  readonly count: number;
+  readonly route: string;
+}
+
+/** Forward-looking sampling load — cumulative LPs due within each window. */
+export interface SamplingForecast {
+  readonly due30: number;
+  readonly due60: number;
+  readonly due90: number;
 }
 
 export interface RecentActivityItem {
@@ -109,30 +137,20 @@ export interface ContractorComparisonBar {
   readonly normal: number;
 }
 
-export interface OilTypeSlice {
-  readonly oilType: string;
-  readonly count: number;
-}
-
 export interface DashboardCharts {
   readonly healthDistribution: readonly HealthDistributionSlice[];
   readonly monthlySampleTrend: readonly MonthlySamplePoint[];
   readonly contractorComparison: readonly ContractorComparisonBar[];
-  readonly oilTypeDistribution: readonly OilTypeSlice[];
-}
-
-export interface DashboardPriorities {
-  readonly greeting: string;
-  readonly bullets: readonly string[];
 }
 
 export interface DashboardView {
   readonly kpis: DashboardKpis;
-  readonly immediateAttention: readonly ImmediateAttentionRow[];
-  readonly needsReview: readonly ReviewQueueItem[];
+  readonly criticalEquipment: readonly CriticalEquipmentRow[];
+  readonly todayActionQueue: readonly ActionQueueItem[];
+  readonly reviewQueue: readonly ReviewQueueItem[];
+  readonly samplingForecast: SamplingForecast;
   readonly recentActivity: readonly RecentActivityItem[];
   readonly charts: DashboardCharts;
-  readonly priorities: DashboardPriorities;
 }
 
 const STATUS_RANK: Record<LpRegisterConditionStatus, number> = {
@@ -143,12 +161,25 @@ const STATUS_RANK: Record<LpRegisterConditionStatus, number> = {
   alert: 4,
 };
 
+const CRITICAL_RANK: Record<CriticalEquipmentRow['reason'], number> = {
+  shutdown: 0,
+  alert: 1,
+  caution: 2,
+  overdue: 3,
+};
+
 function distinctSorted(values: readonly string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 }
 
 function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function addDays(isoDate: string, days: number): string {
+  const d = new Date(`${isoDate}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 function applyContractorScope(
@@ -187,6 +218,14 @@ function latestSampleByLp(samples: readonly OilSampleRow[]): Map<string, OilSamp
     if (!existing || sample.sampledAt.localeCompare(existing.sampledAt) > 0) {
       map.set(lpId, sample);
     }
+  }
+  return map;
+}
+
+function assignedToByLp(): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const action of engineeringActionService.listLatestByLp({ source: 'Oil Analysis' })) {
+    if (action.lpId) map.set(action.lpId, action.assignedTo?.trim() || '—');
   }
   return map;
 }
@@ -285,6 +324,7 @@ function buildEnrichedRows(
 ): DashboardLpRow[] {
   const samples = oilSampleService.list();
   const latestByLp = latestSampleByLp(samples);
+  const assignees = assignedToByLp();
   const baseRows = lpRegisterService.buildRows(scope);
 
   return baseRows
@@ -305,6 +345,7 @@ function buildEnrichedRows(
         lastSampleDate: row.lastSampleDate,
         reportStatus: resolveReportStatus(sample),
         lastAction: resolveLastAction(sample),
+        assignedTo: assignees.get(row.lpId) ?? '—',
       };
     });
 }
@@ -323,8 +364,8 @@ function scopedSamples(
   });
 }
 
-function buildImmediateAttention(rows: readonly DashboardLpRow[]): ImmediateAttentionRow[] {
-  const items: ImmediateAttentionRow[] = [];
+function buildCriticalEquipment(rows: readonly DashboardLpRow[]): CriticalEquipmentRow[] {
+  const items: CriticalEquipmentRow[] = [];
 
   for (const row of rows) {
     const sample = oilSampleService
@@ -337,56 +378,34 @@ function buildImmediateAttention(rows: readonly DashboardLpRow[]): ImmediateAtte
       computeSampleCondition(sample) === 'critical' &&
       /shutdown/i.test(sample.alertType);
 
-    if (row.lastSampleStatus === 'alert') {
-      items.push({
-        id: `${row.id}-alert`,
-        lpId: row.lpId,
-        equipmentId: row.equipmentId,
-        reportStatus: row.reportStatus,
-        lastAction: row.lastAction,
-        reason: shutdown ? 'shutdown' : 'alert',
-      });
-    } else if (row.lastSampleStatus === 'caution') {
-      items.push({
-        id: `${row.id}-caution`,
-        lpId: row.lpId,
-        equipmentId: row.equipmentId,
-        reportStatus: row.reportStatus,
-        lastAction: row.lastAction,
-        reason: 'caution',
-      });
-    } else if (row.isSampleOverdue) {
-      items.push({
-        id: `${row.id}-overdue`,
-        lpId: row.lpId,
-        equipmentId: row.equipmentId,
-        reportStatus: row.reportStatus,
-        lastAction: row.lastAction,
-        reason: 'overdue',
-      });
-    } else if (shutdown) {
-      items.push({
-        id: `${row.id}-shutdown`,
-        lpId: row.lpId,
-        equipmentId: row.equipmentId,
-        reportStatus: row.reportStatus,
-        lastAction: row.lastAction,
-        reason: 'shutdown',
-      });
-    }
+    let reason: CriticalEquipmentRow['reason'] | null = null;
+    if (row.lastSampleStatus === 'alert') reason = shutdown ? 'shutdown' : 'alert';
+    else if (row.lastSampleStatus === 'caution') reason = 'caution';
+    else if (row.isSampleOverdue) reason = 'overdue';
+    else if (shutdown) reason = 'shutdown';
+
+    if (!reason) continue;
+
+    items.push({
+      id: `${row.id}-${reason}`,
+      lpId: row.lpId,
+      equipmentId: row.equipmentId,
+      equipmentName: row.equipmentName,
+      area: row.area,
+      contractorId: row.contractorId,
+      reportStatus: row.reportStatus,
+      lastAction: row.lastAction,
+      assignedTo: row.assignedTo,
+      reason,
+    });
   }
 
-  const rank: Record<ImmediateAttentionRow['reason'], number> = {
-    shutdown: 0,
-    alert: 1,
-    caution: 2,
-    overdue: 3,
-  };
-
-  return items.sort((a, b) => rank[a.reason] - rank[b.reason] || a.lpId.localeCompare(b.lpId));
+  return items.sort(
+    (a, b) => CRITICAL_RANK[a.reason] - CRITICAL_RANK[b.reason] || a.lpId.localeCompare(b.lpId),
+  );
 }
 
-function buildNeedsReview(
+function buildReviewQueue(
   samples: readonly OilSampleRow[],
   openContractorActions: number,
 ): ReviewQueueItem[] {
@@ -407,33 +426,54 @@ function buildNeedsReview(
     : 0;
 
   const items: ReviewQueueItem[] = [
-    {
-      id: 'pdf-queue',
-      label: 'PDF review queue',
-      count: pdfQueue,
-      route: '/oil-analysis/add-sample',
-    },
-    {
-      id: 'pending-review',
-      label: 'Pending reviews',
-      count: pendingReview,
-      route: '/oil-analysis/samples',
-    },
+    { id: 'pdf-queue', label: 'PDF', count: pdfQueue, route: '/oil-analysis/add-sample' },
+    { id: 'pending-review', label: 'Rev', count: pendingReview, route: '/oil-analysis/samples' },
   ];
 
   if (isApprovalWorkflowEnabled()) {
+    items.push({ id: 'pending-approval', label: 'Appr', count: pendingApproval, route: '/oil-analysis/review' });
+  }
+
+  items.push({ id: 'contractor-actions', label: 'Ctr', count: openContractorActions, route: '/oil-analysis/actions' });
+
+  return items;
+}
+
+function buildTodayActionQueue(
+  kpis: Pick<DashboardKpis, 'overdueSamples' | 'pendingApproval'>,
+  pdfPendingReview: number,
+  openContractorActions: number,
+): ActionQueueItem[] {
+  const items: ActionQueueItem[] = [];
+
+  if (pdfPendingReview > 0) {
     items.push({
-      id: 'pending-approval',
-      label: 'Pending approvals',
-      count: pendingApproval,
+      id: 'action-pdf-review',
+      title: `Review ${pdfPendingReview} PDF import(s)`,
+      count: pdfPendingReview,
+      route: '/oil-analysis/add-sample',
+    });
+  }
+  if (isApprovalWorkflowEnabled() && kpis.pendingApproval > 0) {
+    items.push({
+      id: 'action-pending-approval',
+      title: `Approve ${kpis.pendingApproval} pending sample(s)`,
+      count: kpis.pendingApproval,
       route: '/oil-analysis/review',
     });
   }
-
+  if (kpis.overdueSamples > 0) {
+    items.push({
+      id: 'action-overdue',
+      title: `Resample ${kpis.overdueSamples} overdue LP(s)`,
+      count: kpis.overdueSamples,
+      route: '/oil-analysis/register',
+    });
+  }
   if (openContractorActions > 0) {
     items.push({
-      id: 'contractor-actions',
-      label: 'New contractor actions',
+      id: 'action-contractor-actions',
+      title: `Close ${openContractorActions} contractor action(s)`,
       count: openContractorActions,
       route: '/oil-analysis/actions',
     });
@@ -442,6 +482,24 @@ function buildNeedsReview(
   return items;
 }
 
+/** Cumulative count of in-scope LPs whose next sample is due within 30/60/90 days. */
+function buildSamplingForecast(rows: readonly DashboardLpRow[], today: string): SamplingForecast {
+  const d30 = addDays(today, 30);
+  const d60 = addDays(today, 60);
+  const d90 = addDays(today, 90);
+
+  const dueDates = rows
+    .map((r) => r.nextSampleDate)
+    .filter((d): d is string => d !== null && d >= today);
+
+  return {
+    due30: dueDates.filter((d) => d <= d30).length,
+    due60: dueDates.filter((d) => d <= d60).length,
+    due90: dueDates.filter((d) => d <= d90).length,
+  };
+}
+
+/** Single consolidated, chronologically-sorted activity feed (dense — capped to 8 rows). */
 function buildRecentActivity(
   samples: readonly OilSampleRow[],
   records: readonly OcRecord[],
@@ -452,7 +510,7 @@ function buildRecentActivity(
   for (const sample of [...samples]
     .filter((s) => s.importSource === 'pdf-import' || s.status === 'imported')
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 5)) {
+    .slice(0, 4)) {
     items.push({
       id: `sample-${sample.id}`,
       kind: 'sample',
@@ -470,6 +528,7 @@ function buildRecentActivity(
       title: sample.alertType.trim(),
       subtitle: `${sample.lubricationPointId ?? sample.equipmentId} · ${sample.sampleId}`,
       isoDate: sample.updatedAt.slice(0, 10),
+      route: '/oil-analysis/actions',
     });
   }
 
@@ -481,7 +540,7 @@ function buildRecentActivity(
     })
     .filter((r) => r.status !== 'cancelled')
     .sort((a, b) => b.performedAt.localeCompare(a.performedAt))
-    .slice(0, 5)) {
+    .slice(0, 3)) {
     items.push({
       id: `oc-${record.id}`,
       kind: 'oil-change',
@@ -506,7 +565,7 @@ function buildRecentActivity(
 
   return items
     .sort((a, b) => b.isoDate.localeCompare(a.isoDate))
-    .slice(0, 12);
+    .slice(0, 8);
 }
 
 function buildHealthDistribution(rows: readonly DashboardLpRow[]): HealthDistributionSlice[] {
@@ -560,81 +619,6 @@ function buildContractorComparison(rows: readonly DashboardLpRow[]): ContractorC
   });
 }
 
-function buildOilTypeDistribution(rows: readonly DashboardLpRow[]): OilTypeSlice[] {
-  const map = new Map<string, number>();
-  for (const row of rows) {
-    const key = row.oilType || '—';
-    map.set(key, (map.get(key) ?? 0) + 1);
-  }
-  return [...map.entries()]
-    .map(([oilType, count]) => ({ oilType, count }))
-    .sort((a, b) => b.count - a.count);
-}
-
-function buildPriorities(
-  kpis: DashboardKpis,
-  pdfPendingReview: number,
-  locale: string,
-  displayName: string,
-): DashboardPriorities {
-  const hour = new Date().getHours();
-  const period =
-    hour < 12
-      ? locale === 'ar' ? 'صباح الخير' : 'Good morning'
-      : hour < 17
-        ? locale === 'ar' ? 'مساء الخير' : 'Good afternoon'
-        : locale === 'ar' ? 'مساء الخير' : 'Good evening';
-
-  const name = displayName.trim() || (locale === 'ar' ? 'المهندس' : 'Engineer');
-  const greeting = `${period}, ${name}`;
-
-  const bullets: string[] = [];
-  if (kpis.alertEquipment > 0) {
-    bullets.push(
-      locale === 'ar'
-        ? `${kpis.alertEquipment} معدة بحالة تنبيه تتطلب إجراءً.`
-        : `${kpis.alertEquipment} alert equipment item(s) need action.`,
-    );
-  }
-  if (kpis.pendingReview > 0) {
-    bullets.push(
-      locale === 'ar'
-        ? `${kpis.pendingReview} عينة بانتظار المراجعة.`
-        : `${kpis.pendingReview} sample(s) awaiting review.`,
-    );
-  }
-  if (pdfPendingReview > 0) {
-    bullets.push(
-      locale === 'ar'
-        ? `${pdfPendingReview} تقرير PDF بانتظار المراجعة.`
-        : `${pdfPendingReview} PDF report(s) waiting review.`,
-    );
-  }
-  if (kpis.samplesDueToday > 0) {
-    bullets.push(
-      locale === 'ar'
-        ? `${kpis.samplesDueToday} عينة مستحقة اليوم.`
-        : `${kpis.samplesDueToday} sample(s) due today.`,
-    );
-  }
-  if (kpis.overdueSamples > 0) {
-    bullets.push(
-      locale === 'ar'
-        ? `${kpis.overdueSamples} عينة متأخرة عن الجدول.`
-        : `${kpis.overdueSamples} overdue sample(s).`,
-    );
-  }
-  if (bullets.length === 0) {
-    bullets.push(
-      locale === 'ar'
-        ? 'لا توجد أولويات حرجة اليوم — راجع النشاط الأخير أدناه.'
-        : 'No critical priorities today — review recent activity below.',
-    );
-  }
-
-  return { greeting, bullets };
-}
-
 export class OilAnalysisDashboardService {
   getFilterOptions(scope: OilAnalysisContractorScope): DashboardFilterOptions {
     const rows = buildEnrichedRows(scope);
@@ -649,8 +633,6 @@ export class OilAnalysisDashboardService {
   load(
     scope: OilAnalysisContractorScope,
     params: DashboardFilterParams = {},
-    locale = 'en',
-    displayName = '',
   ): DashboardView {
     const contractorFilter = applyContractorScope(scope, params.contractor);
     const allRows = buildEnrichedRows(scope, contractorFilter);
@@ -707,12 +689,16 @@ export class OilAnalysisDashboardService {
         return lpIdSet.has(r.lpId);
       });
 
-    const priorities = buildPriorities(kpis, pdfPendingReview, locale, displayName);
-
     return {
       kpis,
-      immediateAttention: buildImmediateAttention(rows),
-      needsReview: buildNeedsReview(samples, openContractorActions),
+      criticalEquipment: buildCriticalEquipment(rows),
+      todayActionQueue: buildTodayActionQueue(
+        { overdueSamples: kpis.overdueSamples, pendingApproval: kpis.pendingApproval },
+        pdfPendingReview,
+        openContractorActions,
+      ),
+      reviewQueue: buildReviewQueue(samples, openContractorActions),
+      samplingForecast: buildSamplingForecast(rows, today),
       recentActivity: buildRecentActivity(samples, ocRecords, contractorFilter),
       charts: {
         healthDistribution: buildHealthDistribution(rows),
@@ -720,9 +706,7 @@ export class OilAnalysisDashboardService {
         contractorComparison: scope.canViewAllContractors
           ? buildContractorComparison(rows)
           : buildContractorComparison(rows.filter((r) => r.contractorId === contractorFilter)),
-        oilTypeDistribution: buildOilTypeDistribution(rows),
       },
-      priorities,
     };
   }
 }

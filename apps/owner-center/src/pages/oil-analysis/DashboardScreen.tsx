@@ -1,38 +1,35 @@
 // apps/owner-center/src/pages/oil-analysis/DashboardScreen.tsx
-// OA-006 Oil Analysis Dashboard — operational command center.
+// OA-006 Oil Analysis Dashboard — UI-V2 premium industrial rebuild (Milestone UI-V2-01).
+// Built entirely on apps/owner-center/src/components/ui-v2 — the legacy
+// components/ui set is untouched and still used by every other screen.
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { usePlatformSdk } from '../../context/SdkContext';
+import { useIsMobile } from '../../components/ui';
 import {
-  CardList,
+  Accordion,
+  BarChart,
   DataTable,
-  ErrorState,
+  DonutChart,
   FilterBar,
-  KpiCard,
-  KpiGrid,
-  PageHeader,
-  SectionCard,
-  StatusBadge,
-  useIsMobile,
-} from '../../components/ui';
-import type {
-  CardListField,
-  DataTableColumn,
-  FilterFieldConfig,
-  HealthSeverity,
-  StatusBadgeVariant,
-} from '../../components/ui';
+  KpiTile,
+  LineChart,
+  Panel,
+  StatusChip,
+  type DataTableColumnV2,
+  type FilterFieldConfigV2,
+  type Severity,
+} from '../../components/ui-v2';
 import { resolveOilAnalysisContractorScope } from '../../modules/oil-analysis/contractor-scope';
 import { isApprovalWorkflowEnabled } from '../../modules/oil-analysis/settings-guards';
 import {
   oilAnalysisDashboardService,
-  type ContractorComparisonBar,
+  type ActionQueueItem,
+  type CriticalEquipmentRow,
   type DashboardFilterParams,
-  type HealthDistributionSlice,
-  type ImmediateAttentionRow,
   type MonthlySamplePoint,
   type RecentActivityItem,
   type ReviewQueueItem,
@@ -45,340 +42,98 @@ function t<T>(bundle: L10n<T>, locale: string): T {
 }
 
 const COPY = {
-  title: { en: 'Oil Analysis Dashboard', ar: 'لوحة تحليل الزيت' },
-  subtitle: {
-    en: 'What requires your attention today?',
-    ar: 'ما الذي يتطلب انتباهك اليوم؟',
-  },
-  search: { en: 'Search LP, equipment, area…', ar: 'ابحث عن نقطة التشحيم أو المعدة أو المنطقة…' },
-  filterLp: { en: 'LP_ID', ar: 'LP_ID' },
+  eyebrow: { en: 'Oil Analysis', ar: 'تحليل الزيت' },
+  title: { en: 'Reliability Command Center', ar: 'مركز تحكم الموثوقية' },
+  search: { en: 'Search LP ID, equipment…', ar: 'ابحث عن نقطة التشحيم أو المعدة…' },
   filterArea: { en: 'Area', ar: 'المنطقة' },
   filterContractor: { en: 'Contractor', ar: 'المقاول' },
   filterOilType: { en: 'Oil Type', ar: 'نوع الزيت' },
   filterStatus: { en: 'Status', ar: 'الحالة' },
-  filterDate: { en: 'Date', ar: 'التاريخ' },
-  filterAll: { en: 'All', ar: 'الكل' },
-  clearFilters: { en: 'Clear filters', ar: 'مسح الفلاتر' },
-  kpiTotalSampling: { en: 'Total LPs with Sampling', ar: 'إجمالي نقاط التشحيم مع عينات' },
-  kpiAlertEquip: { en: 'Alert Equipment', ar: 'معدات تنبيه' },
-  kpiCautionEquip: { en: 'Caution Equipment', ar: 'معدات حذر' },
-  kpiNormalEquip: { en: 'Normal Equipment', ar: 'معدات طبيعية' },
-  kpiDueToday: { en: 'Samples Due Today', ar: 'عينات مستحقة اليوم' },
-  kpiOverdue: { en: 'Overdue Samples', ar: 'عينات متأخرة' },
+  reset: { en: 'Reset', ar: 'إعادة تعيين' },
+  kpiTotal: { en: 'Total LPs', ar: 'إجمالي النقاط' },
+  kpiAlert: { en: 'Alert', ar: 'تنبيه' },
+  kpiCaution: { en: 'Caution', ar: 'حذر' },
+  kpiNormal: { en: 'Normal', ar: 'طبيعي' },
+  kpiDueToday: { en: 'Due Today', ar: 'مستحق اليوم' },
+  kpiOverdue: { en: 'Overdue', ar: 'متأخر' },
   kpiPendingReview: { en: 'Pending Review', ar: 'بانتظار المراجعة' },
   kpiPendingApproval: { en: 'Pending Approval', ar: 'بانتظار الاعتماد' },
   kpiOpenActions: { en: 'Open Actions', ar: 'إجراءات مفتوحة' },
-  secImmediate: { en: 'Equipment Requiring Immediate Attention', ar: 'معدات تتطلب اهتماماً فورياً' },
-  secNeedsReview: { en: 'Needs Review', ar: 'تحتاج مراجعة' },
+  secCritical: { en: 'Critical Equipment', ar: 'المعدات الحرجة' },
+  secActionQueue: { en: 'Today Action Queue', ar: 'قائمة إجراءات اليوم' },
+  secReviewQueue: { en: 'Review / Approval', ar: 'المراجعة / الاعتماد' },
+  secForecast: { en: 'Sampling Forecast', ar: 'توقعات جمع العينات' },
+  secAnalytics: { en: 'Analytics', ar: 'التحليلات' },
   secRecent: { en: 'Recent Activity', ar: 'النشاط الأخير' },
-  secCharts: { en: 'Analytics', ar: 'التحليلات' },
-  secPriorities: { en: "Today's Priorities", ar: 'أولويات اليوم' },
-  chartHealth: { en: 'Equipment Health Distribution', ar: 'توزيع صحة المعدات' },
-  chartTrend: { en: 'Monthly Sample Trend', ar: 'اتجاه العينات الشهري' },
-  chartContractor: { en: 'Contractor Comparison', ar: 'مقارنة المقاولين' },
-  chartOilType: { en: 'Oil Type Distribution', ar: 'توزيع أنواع الزيت' },
   colLp: { en: 'LP_ID', ar: 'LP_ID' },
-  colReportStatus: { en: 'Report Status', ar: 'حالة التقرير' },
-  colLastAction: { en: 'Last Action', ar: 'آخر إجراء' },
-  emptyAttention: { en: 'No equipment requires immediate attention.', ar: 'لا توجد معدات تتطلب اهتماماً فورياً.' },
-  emptyRecent: { en: 'No recent activity in scope.', ar: 'لا يوجد نشاط حديث ضمن النطاق.' },
-  emptyCharts: { en: 'Insufficient data for charts.', ar: 'بيانات غير كافية للمخططات.' },
+  colEquip: { en: 'Equip', ar: 'المعدة' },
+  colArea: { en: 'Area', ar: 'المنطقة' },
+  colContractor: { en: 'Contr', ar: 'المقاول' },
+  colStatus: { en: 'Status', ar: 'الحالة' },
+  colAction: { en: 'Action', ar: 'الإجراء' },
+  colOpen: { en: '', ar: '' },
+  chartContractor: { en: 'Contractor Comparison', ar: 'مقارنة المقاولين' },
+  chartHealth: { en: 'Equipment Health', ar: 'صحة المعدات' },
+  chartTrend: { en: 'Sample Trend', ar: 'اتجاه العينات' },
+  emptyCritical: { en: 'No critical equipment.', ar: 'لا توجد معدات حرجة.' },
+  emptyQueue: { en: 'Nothing pending.', ar: 'لا يوجد شيء معلّق.' },
+  emptyRecent: { en: 'No recent activity.', ar: 'لا يوجد نشاط حديث.' },
   errorLoad: { en: 'Unable to load dashboard.', ar: 'تعذر تحميل لوحة المعلومات.' },
-  statusNormal: { en: 'Normal', ar: 'طبيعي' },
-  statusCaution: { en: 'Caution', ar: 'حذر' },
   statusAlert: { en: 'Alert', ar: 'تنبيه' },
-  statusPending: { en: 'Pending', ar: 'قيد الانتظار' },
-  statusNone: { en: 'No sample', ar: 'لا توجد عينة' },
+  statusCaution: { en: 'Caution', ar: 'حذر' },
   statusOverdue: { en: 'Overdue', ar: 'متأخر' },
-  activitySample: { en: 'Imported sample', ar: 'عينة مستوردة' },
-  activityAction: { en: 'Action', ar: 'إجراء' },
-  activityOilChange: { en: 'Oil change', ar: 'تغيير زيت' },
-  activityComment: { en: 'Comment', ar: 'تعليق' },
+  footerNote: { en: 'System time · auto-refresh', ar: 'وقت النظام · تحديث تلقائي' },
+  lastUpdated: { en: 'Last updated', ar: 'آخر تحديث' },
+  due30: { en: '30d', ar: '30' },
+  due60: { en: '60d', ar: '60' },
+  due90: { en: '90d', ar: '90' },
 } as const;
 
-const STATUS_FILTER_OPTIONS: ReadonlyArray<{ value: string; label: L10n<string> }> = [
-  { value: 'normal', label: COPY.statusNormal },
+const STATUS_OPTIONS: ReadonlyArray<{ value: string; label: L10n<string> }> = [
+  { value: 'normal', label: { en: 'Normal', ar: 'طبيعي' } },
   { value: 'caution', label: COPY.statusCaution },
   { value: 'alert', label: COPY.statusAlert },
-  { value: 'pending', label: COPY.statusPending },
-  { value: 'none', label: COPY.statusNone },
+  { value: 'pending', label: { en: 'Pending', ar: 'قيد الانتظار' } },
+  { value: 'none', label: { en: 'No sample', ar: 'لا توجد عينة' } },
   { value: 'overdue', label: COPY.statusOverdue },
 ];
 
-const HEALTH_COLORS: Record<string, string> = {
-  alert: 'var(--acc-color-alert, #dc2626)',
-  caution: 'var(--acc-color-caution, #d97706)',
-  overdue: 'var(--acc-color-warning, #ca8a04)',
-  pending: 'var(--acc-color-pending, #6366f1)',
-  normal: 'var(--acc-color-normal, #16a34a)',
-  none: 'var(--acc-color-muted, #94a3b8)',
-};
-
-function kpiSeverity(value: number, warnAbove = 0): HealthSeverity {
+function kpiSeverity(value: number, warnAbove = 0): Severity {
   if (value <= warnAbove) return 'info';
   if (value < 5) return 'caution';
-  return 'critical';
+  return 'alert';
 }
 
-function attentionBadge(reason: ImmediateAttentionRow['reason']): {
-  variant: StatusBadgeVariant;
-  label: string;
-} {
-  switch (reason) {
-    case 'alert':
-    case 'shutdown':
-      return { variant: 'alert', label: 'Alert' };
-    case 'caution':
-      return { variant: 'caution', label: 'Caution' };
-    case 'overdue':
-      return { variant: 'overdue', label: 'Overdue' };
-    default:
-      return { variant: 'disabled', label: '—' };
-  }
+function reasonSeverity(reason: CriticalEquipmentRow['reason']): Severity {
+  if (reason === 'alert' || reason === 'shutdown') return 'alert';
+  return 'caution';
 }
 
-function activityKindLabel(kind: RecentActivityItem['kind'], locale: string): string {
-  const map: Record<RecentActivityItem['kind'], L10n<string>> = {
-    sample: COPY.activitySample,
-    action: COPY.activityAction,
-    'oil-change': COPY.activityOilChange,
-    comment: COPY.activityComment,
-  };
-  return t(map[kind], locale);
+function reasonLabel(reason: CriticalEquipmentRow['reason'], locale: string): string {
+  if (reason === 'alert' || reason === 'shutdown') return t(COPY.statusAlert, locale);
+  if (reason === 'overdue') return t(COPY.statusOverdue, locale);
+  return t(COPY.statusCaution, locale);
 }
 
-interface BarChartProps {
-  readonly title: string;
-  readonly labels: readonly string[];
-  readonly values: readonly number[];
-  readonly colors?: readonly string[];
-}
-
-function SimpleBarChart({ title, labels, values, colors }: BarChartProps): React.ReactElement {
-  const max = Math.max(...values, 1);
-  const width = 320;
-  const height = 180;
-  const pad = { top: 16, right: 12, bottom: 36, left: 12 };
-  const innerW = width - pad.left - pad.right;
-  const innerH = height - pad.top - pad.bottom;
-  const barW = innerW / Math.max(labels.length, 1) - 8;
-
-  return (
-    <div className="acc-oa-dashboard__chart">
-      <h3 className="acc-oa-dashboard__chart-title">{title}</h3>
-      {values.every((v) => v === 0) ? (
-        <p className="acc-oa-dashboard__chart-empty">—</p>
-      ) : (
-        <svg
-          className="acc-oa-dashboard__chart-svg"
-          viewBox={`0 0 ${width} ${height}`}
-          role="img"
-          aria-label={title}
-        >
-          {labels.map((label, i) => {
-            const value = values[i] ?? 0;
-            const barH = (value / max) * innerH;
-            const x = pad.left + i * (barW + 8);
-            const y = pad.top + innerH - barH;
-            const fill = colors?.[i] ?? 'var(--acc-color-primary, #2563eb)';
-            return (
-              <g key={label}>
-                <rect x={x} y={y} width={barW} height={barH} rx={3} fill={fill} />
-                <text
-                  x={x + barW / 2}
-                  y={height - 8}
-                  className="acc-oa-dashboard__chart-label"
-                  textAnchor="middle"
-                >
-                  {label.length > 8 ? `${label.slice(0, 7)}…` : label}
-                </text>
-                {value > 0 && (
-                  <text
-                    x={x + barW / 2}
-                    y={y - 4}
-                    className="acc-oa-dashboard__chart-value"
-                    textAnchor="middle"
-                  >
-                    {value}
-                  </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-      )}
-    </div>
-  );
-}
-
-interface DonutChartProps {
-  readonly title: string;
-  readonly slices: readonly { label: string; value: number; color: string }[];
-}
-
-function SimpleDonutChart({ title, slices }: DonutChartProps): React.ReactElement {
-  const total = slices.reduce((sum, s) => sum + s.value, 0);
-  const size = 160;
-  const r = 56;
-  const cx = size / 2;
-  const cy = size / 2;
-  let angle = -90;
-
-  const arcs = slices.map((slice) => {
-    const sweep = total > 0 ? (slice.value / total) * 360 : 0;
-    const start = angle;
-    angle += sweep;
-    const startRad = (start * Math.PI) / 180;
-    const endRad = ((start + sweep) * Math.PI) / 180;
-    const x1 = cx + r * Math.cos(startRad);
-    const y1 = cy + r * Math.sin(startRad);
-    const x2 = cx + r * Math.cos(endRad);
-    const y2 = cy + r * Math.sin(endRad);
-    const large = sweep > 180 ? 1 : 0;
-    const d =
-      sweep <= 0
-        ? ''
-        : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
-    return { ...slice, d };
-  });
-
-  return (
-    <div className="acc-oa-dashboard__chart">
-      <h3 className="acc-oa-dashboard__chart-title">{title}</h3>
-      {total === 0 ? (
-        <p className="acc-oa-dashboard__chart-empty">—</p>
-      ) : (
-        <>
-          <svg
-            className="acc-oa-dashboard__chart-svg acc-oa-dashboard__chart-svg--donut"
-            viewBox={`0 0 ${size} ${size}`}
-            role="img"
-            aria-label={title}
-          >
-            {arcs.map((arc) =>
-              arc.d ? <path key={arc.label} d={arc.d} fill={arc.color} /> : null,
-            )}
-            <circle cx={cx} cy={cy} r={r * 0.55} fill="var(--acc-surface, #fff)" />
-            <text x={cx} y={cy + 4} className="acc-oa-dashboard__chart-center" textAnchor="middle">
-              {total}
-            </text>
-          </svg>
-          <ul className="acc-oa-dashboard__chart-legend">
-            {slices.map((slice) => (
-              <li key={slice.label}>
-                <span className="acc-oa-dashboard__legend-swatch" style={{ background: slice.color }} />
-                {slice.label} ({slice.value})
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  );
-}
-
-function ContractorComparisonChart({
-  title,
-  bars,
-}: {
-  readonly title: string;
-  readonly bars: readonly ContractorComparisonBar[];
-}): React.ReactElement {
-  const labels = bars.map((b) => b.contractorId);
-  const alertValues = bars.map((b) => b.alert);
-  const cautionValues = bars.map((b) => b.caution);
-  const normalValues = bars.map((b) => b.normal);
-
-  const max = Math.max(...alertValues, ...cautionValues, ...normalValues, 1);
-  const width = 320;
-  const height = 200;
-  const pad = { top: 16, right: 12, bottom: 40, left: 12 };
-  const groupW = (width - pad.left - pad.right) / Math.max(bars.length, 1);
-  const barW = Math.min(14, groupW / 4);
-
-  return (
-    <div className="acc-oa-dashboard__chart">
-      <h3 className="acc-oa-dashboard__chart-title">{title}</h3>
-      {bars.length === 0 ? (
-        <p className="acc-oa-dashboard__chart-empty">—</p>
-      ) : (
-        <>
-          <svg
-            className="acc-oa-dashboard__chart-svg"
-            viewBox={`0 0 ${width} ${height}`}
-            role="img"
-            aria-label={title}
-          >
-            {bars.map((bar, i) => {
-              const gx = pad.left + i * groupW + groupW / 2;
-              const series = [
-                { value: bar.alert, color: HEALTH_COLORS.alert },
-                { value: bar.caution, color: HEALTH_COLORS.caution },
-                { value: bar.normal, color: HEALTH_COLORS.normal },
-              ];
-              return (
-                <g key={bar.contractorId}>
-                  {series.map((s, j) => {
-                    const h = (s.value / max) * (height - pad.top - pad.bottom);
-                    const x = gx - barW * 1.5 + j * (barW + 2);
-                    const y = height - pad.bottom - h;
-                    return (
-                      <rect
-                        key={j}
-                        x={x}
-                        y={y}
-                        width={barW}
-                        height={h}
-                        rx={2}
-                        fill={s.color}
-                      />
-                    );
-                  })}
-                  <text
-                    x={gx}
-                    y={height - 10}
-                    className="acc-oa-dashboard__chart-label"
-                    textAnchor="middle"
-                  >
-                    {bar.contractorId}
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
-          <ul className="acc-oa-dashboard__chart-legend acc-oa-dashboard__chart-legend--inline">
-            <li><span style={{ background: HEALTH_COLORS.alert }} className="acc-oa-dashboard__legend-swatch" />Alert</li>
-            <li><span style={{ background: HEALTH_COLORS.caution }} className="acc-oa-dashboard__legend-swatch" />Caution</li>
-            <li><span style={{ background: HEALTH_COLORS.normal }} className="acc-oa-dashboard__legend-swatch" />Normal</li>
-          </ul>
-        </>
-      )}
-    </div>
-  );
-}
-
-function healthLabel(slice: HealthDistributionSlice, locale: string): string {
-  const map: Record<string, L10n<string>> = {
-    alert: COPY.statusAlert,
-    caution: COPY.statusCaution,
-    normal: COPY.statusNormal,
-    pending: COPY.statusPending,
-    none: COPY.statusNone,
-    overdue: COPY.statusOverdue,
-  };
-  return t(map[slice.status] ?? COPY.statusNone, locale);
-}
+const HEALTH_COLORS: Record<string, string> = {
+  alert: 'var(--accv2-status-alert)',
+  caution: 'var(--accv2-status-caution)',
+  overdue: 'var(--accv2-status-caution)',
+  pending: 'var(--accv2-status-info)',
+  normal: 'var(--accv2-status-normal)',
+  none: 'var(--accv2-status-muted)',
+};
 
 export default function DashboardScreen(): React.ReactElement {
   const { locale } = useLanguage();
   const l = useCallback((bundle: L10n<string>) => t(bundle, locale), [locale]);
   const sdk = usePlatformSdk();
-  const { status: authStatus, user } = useAuth();
+  const { status: authStatus } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const criticalRef = useRef<HTMLDivElement>(null);
 
   const [search, setSearch] = useState('');
-  const [lpId, setLpId] = useState('');
   const [area, setArea] = useState('');
   const [contractor, setContractor] = useState('');
   const [oilType, setOilType] = useState('');
@@ -386,15 +141,11 @@ export default function DashboardScreen(): React.ReactElement {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const contractorScope = useMemo(
-    () => resolveOilAnalysisContractorScope(sdk),
-    [sdk],
-  );
+  const contractorScope = useMemo(() => resolveOilAnalysisContractorScope(sdk), [sdk]);
 
   const filterParams = useMemo<DashboardFilterParams>(
     () => ({
       search,
-      lpId: lpId || undefined,
       area: area || undefined,
       contractor: contractor || undefined,
       oilType: oilType || undefined,
@@ -402,7 +153,7 @@ export default function DashboardScreen(): React.ReactElement {
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     }),
-    [search, lpId, area, contractor, oilType, status, dateFrom, dateTo],
+    [search, area, contractor, oilType, status, dateFrom, dateTo],
   );
 
   const dashboardData = useMemo(() => {
@@ -411,12 +162,7 @@ export default function DashboardScreen(): React.ReactElement {
     }
     try {
       const filterOptions = oilAnalysisDashboardService.getFilterOptions(contractorScope);
-      const view = oilAnalysisDashboardService.load(
-        contractorScope,
-        filterParams,
-        locale,
-        user?.displayName ?? '',
-      );
+      const view = oilAnalysisDashboardService.load(contractorScope, filterParams);
       return { view, filterOptions, error: null as string | null };
     } catch (err) {
       return {
@@ -425,7 +171,7 @@ export default function DashboardScreen(): React.ReactElement {
         error: err instanceof Error ? err.message : 'Load failed',
       };
     }
-  }, [authStatus, contractorScope, filterParams, locale, user?.displayName]);
+  }, [authStatus, contractorScope, filterParams]);
 
   const { view, filterOptions, error } = dashboardData as {
     view: ReturnType<typeof oilAnalysisDashboardService.load> | null;
@@ -433,93 +179,29 @@ export default function DashboardScreen(): React.ReactElement {
     error: string | null;
   };
 
-  const activeFilterCount = [lpId, area, contractor, oilType, status, dateFrom, dateTo].filter(Boolean).length;
+  const activeFilterCount = [area, contractor, oilType, status, dateFrom, dateTo].filter(Boolean).length;
 
-  const filters: FilterFieldConfig[] = useMemo(() => {
-    const fields: FilterFieldConfig[] = [
-      {
-        id: 'lpId',
-        label: l(COPY.filterLp),
-        type: 'select',
-        value: lpId,
-        placeholder: l(COPY.filterAll),
-        options: filterOptions.lpIds.map((value) => ({ value, label: value })),
-      },
-      {
-        id: 'area',
-        label: l(COPY.filterArea),
-        type: 'select',
-        value: area,
-        placeholder: l(COPY.filterAll),
-        options: filterOptions.areas.map((value) => ({ value, label: value })),
-      },
-      {
-        id: 'oilType',
-        label: l(COPY.filterOilType),
-        type: 'select',
-        value: oilType,
-        placeholder: l(COPY.filterAll),
-        options: filterOptions.oilTypes.map((value) => ({ value, label: value })),
-      },
-      {
-        id: 'status',
-        label: l(COPY.filterStatus),
-        type: 'select',
-        value: status,
-        placeholder: l(COPY.filterAll),
-        options: STATUS_FILTER_OPTIONS.map((opt) => ({
-          value: opt.value,
-          label: l(opt.label),
-        })),
-      },
-      {
-        id: 'date',
-        label: l(COPY.filterDate),
-        type: 'date-range',
-        valueFrom: dateFrom,
-        valueTo: dateTo,
-      },
+  const filters: FilterFieldConfigV2[] = useMemo(() => {
+    const fields: FilterFieldConfigV2[] = [
+      { id: 'area', label: l(COPY.filterArea), type: 'select', value: area, placeholder: l(COPY.filterArea), options: filterOptions.areas.map((v) => ({ value: v, label: v })) },
+      { id: 'oilType', label: l(COPY.filterOilType), type: 'select', value: oilType, placeholder: l(COPY.filterOilType), options: filterOptions.oilTypes.map((v) => ({ value: v, label: v })) },
+      { id: 'status', label: l(COPY.filterStatus), type: 'select', value: status, placeholder: l(COPY.filterStatus), options: STATUS_OPTIONS.map((o) => ({ value: o.value, label: l(o.label) })) },
+      { id: 'date', label: '', type: 'date-range', valueFrom: dateFrom, valueTo: dateTo },
     ];
-
     if (contractorScope.canViewAllContractors) {
-      fields.splice(2, 0, {
-        id: 'contractor',
-        label: l(COPY.filterContractor),
-        type: 'select',
-        value: contractor,
-        placeholder: l(COPY.filterAll),
-        options: filterOptions.contractors.map((value) => ({ value, label: value })),
-      });
+      fields.splice(1, 0, { id: 'contractor', label: l(COPY.filterContractor), type: 'select', value: contractor, placeholder: l(COPY.filterContractor), options: filterOptions.contractors.map((v) => ({ value: v, label: v })) });
     }
-
     return fields;
-  }, [
-    area,
-    contractor,
-    contractorScope.canViewAllContractors,
-    dateFrom,
-    dateTo,
-    filterOptions,
-    l,
-    lpId,
-    oilType,
-    status,
-  ]);
+  }, [area, contractor, contractorScope.canViewAllContractors, dateFrom, dateTo, filterOptions, l, oilType, status]);
 
-  const handleClearFilters = (): void => {
-    setSearch('');
-    setLpId('');
-    setArea('');
+  const handleClear = (): void => {
+    setSearch(''); setArea('');
     if (contractorScope.canViewAllContractors) setContractor('');
-    setOilType('');
-    setStatus('');
-    setDateFrom('');
-    setDateTo('');
+    setOilType(''); setStatus(''); setDateFrom(''); setDateTo('');
   };
 
   const handleFilterChange = (id: string, value: string): void => {
     switch (id) {
-      case 'lpId': setLpId(value); break;
       case 'area': setArea(value); break;
       case 'contractor': setContractor(value); break;
       case 'oilType': setOilType(value); break;
@@ -528,112 +210,129 @@ export default function DashboardScreen(): React.ReactElement {
     }
   };
 
+  const scrollToCritical = (): void => {
+    criticalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const filterToStatus = (value: string): void => {
+    setStatus(value);
+    setDateFrom(''); setDateTo('');
+    scrollToCritical();
+  };
+
+  const filterToToday = (): void => {
+    const today = new Date().toISOString().slice(0, 10);
+    setStatus('');
+    setDateFrom(today);
+    setDateTo(today);
+    scrollToCritical();
+  };
+
   const openEquipment = (equipmentId: string, lp?: string): void => {
     const qs = lp ? `?lp=${encodeURIComponent(lp)}` : '';
     navigate(`/oil-analysis/equipment/${encodeURIComponent(equipmentId)}${qs}`);
   };
 
-  const attentionColumns: DataTableColumn<ImmediateAttentionRow>[] = useMemo(
+  const criticalColumns: DataTableColumnV2<CriticalEquipmentRow>[] = useMemo(
     () => [
-      { id: 'lpId', header: l(COPY.colLp), accessor: 'lpId', sortable: true },
+      { id: 'lpId', header: l(COPY.colLp), accessor: 'lpId', mono: true },
+      { id: 'equipmentName', header: l(COPY.colEquip), accessor: 'equipmentName' },
+      { id: 'area', header: l(COPY.colArea), accessor: 'area' },
+      { id: 'contractorId', header: l(COPY.colContractor), accessor: 'contractorId' },
       {
         id: 'reportStatus',
-        header: l(COPY.colReportStatus),
-        accessor: 'reportStatus',
-        sortable: true,
+        header: l(COPY.colStatus),
+        renderCell: (row) => <StatusChip label={reasonLabel(row.reason, locale)} severity={reasonSeverity(row.reason)} />,
       },
       {
         id: 'lastAction',
-        header: l(COPY.colLastAction),
+        header: l(COPY.colAction),
+        renderCell: (row) => <span title={row.lastAction}>{row.lastAction}</span>,
+      },
+      {
+        id: 'open',
+        header: l(COPY.colOpen),
         renderCell: (row) => (
-          <span className="acc-oa-dashboard__action-cell" title={row.lastAction}>
-            {row.lastAction}
-          </span>
+          <button
+            type="button"
+            className="accv2-queue-item"
+            style={{ padding: '0.15rem 0.5rem' }}
+            onClick={(e) => { e.stopPropagation(); openEquipment(row.equipmentId, row.lpId); }}
+          >
+            →
+          </button>
         ),
       },
     ],
-    [l],
+    [l, locale],
   );
 
-  const attentionCardFields: CardListField<ImmediateAttentionRow>[] = useMemo(
-    () => [
-      { id: 'lpId', label: l(COPY.colLp), render: (row) => row.lpId, emphasize: true },
-      { id: 'reportStatus', label: l(COPY.colReportStatus), render: (row) => row.reportStatus },
-      { id: 'lastAction', label: l(COPY.colLastAction), render: (row) => row.lastAction },
-    ],
-    [l],
-  );
-
-  const renderReviewItem = (item: ReviewQueueItem): React.ReactElement => (
-    <button
-      key={item.id}
-      type="button"
-      className="acc-oa-dashboard__review-item"
-      onClick={() => navigate(item.route)}
-    >
-      <span className="acc-oa-dashboard__review-label">{item.label}</span>
-      <StatusBadge
-        variant={item.count > 0 ? 'pending-review' : 'normal'}
-        label={String(item.count)}
-        size="sm"
-      />
+  const renderActionItem = (item: ActionQueueItem): React.ReactElement => (
+    <button key={item.id} type="button" className="accv2-queue-item" onClick={() => navigate(item.route)}>
+      ☐ {item.title}
     </button>
   );
 
-  const renderActivityItem = (item: RecentActivityItem): React.ReactElement => (
-    <li key={item.id} className="acc-oa-dashboard__activity-item">
-      <div className="acc-oa-dashboard__activity-head">
-        <StatusBadge variant="info" label={activityKindLabel(item.kind, locale)} size="sm" />
-        <time className="acc-oa-dashboard__activity-date" dateTime={item.isoDate}>
-          {item.isoDate}
-        </time>
-      </div>
-      <button
-        type="button"
-        className="acc-oa-dashboard__activity-link"
-        onClick={() => item.route && navigate(item.route)}
-        disabled={!item.route}
-      >
-        <span className="acc-oa-dashboard__activity-title">{item.title}</span>
-        <span className="acc-oa-dashboard__activity-sub">{item.subtitle}</span>
+  const renderQueueStat = (item: ReviewQueueItem): React.ReactElement => (
+    <button key={item.id} type="button" className="accv2-stat-chip" onClick={() => navigate(item.route)}>
+      <strong>{item.count}</strong> {item.label}
+    </button>
+  );
+
+  const renderRecentItem = (item: RecentActivityItem): React.ReactElement => (
+    <li key={item.id} className="accv2-recent-row">
+      <span className="accv2-recent-kind">{item.kind}</span>
+      <button type="button" className="accv2-recent-link" onClick={() => item.route && navigate(item.route)} disabled={!item.route}>
+        <span className="accv2-recent-title">{item.title}</span>
+        <span className="accv2-recent-sub">{item.subtitle} · {item.isoDate}</span>
       </button>
     </li>
   );
 
   if (error) {
-    return <ErrorState title={l(COPY.errorLoad)} message={error} />;
+    return (
+      <div className="accv2-dashboard">
+        <Panel title={l(COPY.errorLoad)}><p>{error}</p></Panel>
+      </div>
+    );
   }
 
   const kpis = view?.kpis;
   const charts = view?.charts;
-
-  const healthSlices = (charts?.healthDistribution ?? []).map((slice) => ({
-    label: healthLabel(slice, locale),
-    value: slice.count,
-    color: HEALTH_COLORS[slice.status] ?? HEALTH_COLORS.none,
-  }));
-
+  const forecast = view?.samplingForecast;
+  const criticalRows = view ? [...view.criticalEquipment] : [];
   const trendPoints = charts?.monthlySampleTrend ?? [];
-  const oilTypeSlices = [...(charts?.oilTypeDistribution ?? [])];
+  const maxForecast = forecast ? Math.max(forecast.due30, forecast.due60, forecast.due90, 1) : 1;
 
   return (
-    <div className="acc-oa-dashboard">
-      <PageHeader title={l(COPY.title)} subtitle={l(COPY.subtitle)} />
+    <div className="accv2-dashboard">
+      <div className="accv2-command-strip">
+        <div className="accv2-command-strip__header">
+          <div>
+            <span className="accv2-command-strip__eyebrow">{l(COPY.eyebrow)}</span>
+            <h1 className="accv2-command-strip__title">{l(COPY.title)}</h1>
+          </div>
+          <span className="accv2-command-strip__clock">
+            {new Date().toLocaleString(locale === 'ar' ? 'ar' : undefined)}
+          </span>
+        </div>
 
-      {view && (
-        <SectionCard
-          title={view.priorities.greeting}
-          subtitle={l(COPY.secPriorities)}
-          className="acc-oa-dashboard__priorities"
-          bodyClassName="acc-oa-dashboard__priorities-body"
-        >
-          <ul className="acc-oa-dashboard__priority-list">
-            {view.priorities.bullets.map((bullet) => (
-              <li key={bullet}>{bullet}</li>
-            ))}
-          </ul>
-        </SectionCard>
-      )}
+        {kpis && (
+          <div className="accv2-kpi-row">
+            <KpiTile value={kpis.totalLpsWithSampling} label={l(COPY.kpiTotal)} severity="info" onClick={() => navigate('/oil-analysis/register')} />
+            <KpiTile value={kpis.alertEquipment} label={l(COPY.kpiAlert)} severity={kpiSeverity(kpis.alertEquipment)} onClick={() => filterToStatus('alert')} />
+            <KpiTile value={kpis.cautionEquipment} label={l(COPY.kpiCaution)} severity={kpiSeverity(kpis.cautionEquipment)} onClick={() => filterToStatus('caution')} />
+            <KpiTile value={kpis.normalEquipment} label={l(COPY.kpiNormal)} severity="normal" onClick={() => filterToStatus('normal')} />
+            <KpiTile value={kpis.samplesDueToday} label={l(COPY.kpiDueToday)} severity={kpiSeverity(kpis.samplesDueToday)} onClick={filterToToday} />
+            <KpiTile value={kpis.overdueSamples} label={l(COPY.kpiOverdue)} severity={kpiSeverity(kpis.overdueSamples)} onClick={() => filterToStatus('overdue')} />
+            <KpiTile value={kpis.pendingReview} label={l(COPY.kpiPendingReview)} severity={kpiSeverity(kpis.pendingReview)} onClick={() => navigate('/oil-analysis/samples')} />
+            {isApprovalWorkflowEnabled() && (
+              <KpiTile value={kpis.pendingApproval} label={l(COPY.kpiPendingApproval)} severity={kpiSeverity(kpis.pendingApproval)} onClick={() => navigate('/oil-analysis/review')} />
+            )}
+            <KpiTile value={kpis.openActions} label={l(COPY.kpiOpenActions)} severity={kpiSeverity(kpis.openActions)} onClick={() => navigate('/oil-analysis/actions')} />
+          </div>
+        )}
+      </div>
 
       <FilterBar
         searchValue={search}
@@ -643,128 +342,98 @@ export default function DashboardScreen(): React.ReactElement {
         onFilterChange={handleFilterChange}
         onDateFromChange={(_id, value) => setDateFrom(value)}
         onDateToChange={(_id, value) => setDateTo(value)}
-        onClear={handleClearFilters}
-        clearLabel={l(COPY.clearFilters)}
+        onClear={handleClear}
+        clearLabel={l(COPY.reset)}
         activeFilterCount={activeFilterCount}
-        className="acc-oa-dashboard__filters"
       />
 
-      {kpis && (
-        <KpiGrid desktopColumns={8} className="acc-oa-dashboard__kpis">
-          <KpiCard value={kpis.totalLpsWithSampling} label={l(COPY.kpiTotalSampling)} severity="info" />
-          <KpiCard
-            value={kpis.alertEquipment}
-            label={l(COPY.kpiAlertEquip)}
-            severity={kpiSeverity(kpis.alertEquipment)}
-          />
-          <KpiCard
-            value={kpis.cautionEquipment}
-            label={l(COPY.kpiCautionEquip)}
-            severity={kpiSeverity(kpis.cautionEquipment)}
-          />
-          <KpiCard value={kpis.normalEquipment} label={l(COPY.kpiNormalEquip)} severity="normal" />
-          <KpiCard
-            value={kpis.samplesDueToday}
-            label={l(COPY.kpiDueToday)}
-            severity={kpiSeverity(kpis.samplesDueToday)}
-          />
-          <KpiCard
-            value={kpis.overdueSamples}
-            label={l(COPY.kpiOverdue)}
-            severity={kpiSeverity(kpis.overdueSamples)}
-          />
-          <KpiCard
-            value={kpis.pendingReview}
-            label={l(COPY.kpiPendingReview)}
-            severity={kpiSeverity(kpis.pendingReview)}
-          />
-          {isApprovalWorkflowEnabled() && (
-            <KpiCard
-              value={kpis.pendingApproval}
-              label={l(COPY.kpiPendingApproval)}
-              severity={kpiSeverity(kpis.pendingApproval)}
-            />
-          )}
-          <KpiCard
-            value={kpis.openActions}
-            label={l(COPY.kpiOpenActions)}
-            severity={kpiSeverity(kpis.openActions)}
-          />
-        </KpiGrid>
-      )}
-
-      <SectionCard
-        title={l(COPY.secImmediate)}
-        className="acc-oa-dashboard__attention"
-        empty={!view || view.immediateAttention.length === 0}
-        emptyTitle={l(COPY.emptyAttention)}
-      >
-        {view && view.immediateAttention.length > 0 && (
-          isMobile ? (
-            <CardList
-              items={[...view.immediateAttention]}
-              fields={attentionCardFields}
-              getStatus={(row) => attentionBadge(row.reason)}
-              onItemClick={(row) => openEquipment(row.equipmentId, row.lpId)}
-            />
-          ) : (
-            <DataTable
-              columns={attentionColumns}
-              data={[...view.immediateAttention]}
-              onRowClick={(row) => openEquipment(row.equipmentId, row.lpId)}
-              getRowStatus={(row) => attentionBadge(row.reason)}
-              stickyHeader
-            />
-          )
-        )}
-      </SectionCard>
-
-      <div className="acc-oa-dashboard__zones">
-        <SectionCard title={l(COPY.secNeedsReview)} className="acc-oa-dashboard__zone">
-          {view && (
-            <div className="acc-oa-dashboard__review-list">
-              {view.needsReview.map(renderReviewItem)}
-            </div>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title={l(COPY.secRecent)}
-          className="acc-oa-dashboard__zone"
-          empty={!view || view.recentActivity.length === 0}
-          emptyTitle={l(COPY.emptyRecent)}
+      <div className="accv2-main-grid" ref={criticalRef}>
+        <Panel
+          title={l(COPY.secCritical)}
+          empty={!view || criticalRows.length === 0}
+          emptyLabel={l(COPY.emptyCritical)}
         >
-          {view && view.recentActivity.length > 0 && (
-            <ul className="acc-oa-dashboard__activity-list" role="list">
-              {view.recentActivity.map(renderActivityItem)}
-            </ul>
+          {view && criticalRows.length > 0 && (
+            <DataTable
+              columns={criticalColumns}
+              data={criticalRows}
+              onRowClick={(row) => openEquipment(row.equipmentId, row.lpId)}
+              getRowSeverity={(row) => reasonSeverity(row.reason)}
+            />
           )}
-        </SectionCard>
+        </Panel>
+
+        <div className="accv2-sidebar">
+          <Accordion title={l(COPY.secActionQueue)} isMobile={isMobile}>
+            {view && view.todayActionQueue.length > 0 ? (
+              <div className="accv2-queue-list">{view.todayActionQueue.map(renderActionItem)}</div>
+            ) : (
+              <p className="accv2-panel__empty">{l(COPY.emptyQueue)}</p>
+            )}
+          </Accordion>
+
+          <Accordion title={l(COPY.secReviewQueue)} isMobile={isMobile}>
+            {view && <div className="accv2-stat-strip">{view.reviewQueue.map(renderQueueStat)}</div>}
+          </Accordion>
+
+          <Accordion title={l(COPY.secForecast)} isMobile={isMobile}>
+            {forecast && (
+              <div className="accv2-forecast-bars">
+                <div className="accv2-forecast-row">
+                  <span>{l(COPY.due30)}</span>
+                  <span className="accv2-forecast-track"><span className="accv2-forecast-fill" style={{ width: `${(forecast.due30 / maxForecast) * 100}%` }} /></span>
+                  <strong>{forecast.due30}</strong>
+                </div>
+                <div className="accv2-forecast-row">
+                  <span>{l(COPY.due60)}</span>
+                  <span className="accv2-forecast-track"><span className="accv2-forecast-fill" style={{ width: `${(forecast.due60 / maxForecast) * 100}%` }} /></span>
+                  <strong>{forecast.due60}</strong>
+                </div>
+                <div className="accv2-forecast-row">
+                  <span>{l(COPY.due90)}</span>
+                  <span className="accv2-forecast-track"><span className="accv2-forecast-fill" style={{ width: `${(forecast.due90 / maxForecast) * 100}%` }} /></span>
+                  <strong>{forecast.due90}</strong>
+                </div>
+              </div>
+            )}
+          </Accordion>
+        </div>
       </div>
 
-      <SectionCard title={l(COPY.secCharts)} className="acc-oa-dashboard__charts-section">
+      <Accordion title={l(COPY.secAnalytics)} isMobile={isMobile} className="accv2-analytics">
         {charts ? (
-          <div className="acc-oa-dashboard__charts">
-            <SimpleDonutChart title={l(COPY.chartHealth)} slices={healthSlices} />
-            <SimpleBarChart
+          <div className="accv2-charts-row">
+            <BarChart
+              title={l(COPY.chartContractor)}
+              groups={charts.contractorComparison.map((b) => ({ label: b.contractorId, alert: b.alert, caution: b.caution, normal: b.normal }))}
+            />
+            <DonutChart
+              title={l(COPY.chartHealth)}
+              slices={charts.healthDistribution.map((s) => ({ label: s.status, value: s.count, color: HEALTH_COLORS[s.status] ?? HEALTH_COLORS.none }))}
+            />
+            <LineChart
               title={l(COPY.chartTrend)}
               labels={trendPoints.map((p: MonthlySamplePoint) => p.label)}
               values={trendPoints.map((p) => p.count)}
             />
-            <ContractorComparisonChart
-              title={l(COPY.chartContractor)}
-              bars={charts.contractorComparison}
-            />
-            <SimpleBarChart
-              title={l(COPY.chartOilType)}
-              labels={oilTypeSlices.map((s) => s.oilType)}
-              values={oilTypeSlices.map((s) => s.count)}
-            />
           </div>
         ) : (
-          <p className="acc-oa-dashboard__chart-empty">{l(COPY.emptyCharts)}</p>
+          <p className="accv2-panel__empty">—</p>
         )}
-      </SectionCard>
+      </Accordion>
+
+      <Accordion title={l(COPY.secRecent)} isMobile={isMobile}>
+        {view && view.recentActivity.length > 0 ? (
+          <ul className="accv2-recent-list" role="list">{view.recentActivity.map(renderRecentItem)}</ul>
+        ) : (
+          <p className="accv2-panel__empty">{l(COPY.emptyRecent)}</p>
+        )}
+      </Accordion>
+
+      <div className="accv2-footer-bar">
+        <span>{l(COPY.footerNote)}</span>
+        <span>{l(COPY.lastUpdated)}: {new Date().toLocaleTimeString(locale === 'ar' ? 'ar' : undefined)}</span>
+      </div>
     </div>
   );
 }

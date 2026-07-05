@@ -2281,23 +2281,6 @@
   overflow-x: hidden;
 }
 
-.acc-oa-dashboard__priorities {
-  margin-bottom: 0;
-}
-
-.acc-oa-dashboard__priorities-body {
-  padding-top: 0;
-}
-
-.acc-oa-dashboard__priority-list {
-  margin: 0;
-  padding-inline-start: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  color: var(--acc-text-secondary, #475569);
-}
-
 .acc-oa-dashboard__filters {
   margin-bottom: 0;
 }
@@ -2319,73 +2302,208 @@
   text-align: start;
 }
 
-.acc-oa-dashboard__zones {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--acc-space-4, 1rem);
+.acc-oa-dashboard__open-btn {
+  border: 1px solid var(--acc-border, #e2e8f0);
+  border-radius: var(--acc-radius-sm, 6px);
+  background: var(--acc-surface, #fff);
+  cursor: pointer;
+  padding: 0.2rem 0.6rem;
 }
 
-.acc-oa-dashboard__review-list {
+.acc-oa-dashboard__open-btn:hover {
+  border-color: var(--acc-color-primary, #2563eb);
+  color: var(--acc-color-primary, #2563eb);
+}
+
+/* main layout: critical equipment table (dominant) | sidebar (action queue, review queue, forecast) */
+.acc-oa-dashboard__main-grid {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr;
+  gap: var(--acc-space-3, 0.75rem);
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .acc-oa-dashboard__main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.acc-oa-dashboard__sidebar {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--acc-space-3, 0.75rem);
 }
 
-.acc-oa-dashboard__review-item {
+.acc-oa-dashboard__zone {
+  margin-bottom: 0;
+}
+
+.acc-oa-dashboard__compact-empty {
+  margin: 0;
+  padding: 0.25rem 0;
+  font-size: 0.8125rem;
+  color: var(--acc-text-muted, #94a3b8);
+}
+
+/* Today Action Queue — dense checklist */
+.acc-oa-dashboard__queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.acc-oa-dashboard__queue-item {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: var(--acc-radius-sm, 6px);
+  background: none;
+  cursor: pointer;
+  text-align: start;
+  font-size: 0.8125rem;
+  color: var(--acc-text-primary, #0f172a);
+}
+
+.acc-oa-dashboard__queue-item:hover {
+  background: var(--acc-surface-hover, #f8fafc);
+}
+
+/* Review / Approval — inline compact stat chips */
+.acc-oa-dashboard__stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.acc-oa-dashboard__stat-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--acc-border, #e2e8f0);
+  border-radius: 999px;
+  background: var(--acc-surface, #fff);
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--acc-text-secondary, #64748b);
+}
+
+.acc-oa-dashboard__stat-chip:hover {
+  border-color: var(--acc-color-primary, #2563eb);
+}
+
+.acc-oa-dashboard__stat-chip strong {
+  color: var(--acc-text-primary, #0f172a);
+}
+
+/* Sampling Forecast — 3 compact inline bar rows */
+.acc-oa-dashboard__forecast-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.acc-oa-dashboard__forecast-row {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr 2rem;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.acc-oa-dashboard__forecast-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--acc-border, #e2e8f0);
+  overflow: hidden;
+  display: block;
+}
+
+.acc-oa-dashboard__forecast-track span {
+  display: block;
+  height: 100%;
+  background: var(--acc-color-primary, #2563eb);
+}
+
+/* mobile accordion — collapsed by default, replaces SectionCard on secondary zones */
+.acc-oa-dashboard__accordion {
+  border: 1px solid var(--acc-border, #e2e8f0);
+  border-radius: var(--acc-radius-md, 8px);
+  background: var(--acc-surface, #fff);
+  padding: 0.6rem 0.75rem;
+}
+
+.acc-oa-dashboard__accordion summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--acc-text-primary, #0f172a);
+  list-style: none;
+}
+
+.acc-oa-dashboard__accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.acc-oa-dashboard__accordion summary::before {
+  content: '▸ ';
+}
+
+.acc-oa-dashboard__accordion[open] summary::before {
+  content: '▾ ';
+}
+
+.acc-oa-dashboard__accordion-body {
+  padding-top: 0.5rem;
+}
+
+.acc-oa-dashboard__footer-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  width: 100%;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid var(--acc-border, #e2e8f0);
-  border-radius: var(--acc-radius-md, 8px);
-  background: var(--acc-surface, #fff);
-  cursor: pointer;
-  text-align: start;
-  min-height: var(--acc-touch-min, 44px);
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--acc-border, #e2e8f0);
+  font-size: 0.75rem;
+  color: var(--acc-text-muted, #94a3b8);
+  flex-wrap: wrap;
 }
 
-.acc-oa-dashboard__review-item:hover {
-  border-color: var(--acc-color-primary, #2563eb);
-  background: var(--acc-surface-hover, #f8fafc);
-}
-
-.acc-oa-dashboard__review-label {
-  font-weight: 500;
-  color: var(--acc-text-primary, #0f172a);
-}
-
-.acc-oa-dashboard__activity-list {
+/* Recent Activity — single dense list */
+.acc-oa-dashboard__recent-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.35rem;
+  max-height: 260px;
+  overflow-y: auto;
 }
 
-.acc-oa-dashboard__activity-item {
+.acc-oa-dashboard__recent-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   border-bottom: 1px solid var(--acc-border, #e2e8f0);
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.35rem;
 }
 
-.acc-oa-dashboard__activity-item:last-child {
+.acc-oa-dashboard__recent-row:last-child {
   border-bottom: none;
   padding-bottom: 0;
 }
 
-.acc-oa-dashboard__activity-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.35rem;
-}
-
-.acc-oa-dashboard__activity-date {
-  font-size: 0.75rem;
-  color: var(--acc-text-muted, #94a3b8);
+.acc-oa-dashboard__recent-kind {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--acc-surface-hover, #f1f5f9);
+  color: var(--acc-text-secondary, #64748b);
 }
 
 .acc-oa-dashboard__activity-link {
@@ -2420,6 +2538,22 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--acc-space-4, 1rem);
+}
+
+.acc-oa-dashboard__charts--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1000px) {
+  .acc-oa-dashboard__charts--three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .acc-oa-dashboard__charts--three {
+    grid-template-columns: 1fr;
+  }
 }
 
 .acc-oa-dashboard__chart {
