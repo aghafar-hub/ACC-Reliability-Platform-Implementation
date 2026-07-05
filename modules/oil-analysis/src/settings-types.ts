@@ -33,6 +33,9 @@ export type OilAnalysisDateFormat =
   | 'MM/DD/YYYY'
   | 'DD-MMM-YYYY';
 
+/** Combined timeline flow direction (OA-007). */
+export type OilAnalysisTimelineDirection = 'ltr' | 'rtl';
+
 /** Numeric thresholds for a single parameter (monitor → caution → critical). */
 export interface OilAnalysisParameterThresholds {
   readonly monitor: number | null;
@@ -82,6 +85,8 @@ export interface OilAnalysisLaboratorySettings {
     readonly percent: string;
   };
   readonly dateFormat: OilAnalysisDateFormat;
+  /** OA-007 — horizontal timeline event order. */
+  readonly timelineDirection: OilAnalysisTimelineDirection;
 }
 
 /** Section 4 — condition rule descriptions (thresholds live on parameters). */
