@@ -2,6 +2,9 @@
 // UI-V2 premium industrial component set — barrel export.
 // Additive namespace: does not replace apps/owner-center/src/components/ui.
 
+export { PlatformHeader } from './PlatformHeader';
+export type { PlatformHeaderProps } from './PlatformHeader';
+
 export { KpiTile } from './KpiTile';
 export type { KpiTileProps } from './KpiTile';
 

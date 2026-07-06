@@ -636,3 +636,98 @@
     padding-inline: var(--accv2-space-4);
   }
 }
+
+/* -- Platform Header (Sprint 01A) --------------------------------------
+   Desktop/laptop layout only -- no responsive interaction logic. Narrow
+   viewports fall back to a plain flex-wrap below; mobile-specific
+   interaction (an overflow menu, etc.) is Sprint 01C, not this rule.
+   Uses the fixed identity-chrome surface tokens (--accv2-surface-dark /
+   -dark-alt), which per 101 Section 9 never invert with the app's light/dark
+   theme -- this header looks the same regardless of data-theme. */
+.accv2-platform-header {
+  display: flex;
+  align-items: center;
+  gap: var(--accv2-space-4);
+  min-height: var(--accv2-header-height);
+  padding-inline: var(--accv2-space-6);
+  background: linear-gradient(160deg, var(--accv2-surface-dark) 0%, var(--accv2-surface-dark-alt) 100%);
+  box-shadow: var(--accv2-shadow-dark);
+  color: var(--accv2-text-inverse);
+  font-family: var(--accv2-font-sans);
+}
+
+.accv2-platform-header__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--accv2-space-3);
+  flex-shrink: 0;
+}
+
+.accv2-platform-header__brand-logo {
+  height: 28px;
+  width: auto;
+}
+
+.accv2-platform-header__brand-name {
+  font-size: var(--accv2-text-md);
+  font-weight: 700;
+  color: var(--accv2-text-inverse);
+}
+
+.accv2-platform-header__brand-subtitle {
+  font-size: var(--accv2-text-xs);
+  color: var(--accv2-text-inverse-muted);
+  margin-inline-start: var(--accv2-space-2);
+}
+
+.accv2-platform-header__contractor {
+  display: flex;
+  align-items: center;
+  padding-inline-start: var(--accv2-space-3);
+  border-inline-start: 1px solid var(--accv2-border-dark);
+}
+
+.accv2-platform-header__contractor-logo {
+  height: 22px;
+  width: auto;
+}
+
+.accv2-platform-header__contractor-name {
+  font-size: var(--accv2-text-sm);
+  color: var(--accv2-text-inverse-muted);
+}
+
+.accv2-platform-header__spacer {
+  flex: 1 1 auto;
+}
+
+.accv2-platform-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--accv2-space-2);
+  flex-wrap: wrap;
+}
+
+.accv2-platform-header__slot {
+  display: flex;
+  align-items: center;
+}
+
+.accv2-platform-header__sep {
+  width: 1px;
+  align-self: stretch;
+  margin-block: var(--accv2-space-2);
+  background: var(--accv2-border-dark);
+}
+
+@media (max-width: 768px) {
+  /* Natural stacking only -- no JS, no overflow menu (Sprint 01C). */
+  .accv2-platform-header {
+    flex-wrap: wrap;
+    min-height: auto;
+    padding-block: var(--accv2-space-3);
+  }
+  .accv2-platform-header__actions {
+    row-gap: var(--accv2-space-2);
+  }
+}

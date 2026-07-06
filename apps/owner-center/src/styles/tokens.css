@@ -58,6 +58,13 @@
   --accv2-space-6: 1.5rem;
   --accv2-space-8: 2rem;
 
+  /* -- Shell --
+     Sprint 01A: matches the current shell.css --header-height (60px)
+     exactly, so mounting PlatformHeader later introduces no layout shift.
+     The approved blueprint value (56px) is deferred to the AppLayout
+     migration sprint. */
+  --accv2-header-height: 60px;
+
   /* ── Radius / elevation ── */
   --accv2-radius-sm: 4px;
   --accv2-radius-md: 8px;
