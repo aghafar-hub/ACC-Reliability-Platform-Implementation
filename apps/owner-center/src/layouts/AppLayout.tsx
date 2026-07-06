@@ -23,50 +23,14 @@ import { NotificationBell } from '../components/NotificationBell';
 import { SearchButton } from '../components/SearchButton';
 import { CommandPalette } from '../components/CommandPalette';
 import { MasterDataProviderIndicator } from '../components/MasterDataProviderIndicator';
+import { PlatformHeader } from '../components/ui-v2';
 import { useMasterDataProviderMode } from '../context/SdkContext';
 import type { LocaleCode, ThemeId } from '../types/app-types';
 import type { GuideTourId } from '../types/tour-types';
 import type { ModuleId } from '@acc-reliability/sdk';
 import type { ModuleNavItem } from '../types/module-registry-types';
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-/** ACC + optional contractor logo block — top-left of the header. */
-function BrandBlock(): React.ReactElement {
-  const { branding } = useBranding();
-  const { acc, contractor } = branding;
-
-  return (
-    <div className="brand-block" aria-label="Branding">
-      <div className="brand-acc">
-        {acc.logoSrc !== undefined ? (
-          <img className="brand-acc__logo" src={acc.logoSrc} alt="ACC logo" />
-        ) : (
-          <>
-            <span className="brand-acc__name">ACC Reliability Platform</span>
-            {acc.appName !== undefined && (
-              <span className="brand-subtitle">{acc.appName}</span>
-            )}
-          </>
-        )}
-      </div>
-
-      {contractor !== undefined && (
-        <div className="brand-contractor" aria-label="Contractor branding">
-          {contractor.logoSrc !== undefined ? (
-            <img
-              className="brand-contractor__logo"
-              src={contractor.logoSrc}
-              alt={`${contractor.displayName ?? 'Contractor'} logo`}
-            />
-          ) : contractor.displayName !== undefined ? (
-            <span className="brand-contractor__name">{contractor.displayName}</span>
-          ) : null}
-        </div>
-      )}
-    </div>
-  );
-}
+// -- Sub-components -----------------------------------------------------------
 
 /** Toggle between EN and AR locales. */
 function LanguageToggle({
@@ -115,7 +79,7 @@ function ThemeToggle({
   );
 }
 
-/** "Guide Me" button — placeholder until tour overlay milestone. */
+/** "Guide Me" button -- placeholder until tour overlay milestone. */
 function GuideMeButton(): React.ReactElement {
   const { tourState, startTour } = useTour();
 
@@ -139,7 +103,7 @@ function GuideMeButton(): React.ReactElement {
   );
 }
 
-// ── Sidebar item shape accepted by the render helper ─────────────────────────
+// -- Sidebar item shape accepted by the render helper -------------------------
 
 interface SidebarItem {
   readonly path: string;
@@ -190,14 +154,14 @@ function SidebarNavLink({
  * pages are hidden from the sidebar and accessed via Settings.
  *
  * **Module context** (when the current path starts with a business module's
- * route): Shows a "← Back to Platform" button followed by that module's own
+ * route): Shows a "<- Back to Platform" button followed by that module's own
  * `moduleNavItems`.
  *
  * Visibility rules (permission filtering):
- *  1. `alwaysVisible` items / items with no `moduleId` — always shown.
- *  2. Not authenticated — hide all permission-guarded items.
- *  3. `adminOnly` items — shown only when `canAccessAdminModule` passes.
- *  4. All other items — shown when `canAccessModule` passes.
+ *  1. `alwaysVisible` items / items with no `moduleId` -- always shown.
+ *  2. Not authenticated -- hide all permission-guarded items.
+ *  3. `adminOnly` items -- shown only when `canAccessAdminModule` passes.
+ *  4. All other items -- shown when `canAccessModule` passes.
  */
 function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
   const isAr = locale === 'ar';
@@ -236,7 +200,7 @@ function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
     [visibleModuleItems, location.pathname],
   );
 
-  // ── Module context sidebar ───────────────────────────────────────────────
+  // -- Module context sidebar ------------------------------------------------
   if (activeModule !== undefined) {
     const rawSubItems = activeModule.moduleNavItems ?? [];
     const subItems = activeModule.moduleId === 'oil-analysis'
@@ -266,7 +230,7 @@ function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
     );
   }
 
-  // ── Platform context sidebar ─────────────────────────────────────────────
+  // -- Platform context sidebar ----------------------------------------------
   return (
     <nav className="app-sidebar" aria-label="Module navigation">
       {visiblePlatformItems.map((item) => (
@@ -289,7 +253,7 @@ function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
   );
 }
 
-// ── AppLayout ─────────────────────────────────────────────────────────────────
+// -- AppLayout ------------------------------------------------------------------
 
 /**
  * Top-level shell layout.
@@ -298,13 +262,17 @@ function AppSidebar({ locale }: { locale: LocaleCode }): React.ReactElement {
  * `document.documentElement` so the full page responds to theme and locale.
  *
  * Structure:
- *   - app-header : BrandBlock | spacer | SearchButton NotificationBell LanguageToggle ThemeToggle GuideMeButton UserMenu
+ *   - PlatformHeader (ui-v2, Sprint 01B) : brand | spacer | MasterDataProviderIndicator
+ *     SearchButton NotificationBell | LanguageToggle ThemeToggle GuideMeButton | UserMenu
+ *     -- each existing control passed in unchanged via slot props; AppLayout is still the
+ *     only place that reads application context (branding/theme/locale/auth/etc).
  *   - app-body   : AppSidebar | app-content (Breadcrumb + <Outlet />)
  *   - CommandPalette (position:fixed overlay, rendered last)
  */
 export function AppLayout(): React.ReactElement {
   const { theme, setTheme } = useTheme();
   const { locale, setLocale } = useLanguage();
+  const { branding } = useBranding();
   const palette = useCommandPalette();
   const masterDataProvider = useMasterDataProviderMode();
   const showMasterDataIndicator = import.meta.env.DEV;
@@ -318,23 +286,23 @@ export function AppLayout(): React.ReactElement {
 
   return (
     <div className="app-shell" data-theme={theme} dir={dir} lang={locale}>
-      <header className="app-header" aria-label="Platform header">
-        <BrandBlock />
-        <div className="app-header__spacer" />
-        <div className="app-header__actions">
-          {showMasterDataIndicator && (
-            <MasterDataProviderIndicator mode={masterDataProvider} locale={locale} />
-          )}
-          <SearchButton locale={locale} onOpen={palette.open} />
-          <NotificationBell locale={locale} />
-          <div className="app-header__sep" aria-hidden="true" />
-          <LanguageToggle locale={locale} setLocale={setLocale} />
-          <ThemeToggle theme={theme} setTheme={setTheme} />
-          <GuideMeButton />
-          <div className="app-header__sep" aria-hidden="true" />
-          <UserMenu locale={locale} />
-        </div>
-      </header>
+      <PlatformHeader
+        accLogoSrc={branding.acc.logoSrc}
+        appName={branding.acc.appName}
+        contractorLogoSrc={branding.contractor?.logoSrc}
+        contractorName={branding.contractor?.displayName}
+        masterDataIndicatorSlot={
+          showMasterDataIndicator
+            ? <MasterDataProviderIndicator mode={masterDataProvider} locale={locale} />
+            : undefined
+        }
+        searchSlot={<SearchButton locale={locale} onOpen={palette.open} />}
+        notificationsSlot={<NotificationBell locale={locale} />}
+        languageToggleSlot={<LanguageToggle locale={locale} setLocale={setLocale} />}
+        themeToggleSlot={<ThemeToggle theme={theme} setTheme={setTheme} />}
+        guideMeSlot={<GuideMeButton />}
+        profileSlot={<UserMenu locale={locale} />}
+      />
 
       <div className="app-body">
         <AppSidebar locale={locale} />
@@ -344,7 +312,7 @@ export function AppLayout(): React.ReactElement {
         </main>
       </div>
 
-      {/* Command palette — position:fixed, overlays everything */}
+      {/* Command palette -- position:fixed, overlays everything */}
       <CommandPalette
         isOpen={palette.isOpen}
         query={palette.query}

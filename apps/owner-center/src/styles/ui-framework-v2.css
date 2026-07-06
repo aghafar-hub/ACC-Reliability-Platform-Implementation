@@ -645,6 +645,7 @@
    -dark-alt), which per 101 Section 9 never invert with the app's light/dark
    theme -- this header looks the same regardless of data-theme. */
 .accv2-platform-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: var(--accv2-space-4);
@@ -730,4 +731,109 @@
   .accv2-platform-header__actions {
     row-gap: var(--accv2-space-2);
   }
+}
+
+/* -- Platform Header visual polish (Sprint 01B-FIX) ---------------------
+   Scoped descendant overrides only -- shell.css's .search-btn/.notif-bell/
+   .user-menu/.lang-toggle/.theme-toggle/.guide-me-btn/.master-data-indicator
+   rules are untouched and still serve every other consumer. These rules
+   only take effect when those elements render inside .accv2-platform-header. */
+
+/* Unify every header control to one consistent dark-chip language,
+   regardless of each legacy component's own base rule. */
+.accv2-platform-header .search-btn,
+.accv2-platform-header .notif-bell,
+.accv2-platform-header .user-menu,
+.accv2-platform-header .lang-toggle,
+.accv2-platform-header .theme-toggle,
+.accv2-platform-header .guide-me-btn {
+  height: 36px;
+  border-radius: var(--accv2-radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.accv2-platform-header .search-btn:hover,
+.accv2-platform-header .notif-bell:hover,
+.accv2-platform-header .user-menu:hover,
+.accv2-platform-header .lang-toggle:hover,
+.accv2-platform-header .theme-toggle:hover,
+.accv2-platform-header .guide-me-btn:hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* Master Data indicator: quiet dev-only tag, not a bright light pill --
+   this was the control breaking the row's rhythm (built for the old
+   light-blue header, unstyled for a dark one). */
+.accv2-platform-header .master-data-indicator {
+  height: 36px;
+  padding: 0 var(--accv2-space-2);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--accv2-radius-sm);
+  color: var(--accv2-text-inverse-muted);
+  font-size: var(--accv2-text-xs);
+}
+
+.accv2-platform-header .master-data-indicator--apps-script {
+  border-color: rgba(31, 122, 92, 0.55);
+  color: var(--accv2-text-inverse);
+}
+
+.accv2-platform-header .master-data-indicator__label {
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.accv2-platform-header .master-data-indicator__value {
+  color: var(--accv2-text-inverse);
+  font-weight: 700;
+}
+
+/* Search icon: CSS mask (SVG) instead of the fragile U+2315 font glyph --
+   renders identically regardless of font glyph coverage. */
+.accv2-platform-header .search-btn__icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  font-size: 0;
+  line-height: 0;
+  background-color: currentColor;
+  opacity: 0.85;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+/* Brand block refinement: decorative accent mark + text lockup */
+.accv2-platform-header__brand-mark {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--accv2-brand);
+  fill: currentColor;
+}
+
+.accv2-platform-header__brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.accv2-platform-header__brand-name {
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+
+/* Signature hairline: small, restrained brand-green accent at the header's
+   bottom edge -- the one deliberate color touch beyond the dark identity
+   surface, consistent with the brand accent being rare and load-bearing. */
+.accv2-platform-header {
+  border-bottom: 1px solid var(--accv2-brand-strong);
 }

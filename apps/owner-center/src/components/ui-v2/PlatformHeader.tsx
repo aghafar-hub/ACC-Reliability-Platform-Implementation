@@ -1,17 +1,24 @@
 // apps/owner-center/src/components/ui-v2/PlatformHeader.tsx
-// Platform header — pure presentational shell (Sprint 01A).
+// Platform header -- pure presentational shell (Sprint 01A; visual polish
+// pass in Sprint 01B-FIX).
 //
 // Zero business logic: no context, no hooks, no data fetching. Brand is
 // rendered from plain data props; every interactive control (search,
 // notifications, language/theme toggles, guide-me, profile, master-data
 // indicator) is accepted as a pre-rendered slot, supplied by the caller
-// (eventually AppLayout, in a later sprint) — this component never imports
-// or knows what implementation lives behind a slot.
+// (AppLayout) -- this component never imports or knows what implementation
+// lives behind a slot.
 //
 // Desktop/laptop layout only this sprint: a single flex row. Mobile has no
-// bespoke interaction (no overflow menu, no JS) — narrow viewports fall back
-// to a plain CSS wrap, per the approved Sprint 01A scope. Responsive
-// interaction behavior is Sprint 01C.
+// bespoke interaction (no overflow menu, no JS) -- narrow viewports fall
+// back to a plain CSS wrap. Responsive interaction behavior is Sprint 01C.
+//
+// Sprint 01B-FIX: when no accLogoSrc is supplied (true today -- no default
+// branding logo is configured anywhere in the app), a small decorative
+// accent mark renders beside the text brand lockup so the "logo area"
+// reads as an intentional brand mark rather than bare text. This is a
+// hand-drawn placeholder shape, not the official raster logo asset --
+// wiring that in is a separate, later decision (see plan notes).
 
 import React from 'react';
 import { cn } from './types';
@@ -31,11 +38,11 @@ export interface PlatformHeaderProps {
   readonly searchSlot: React.ReactNode;
   /** The existing notification bell (e.g. today's `NotificationBell`), unchanged. */
   readonly notificationsSlot: React.ReactNode;
-  /** The existing language toggle, unchanged — visual redesign is future scope. */
+  /** The existing language toggle, unchanged -- visual redesign is future scope. */
   readonly languageToggleSlot: React.ReactNode;
-  /** The existing theme toggle, unchanged — visual redesign is future scope. */
+  /** The existing theme toggle, unchanged -- visual redesign is future scope. */
   readonly themeToggleSlot: React.ReactNode;
-  /** The existing "Guide Me" tour trigger, unchanged — visual redesign is future scope. */
+  /** The existing "Guide Me" tour trigger, unchanged -- visual redesign is future scope. */
   readonly guideMeSlot: React.ReactNode;
   /** The existing profile/user menu (e.g. today's `UserMenu`), unchanged. */
   readonly profileSlot: React.ReactNode;
@@ -67,12 +74,23 @@ export function PlatformHeader({
           <img className="accv2-platform-header__brand-logo" src={accLogoSrc} alt={accName ?? 'ACC logo'} />
         ) : (
           <>
-            <span className="accv2-platform-header__brand-name">
-              {accName ?? 'ACC Reliability Platform'}
+            <svg
+              className="accv2-platform-header__brand-mark"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M12 3c-1.6 3.2-3.6 4.8-3.6 8a3.6 3.6 0 007.2 0c0-3.2-2-4.8-3.6-8z" />
+              <path d="M12 13.4V21" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+            </svg>
+            <span className="accv2-platform-header__brand-text">
+              <span className="accv2-platform-header__brand-name">
+                {accName ?? 'ACC Reliability Platform'}
+              </span>
+              {appName !== undefined && (
+                <span className="accv2-platform-header__brand-subtitle">{appName}</span>
+              )}
             </span>
-            {appName !== undefined && (
-              <span className="accv2-platform-header__brand-subtitle">{appName}</span>
-            )}
           </>
         )}
 
